@@ -4,6 +4,7 @@
 #include <igl/readDMAT.h>
 #include <igl/REDRUM.h>
 #include <igl/active_set.h>
+// #include <igl/mosek/mosek_quadprog.h>
 
 #include <string>
 #include <vector>
@@ -66,79 +67,137 @@ void read_transform_from_file(const std::string &path, Eigen::MatrixXd & T)
 	igl::list_to_matrix(transforms,T);
 }
 
-void solve_weights_dense(
+void solve_weights(
 	const std::vector<Pose> & poses, 
 	const Eigen::MatrixXd & W,
-	Eigen::MatrixXd & nW)
+	Eigen::MatrixXd & nW,
+	bool use_sparse_solver = false)
 {
 	using namespace std;
 	using namespace Eigen;
 	
+	typedef Eigen::Triplet<double> Tr;
+
 	const int p = poses.size();				// #poses
 	assert(p>=1);
 	const int n = poses[0].V.rows();		// #vertices
 	const int h = poses[0].T.rows();		// #handles
 	assert( W.cols() == h );
 	
+	cout << "sparse solver: " << endl;
 	cout << "Prepare to solve weights" << endl;
-	cout << "System size: " + to_string(n*h) << endl;
+	cout << "System size: " << n*h << endl;
 	// Laplacian
-	Eigen::SparseMatrix<double> sparse_L;
-	igl::cotmatrix(poses[0].V,poses[0].F,sparse_L);
+	Eigen::SparseMatrix<double> L;
+	igl::cotmatrix(poses[0].V,poses[0].F,L);
 	
-	MatrixXd L = -MatrixXd(sparse_L);
-	assert( L.rows() == n && L.cols() == n );
-	MatrixXd G(n*h, n*h);
+	L = -L;
+	Eigen::SparseMatrix<double> A(n*h, n*h);
+	A.reserve(L.nonZeros()*h);
 	for(int i=0; i<h; i++) {
-		G.block(i*n, i*n, n, n) = L;
+		for (int k=0; k<L.outerSize(); ++k) {
+			for (SparseMatrix<double>::InnerIterator it(L,k); it; ++it)
+			{
+				A.insert(it.row()+n*i,it.col()+n*i) = it.value();
+			}
+		}
 	}
-	VectorXd g0(n*h);
-	g0.setZero();
+
+	VectorXd B(n*h);
+	B.setZero();
 	cout << "Sparse Laplacian system built." << endl;
+	cout << "Sparse L: " << L.nonZeros() << endl;
+	cout << "Sparse A: " << A.nonZeros() << " " << A.rows() << " " << A.cols() << endl;
+
+	// add soft constraints TE.X + te0 = 0, representing sum_i(w_ij*T_ij) = T_j
+	std::vector<Tr> tripletList;
+	tripletList.reserve(12*h*n);
 	
-	// add soft constraints TE^T.X + te0 = 0, representing sum_i(w_ij*T_ij) = T_j
-	MatrixXd TE(n*h,n*12*p);
 	VectorXd te0(n*12*p);
 	for(int i=0; i<p; i++) {
-		MatrixXd TE_i(n*12,n*h);
-		TE_i.setZero();
 		MatrixXd WT = W*poses[i].T;		// nx12
 		for(int k=0; k<n; k++){
 			for(int j=0; j<h; j++) {
-				TE_i.block(k*12,j*n+k,12,1) = poses[i].T.row(j).transpose();
+				for(int t=0; t<12; t++) {
+					tripletList.push_back(Tr(i*n*12+k*12+t, j*n+k, poses[i].T(j,t)));
+				}
 			}
-			te0.segment(i*12*n+k*12,12) = -WT.row(k).transpose();
+			te0.segment(i*n*12+k*12,12) = -WT.row(k).transpose();
 		}
-		TE.block(0,i*12*n,n*h,n*12) = TE_i.transpose();
 	}
-	const double penalty_weight = 1e6;
-	G += TE*TE.transpose()*penalty_weight;
-	g0 += TE*te0*penalty_weight;
-	cout << "Soft equality constraints added." << endl;
+	Eigen::SparseMatrix<double> TE(n*12*p,n*h);
+	TE.setFromTriplets(tripletList.begin(), tripletList.end());
+// 	cout << "Sparse TE: " << TE.nonZeros() << " " << TE.rows() << " " << TE.cols() << endl;
 	
-	// w_ij >= 0
-	MatrixXd CI(n*h,n*h);
-	CI.setIdentity();
-	VectorXd ci0(n*h);
-	ci0.setZero();
-	cout << "Inequality constraints built." << endl;
+	const double penalty_weight = 1e6;
+	Eigen::SparseMatrix<double> temp(TE.transpose());
+	Eigen::SparseMatrix<double> A2 = temp*TE;
+	A2 *= penalty_weight;
+
+	cout << "Sparse A2: " << A2.nonZeros() << " " << A2.rows() << " " << A2.cols() << endl;
+	A += A2;
+	B += temp*te0*penalty_weight;
+	cout << "Soft equality constraints added." << endl;	
 	
 	// equality constraints, representing sum_i(w_ij) = 1
-	MatrixXd CE(n*h,n);
-	for(int i=0; i<h; i++) {
-		CE.block(i*n,0,n,n).setIdentity();
-	}
-	VectorXd ce0(n);
-	ce0.setConstant(-1);
+	tripletList.clear();
+	tripletList.reserve(n*h);
 	
+	for(int i=0; i<h; i++) {
+		for(int j=0; j<n; j++) {
+			tripletList.push_back(Tr(j,i*n+j,1));
+		}
+	}
+	Eigen::SparseMatrix<double> Aeq(n,n*h);
+	Aeq.setFromTriplets(tripletList.begin(), tripletList.end());
+	VectorXd Beq(n);
+	Beq.setConstant(1);	
 	cout << "Equality constraints built." << endl;
 	
 	// solve
 	VectorXd X;
-	solve_quadprog(G,g0,CE,ce0,CI,ci0,X);
-	cout << GREENGIN("Weight solved.") << endl;
 	
-	cout << CE.transpose()*X+ce0 << endl;
+	if( use_sparse_solver ) {
+	
+		VectorXd lx(n*h), ux(n*h);
+		lx.setConstant(0);
+		ux.setConstant(1);
+		cout << "Inequality constraints built." << endl;
+	
+		VectorXi known;
+		VectorXd Y;
+		Eigen::SparseMatrix<double> Aieq;
+		VectorXd Bieq;
+		
+		igl::active_set_params params;
+		params.Auu_pd = true;
+		params.max_iter = 1;
+	
+		igl::active_set(A,B,known,Y,Aeq,Beq,Aieq,Bieq,lx,ux,params,X);
+	}
+	else {
+		// w_ij >= 0
+		tripletList.clear();
+		tripletList.reserve(n*h);
+	
+		for(int i=0; i<n*h; i++) {
+			tripletList.push_back(Tr(i,i,1));
+		}
+		Eigen::SparseMatrix<double> Aieq(n*h,n*h);
+		Aieq.setFromTriplets(tripletList.begin(), tripletList.end());
+		VectorXd Bieq(n*h);
+		Bieq.setZero();
+		cout << "Inequality constraints built." << endl;
+		
+		MatrixXd G = MatrixXd(A);
+		VectorXd g0 = B;
+		MatrixXd CE = MatrixXd(Aeq).transpose();
+		VectorXd ce0 = -Beq;
+		MatrixXd CI = MatrixXd(Aieq).transpose();
+		VectorXd ci0 = -Bieq;
+		solve_quadprog(G,g0,CE,ce0,CI,ci0,X);
+	}
+	cout << GREENGIN("Weight solved.") << endl;
 	
 	// reshape new weights
 	nW.resize(n,h);
@@ -146,14 +205,6 @@ void solve_weights_dense(
 		nW.col(i) = X.segment(i*n,n);
 	}
 	cout << nW << endl;
-}
-
-void solve_weights_sparse(
-	const std::vector<Pose> & poses, 
-	const Eigen::MatrixXd & W,
-	Eigen::MatrixXd & nW)
-{
-	
 }
 
 int main(int argc, char* argv[]) {
@@ -194,7 +245,8 @@ int main(int argc, char* argv[]) {
 	}
 	
 	MatrixXd nW;
-	Measure<>::execution(solve_weights_dense, poses, W, nW);
+	bool use_sparse_solver = true;
+	Measure<>::execution(solve_weights, poses, W, nW, use_sparse_solver);
 	double max_error = (nW-W).array().abs().maxCoeff();
 	cout << "max error: " << max_error << endl;
 	if( max_error > 1e-4) {

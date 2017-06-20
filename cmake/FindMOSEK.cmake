@@ -8,7 +8,10 @@
 #
 
 FIND_PATH(MOSEK_INCLUDE_DIR mosek.h
-  PATHS /usr/local/mosek/7/tools/platform/osx64x86/h/
+  PATHS
+#   "/usr/local/mosek/7/tools/platform/osx64x86/h/"
+  "$ENV{HOME}/mosek/7/tools/platform/osx64x86/h/"
+	NO_DEFAULT_PATH
     )
 
 SET(SEARCH_PATHS "${MOSEK_INCLUDE_DIR}" "${MOSEK_INCLUDE_DIR}/../bin" "${MOSEK_INCLUDE_DIR}/lib")

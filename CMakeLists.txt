@@ -9,8 +9,10 @@ include_directories( "${EIGEN_INCLUDE_DIR}" )
 ## We need libigl
 find_package(LIBIGL REQUIRED)
 include_directories( "${LIBIGL_INCLUDE_DIR}" )
-## We don't have/want MOSEK
-add_definitions(-DIGL_NO_MOSEK)
+
+## We have/want MOSEK
+find_package(MOSEK REQUIRED)
+include_directories( "${MOSEK_INCLUDE_DIR}" )
 
 ## Tetgen
 find_package(TETGEN REQUIRED)
@@ -26,6 +28,7 @@ link_directories(
 set(LIBS 
 	${COCOA_LIBRARY}
 	${LIBIGL_LIBRARIES}
+#	${MOSEK_LIBRARIES}
 	) 
 
 ## We need C++11. Put this directive after CGAL's include.
