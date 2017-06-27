@@ -28,7 +28,7 @@ link_directories(
 set(LIBS 
 	${COCOA_LIBRARY}
 	${LIBIGL_LIBRARIES}
-#	${MOSEK_LIBRARIES}
+	${MOSEK_LIBRARIES}
 	) 
 
 ## We need C++11. Put this directive after CGAL's include.
