@@ -110,8 +110,8 @@ void solve_weights(
 			}
 		}
 	}
-	Eigen::SparseMatrix<double> A(n*h, n*h);
-	A.setFromTriplets(tripletList.begin(), tripletList.end());
+	Eigen::SparseMatrix<double> A(n*h, n*h), A1(n*h, n*h);
+	A1.setFromTriplets(tripletList.begin(), tripletList.end());
 
 	VectorXd B(n*h);
 	B.setZero();
@@ -145,21 +145,23 @@ void solve_weights(
 	A2 *= penalty_weight;
 
 	cout << "Sparse A2: " << A2.nonZeros() << " " << A2.rows() << " " << A2.cols() << endl;
-	A += A2;
-	B += temp*te0*penalty_weight;
+	A = A1 + A2;
+	B = temp*te0*penalty_weight;
 	cout << "Soft equality constraints added." << endl;	
 	
 	// equality constraints, representing sum_i(w_ij) = 1
-	tripletList.clear();
-	tripletList.reserve(n*h);
+	std::vector<Tr> Aeq_TripList;
+	Aeq_TripList.clear();
+	Aeq_TripList.reserve(n*h);
 	
 	for(int i=0; i<h; i++) {
 		for(int j=0; j<n; j++) {
-			tripletList.push_back(Tr(j,i*n+j,1));
+			Aeq_TripList.push_back(Tr(j,i*n+j,1));
+			tripletList.push_back(Tr(n*12*p+j,i*n+j,1));
 		}
 	}
 	Eigen::SparseMatrix<double> Aeq(n,n*h);
-	Aeq.setFromTriplets(tripletList.begin(), tripletList.end());
+	Aeq.setFromTriplets(Aeq_TripList.begin(), Aeq_TripList.end());
 	VectorXd Beq(n);
 	Beq.setConstant(1);	
 	cout << "Equality constraints built." << endl;
@@ -167,8 +169,8 @@ void solve_weights(
 	// solve
 	VectorXd X;
 	
-	string output_system = "../models/system.DMAT";
-	igl::writeDMAT(output_system, MatrixXd(A));
+// 	string output_system = "../models/system.DMAT";
+// 	igl::writeDMAT(output_system, MatrixXd(A));
 	
 	if( solver_type == mosek ) {
 		VectorXd lx(n*h);
@@ -176,10 +178,26 @@ void solve_weights(
 		lx.setZero();
 		ux.setOnes();
 		VectorXd lc, uc;
+		SparseMatrix<double> Aieq;
+		double cf = 0.;
 		
 		// convert equality constraints to energy
-		MatrixXd EQ = Aeq*Aeq.transpose()*penalty_weight;
-// 		VectorXd eq0 = Aeq*Beq
+		Eigen::SparseMatrix<double> QE(n*12*p+n,n*h);
+		QE.setFromTriplets(tripletList.begin(), tripletList.end());
+		
+		Eigen::SparseMatrix<double> temp2(QE.transpose());
+		Eigen::SparseMatrix<double> A3 = temp2*QE;
+		A3 *= penalty_weight;
+		
+		VectorXd qe0(n*12*p+n);
+		qe0.segment(0,n*12*p) = te0;
+		qe0.segment(n*12*p,n) = -Beq;
+		
+		A = A1 + A3;
+		B = temp2*qe0*penalty_weight;
+		
+		igl::mosek::MosekData mosek_data;
+		igl::mosek::mosek_quadprog(A,B,cf,Aieq,lc,uc,lx,ux,mosek_data,X);
 		
 	} 
 	else if( solver_type == active_set ) {
@@ -315,10 +333,11 @@ void solve_weights_locally(
 // 	for(int i=0; i<n; i++)	curr_W.row(i) /= curr_W.row(i).sum();
 	
 	const double scale = 0.25;
-	const double threshold = 1e-5;
+	const double threshold = 1e-7;
 	
 	cout << "curr_W:" << endl;
 	cout << curr_W << endl;
+	vector<double> weight_diff_vec;
 	
 	for(int k=0; k<max_iter; k++) {
 		
@@ -383,10 +402,12 @@ void solve_weights_locally(
 		
 		double norm = (prev_W-curr_W).norm();
 		cout << "weight difference norm: " << norm << endl;
-		if(norm <= threshold) {
+		if( !weight_diff_vec.empty() && abs(norm - weight_diff_vec.back()) <= threshold) {
+// 		if(norm <= threshold) {
 			cout << "Stop optimization at " << k << " iterations" << endl;
 			break;
 		}
+		weight_diff_vec.push_back(norm);
 	}
 	nW = curr_W;
 }
@@ -428,12 +449,11 @@ int main(int argc, char* argv[]) {
 		poses.push_back(P);
 	}
 	
-	SolverType solver_type = eiquadprog;
+	SolverType solver_type = mosek;
 	
 	MatrixXd nW;
-	bool use_sparse_solver = true;
-	Measure<>::execution(solve_weights, poses, W, nW, solver_type);
-// 	Measure<>::execution(solve_weights_locally, poses, W, nW);
+// 	Measure<>::execution(solve_weights, poses, W, nW, solver_type);
+	Measure<>::execution(solve_weights_locally, poses, W, nW);
 	cout << nW << endl;
 	double max_error = (nW-W).array().abs().maxCoeff();
 	cout << "max error: " << max_error << endl;
@@ -443,6 +463,9 @@ int main(int argc, char* argv[]) {
 	if( max_error > 1e-4) {
 // 		cout << "Weight:\n" << nW << endl;
 	}
+	
+	// normalize weights
+	for(int i=0; i<nW.rows(); i++)	nW.row(i) /= nW.row(i).sum();
 	
 	string output_weight = pythonlike::os_path_split(weight_path).first+"-estimated.DMAT";
 	igl::writeDMAT(output_weight, nW);
