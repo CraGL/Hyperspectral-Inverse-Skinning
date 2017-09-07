@@ -18,9 +18,14 @@ This code depends on:
     make
 
 ### Running the included GUI
+View a set of poses with random coloring on each handle's influencing region.
+
 	./viewer ../models/animal/poses-1/animal-1.obj ../models/animal/poses-1/animal-2.obj ../models/animal/poses-1/animal-3.obj ../models/animal-estimated.DMAT
 	
 ### Estimate weights
+Assuming a set of poses and corresponding handle(bone)'s transformation matrices(Tmat, #handle*4-by-3) are given,
+Estimate each vertex's weights.
+
 	./estimate_weights ../models/animal/poses-*/animal-*.obj ../models/animal/poses-*/animal-*.Tmat --weight ../models/animal/animal.DMAT	
 
 ### Test the minimum volume enclosure simplex
