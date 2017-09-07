@@ -16,6 +16,7 @@ import scipy
 
 import obj_reader
 import glob
+import mves2
 
 def create_parser():
 	""" Creates an ArgumentParser for this command line tool. """
@@ -149,12 +150,27 @@ if __name__ == '__main__':
 	print( 'Unique Ts.shape:', Ts_unique.shape )
 	
 	uncorrelated = uncorrellated_space( Ts )
+	print( "uncorrelated data shape" )
 	print( uncorrelated.shape )
 	
-	import scipy.spatial
-	hull = scipy.spatial.ConvexHull( uncorrelated )
-	print( len( hull.vertices ) )
-	print( hull.vertices )
+	import os,sys
+	dirs = sys.argv[-1].split(os.path.sep)
+	assert( len(dirs) > 2 )
+	path = "benchmarks/" + dirs[-2] + "-" + dirs[-1] + ".csv"
+	print("path: ", path)
+	numpy.savetxt(path, uncorrelated, fmt="%1.6f", delimiter=",")
+	
+	
+	## Option 1: compute convex hull
+# 	import scipy.spatial
+# 	hull = scipy.spatial.ConvexHull( uncorrelated )
+# 	print( len( hull.vertices ) )
+# 	print( hull.vertices )
+
+	## Option 2: compute minimum-volume enclosing simplex
+	solution = mves2.MVES( uncorrelated )
+	print( 'solution' )
+	print( solution )
 
 #	  print("Runtime: %g" % (time.time() - startTime), file)
 

@@ -134,18 +134,19 @@ def MVES( pts ):
     
     return solution
 
-# pts = [ [ 0,1 ], [ 1,0 ], [ -2,0 ], [ 0, 0 ] ]
-# pts = [ [ 0,.9 ], [.1,.9], [ 1,0 ], [ 0, 0 ] ]
-numpy.random.seed(0)
-pts = numpy.random.random_sample((20000, 8))
-solution = MVES( pts )
-print( 'solution' )
-print( solution )
+def test():
+	# pts = [ [ 0,1 ], [ 1,0 ], [ -2,0 ], [ 0, 0 ] ]
+	# pts = [ [ 0,.9 ], [.1,.9], [ 1,0 ], [ 0, 0 ] ]
+	numpy.random.seed(0)
+	pts = numpy.random.random_sample((20000, 16))
+	solution = MVES( pts )
+	print( 'solution' )
+	print( solution )
 
-print( 'solution * data', '(', len(pts), 'data points)' )
-n, data = points_to_data( pts )
-print( numpy.dot( solution.x, data ) )
+	print( 'solution * data', '(', len(pts), 'data points)' )
+	n, data = points_to_data( pts )
+	print( numpy.dot( solution.x, data ) )
 
-simplex = numpy.linalg.inv( solution.x )
-print( 'solution simplex', simplex.shape[1], 'points' )
-print( simplex.round(2) )
+	simplex = numpy.linalg.inv( solution.x )
+	print( 'solution simplex', simplex.shape[1], 'points' )
+	print( simplex.round(2) )

@@ -84,7 +84,7 @@ endif()
 
 ## A program for rendering static scene
 add_executable(estimate_weights
-	general_barycentric_coordinates.cpp
+	estimate_weights.cpp
 	)
 target_link_libraries(estimate_weights
 	${NON_GUI_LIBS}

@@ -412,6 +412,15 @@ void solve_weights_locally(
 	nW = curr_W;
 }
 
+namespace
+{
+void usage( const char* argv0 ) {
+    std::cerr<<"Usage:"<<std::endl<<"    " << argv0 << " pos1.obj pos2.obj pos3.obj ... pos1.Tmat pos2.Tmat pos3.Tmat ... \
+    	[--weights path/to/weights_ground_truth.DMAT]"<< std::endl;
+    // exit(0) means success. Anything else means failure.
+    exit(-1);
+}
+
 int main(int argc, char* argv[]) {
 	using namespace std;
 	using namespace Eigen;
@@ -421,15 +430,16 @@ int main(int argc, char* argv[]) {
 	string weight_path;
 	MatrixXd W;
 	const bool found_weight_param = get_optional_parameter( args, "--weight", weight_path );
-	if(!igl::readDMAT(weight_path, W)) {
+	if(found_weight_param && !igl::readDMAT(weight_path, W)) {
 		cerr << "Cannot read weights from " + weight_path << endl;
-		exit(-1);
+		usage(args[0]);
 	}
 		
 	assert(args.size() >= 4 && args.size()%2 == 0);
 	vector<Pose> poses;
 	
-	for(int i=0; i<args.size(); i+=2) {
+	const int num_poses = args.size()/2;
+	for(int i=0; i<num_poses; i++) {
 		Pose P;
 		igl::read_triangle_mesh(args[i], P.V, P.F);
 		MatrixXd T;	
