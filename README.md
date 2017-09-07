@@ -4,14 +4,12 @@
 
 This code depends on:
 
-- [libigl](https://github.com/libigl/libigl)
+- [libigl](https://github.com/libigl/libigl)(e.g. `git clone https://github.com/libigl/libigl.git --recursive`)
 - [CGAL](http://www.cgal.org) (e.g. `brew install cgal`)
 - [eigen](http://eigen.tuxfamily.org/) (e.g. `brew install eigen`)
 - [GLFW3](http://www.glfw.org/) (e.g. `brew install glfw3`)
-- [numpy](http://www.numpy.org/)
-
-### Download libigl and compile the third-party dependencies
-    git clone https://github.com/libigl/libigl.git --recursive
+- [numpy](http://www.numpy.org/) (e.g. `pip install numpy`)
+- [scipy](https://www.scipy.org/) (e.g. `pip install scipy`)
 
 ### Compile this project
     mkdir build
