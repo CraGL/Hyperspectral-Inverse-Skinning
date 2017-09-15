@@ -16,7 +16,6 @@ import scipy
 
 import obj_reader
 import glob
-import mves2
 
 def create_parser():
 	""" Creates an ArgumentParser for this command line tool. """
@@ -61,20 +60,6 @@ def uniquify_points_and_return_input_index_to_unique_index_map( pts, digits = 0 
 	# return [ tuple( pt[ abs( asarray( pt ).round( digits ) - asarray( pt ) ).sum(axis=1).argmin() ] ) for i, pt in unique_pts.itervalues() ], pts_map
 	## Simplest, the first rounded point:
 	return [ tuple( pt ) for i, pt in unique_pts.itervalues() ], pts_map
-
-def read_DMAT(path):
-	lines = [line.strip() for line in open(path, 'r')]
-	num_dims,num_verts = numpy.asarray(lines[0].split(' '), dtype=numpy.int64)
-	assert(num_dims == 12)		# transformation per vertex
-		
-	T = numpy.asarray(lines[1:], dtype=numpy.float64)
-	
-	assert(len(T) == num_dims*num_verts)
-	
-	## Careful: DMAT is column-major.
-	T = T.reshape(num_dims, num_verts).T
-
-	return T
 	
 def parse_args(parser=None):
 	"""
@@ -101,7 +86,11 @@ def parse_args(parser=None):
 	meshes = [ obj_reader.quads_to_triangles(obj_reader.load_obj(in_mesh)) for in_mesh in in_meshes ]
 	
 	in_transformations = glob.glob(path + "/*.DMAT")
-	Ts = numpy.array([ read_DMAT(transform_path) for transform_path in in_transformations ])
+	import DMAT2MATLAB
+	Ts = numpy.array([ DMAT2MATLAB.load_DMAT(transform_path).T for transform_path in in_transformations ])
+	
+	handle_trans = glob.glob(path + "/*.Tmat")
+	Tmat = numpy.array([ DMAT2MATLAB.load_Tmat(transform_path).T for transform_path in handle_trans ])
 	
 	num_poses = Ts.shape[0]
 	num_verts = Ts.shape[1]
@@ -109,7 +98,10 @@ def parse_args(parser=None):
 	Ts = numpy.swapaxes(Ts,0,1)
 	Ts = Ts.reshape(num_verts, -1)
 	
-	return (meshes, Ts)
+	Tmat = numpy.swapaxes(Tmat,0,1)
+	Tmat = Tmat.reshape(Tmat.shape[0], Tmat.shape[1]*Tmat.shape[2])
+	
+	return (meshes, Ts, Tmat)
 			
 
 ## Formalize the above with functions, from Yotam's experiments
@@ -127,9 +119,44 @@ def uncorrellated_space( Ts, threshold = 1e-6 ):
 	stop_s = len(s) - numpy.searchsorted( s[::-1], threshold )
 	print( "s: ", s )
 	print( "stop_s: ", stop_s )
-		
-	return numpy.dot( Xp, V[:stop_s].T )
-				
+	
+	## Change scale to something that makes the projection of the points
+	## have unit size in each dimension...
+	# scale = array( [numpy.linalg.norm(x) for x in project( Ts ).T ] )
+	scale = numpy.array( [1./(max(x)-min(x)) for x in numpy.dot( Xp, V[:stop_s].T ).T ] )
+	print( "scale: ", scale )
+# 	scale = max( scale )
+	
+	def project( correllated_poses, scale = None ):
+		if scale is not None:
+			return numpy.multiply( numpy.dot( correllated_poses - Xavg, V[:stop_s].T ), scale )
+		else:
+			return numpy.dot( correllated_poses - Xavg, V[:stop_s].T )
+	
+	def restore( uncorrellated_poses, scale = None ):
+		if scale is not None:
+			return numpy.dot( numpy.divide( uncorrellated_poses, scale ), V[:stop_s] ) + Xavg
+		else:
+			return numpy.dot( uncorrellated_poses, V[:stop_s] ) + Xavg
+	
+	return project, restore, scale
+
+def simplex_volumn( pts ):
+	'''
+	pts should be N-by-N+1 dimensions
+	'''
+	assert( len( pts.shape ) == 2 )
+	N = pts.shape[0]
+	assert ( pts.shape[1] == N + 1 )
+	Vinv = numpy.ones( ( N+1, N+1 ) )
+	Vinv[:N, :] = pts
+	
+	## http://www.mathpages.com/home/kmath664/kmath664.htm
+	invvol = abs( numpy.linalg.det( Vinv ) )
+	
+	return invvol
+
+
 ########################################
 # CMD-line tool for getting filenames. #
 ########################################
@@ -137,19 +164,20 @@ if __name__ == '__main__':
 
 	# Time the amount of time this takes.
 	startTime = time.time()
-	(meshes, Ts) = parse_args()
+	(meshes, Ts, Tmat) = parse_args()
 	
 	root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 	
 	print("\nReading pose meshes costs: %.2f seconds" % (time.time() - startTime))
 	readTime = time.time()
 	
-	print( 'Ts.shape:', Ts.shape )
-	Ts_unique, unique_to_original_map = uniquify_points_and_return_input_index_to_unique_index_map( Ts, digits = 5 )
-	Ts_unique = numpy.asarray( Ts_unique )
-	print( 'Unique Ts.shape:', Ts_unique.shape )
+# 	print( 'Ts.shape:', Ts.shape )
+# 	Ts_unique, unique_to_original_map = uniquify_points_and_return_input_index_to_unique_index_map( Ts, digits = 5 )
+# 	Ts_unique = numpy.asarray( Ts_unique )
+# 	print( 'Unique Ts.shape:', Ts_unique.shape )
 	
-	uncorrelated = uncorrellated_space( Ts )
+	project, unproject, scale = uncorrellated_space( Ts )
+	uncorrelated = project( Ts, scale )
 	print( "uncorrelated data shape" )
 	print( uncorrelated.shape )
 	
@@ -159,19 +187,50 @@ if __name__ == '__main__':
 	path = "benchmarks/" + dirs[-2] + "-" + dirs[-1] + ".csv"
 	print("path: ", path)
 	numpy.savetxt(path, uncorrelated, fmt="%1.6f", delimiter=",")
+	outpath = "benchmarks/" + dirs[-2] + "-" + dirs[-1] + ".mat"
+	import scipy.io
+	scipy.io.savemat( outpath, { 'X': uncorrelated } )
 	
+	numpy.set_printoptions(precision=4, suppress=True)
+	print( "ground truth simplex volumn:" )
+	print( simplex_volumn( project( Tmat, scale ).T ) )
 	
-	## Option 1: compute convex hull
-# 	import scipy.spatial
-# 	hull = scipy.spatial.ConvexHull( uncorrelated )
-# 	print( len( hull.vertices ) )
-# 	print( hull.vertices )
-
+	## Option 1: HyperCSI
+# 	import HyperCSI
+# 	N = uncorrelated.shape[1] + 1
+# 	solution_1 = HyperCSI.hyperCSI( uncorrelated.T, N )[0]
+ 
 	## Option 2: compute minimum-volume enclosing simplex
-	solution = mves2.MVES( uncorrelated )
-	print( 'solution' )
+	import mves2
+# 	solution = mves2.MVES( uncorrelated )
+	solution = mves2.MVES( uncorrelated, project( Tmat ) )
+	print( "solution simplex volumn:" )
+	print( simplex_volumn( solution.x[:-1] ) )
+	print( "solution" )
 	print( solution )
-
+	
+	recovered = unproject( solution.x[:-1].T, scale )
+# 	print( 'recovered' )
+# 	print( recovered.round(3) )
+	
+	def check_recovered( recovered, ground ):
+		flags = numpy.zeros( len(Tmat), dtype = bool )
+		for i, ht in enumerate( recovered ):
+			for j, gt in enumerate( ground ):
+				if numpy.allclose(ht, gt, atol=1e-3):
+					flags[i] = True
+					numpy.delete(ground, j, 0)
+					break
+		return flags, ground
+	
+	status, remains = check_recovered( recovered, Tmat )
+	if( all( status ) ):	print( "match ground truth" )
+	else:
+		print( "#unmatched: ", numpy.nonzero( ~status ) )
+		print( "Unmatched recovery:" )
+		print( recovered[ numpy.nonzero( ~status ) ].round(3) )
+		print( "Unmatched ground truth: " )
+		print( remains.round(3) )
 #	  print("Runtime: %g" % (time.time() - startTime), file)
 
 	print("\nTotal Runtime: %.2f seconds" % (time.time() - startTime))

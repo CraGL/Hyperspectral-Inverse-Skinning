@@ -161,18 +161,47 @@ def hyperCSI(X, N):
 	end = time.time()
 	return A_est, S_est, end-start
 
-import sys,os		
-if len( sys.argv ) != 3:
-    print( 'Usage:', sys.argv[0], 'path/to/input.mat N', file = sys.stderr )
-    sys.exit(-1)
+# import sys,os		
+# if len( sys.argv ) != 3:
+#     print( 'Usage:', sys.argv[0], 'path/to/input.mat path/to/groundtruth_tranformation_matrix.Tmat N', file = sys.stderr )
+#     sys.exit(-1)
+#
+# argv = sys.argv[1:]
+# 		
+# import scipy.io	
+# X = scipy.io.loadmat(argv[0])['X']
+# N = int(argv[1])
+# A_est, S_est, time_elapsed = hyperCSI(X, N)
+# print("A_est: ", A_est)
+# print("S_est: ", S_est)
 
-# path = "models/cube4/cube.mat"
-# N = 4
-argv = sys.argv[1:]
-		
-import scipy.io	
-X = scipy.io.loadmat(argv[0])['X']
-N = int(argv[1])
-A_est, S_est, time_elapsed = hyperCSI(X, N)
-print("A_est: ", A_est)
-print("S_est: ", S_est)
+if __name__ == '__main__':
+	import sys
+	argv = sys.argv[1:]
+	
+	import scipy.io 
+	import DMAT2MATLAB
+# 	data = scipy.io.loadmat(argv[0])['X'].T
+	data = DMAT2MATLAB.load_DMAT(argv[0]).T
+	print( 'X.shape:', data.shape )
+	T_mat = DMAT2MATLAB.load_Tmat(argv[1]).T
+	print( 'T_mat.shape:', T_mat.shape )
+	print( 'T_mat' )
+	print(T_mat)
+	
+	from convex_hull import uncorrellated_space
+	project, unproject = uncorrellated_space( data )
+	X = project( data ).T
+	N = X.shape[0] + 1
+	
+	# solution = MVES( project( X ), project( T_mat ) )
+	A_est, S_est, time = hyperCSI( X, N )
+	print( 'solution' )
+	print( A_est )
+	
+	print( 'solution.T (rows are points)' )
+	# print( unproject( solution.x[:-1].T ) - T_mat )
+	print( unproject( A_est ).round(3) )
+	print( 'solution.T 0-th point compared to ground truth 1-st point:' )
+	## For the example above, these match:
+	print( unproject( A_est )[0] - T_mat[1] )
