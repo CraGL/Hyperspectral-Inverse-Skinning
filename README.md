@@ -32,11 +32,10 @@ Estimate each vertex's weights.
 On the minimum volume simplex enclosure problem for estimating a linear mixing model
 (https://link.springer.com/article/10.1007/s10898-012-9876-5).
 
-	python -i ../mves2.py
-	test()
+	python simplex_hull.py models/cube4/poses-1
 
 ### A python implementation of Hyperplane-based Craig-Simplex-Identification algorithm
 A fast hyperplane-based minimum-volume enclosing simplex algorithm for blind hyperspectral unmixing
 (https://arxiv.org/abs/1510.08917).
 
-	python ../HyperCSI.py ../models/cube4/cube.mat 4
+	python simplex_hull2.py models/cube4/poses-1
