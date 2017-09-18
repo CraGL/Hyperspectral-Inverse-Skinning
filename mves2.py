@@ -46,7 +46,7 @@ def MVES( pts, initial_guess_vertices = None ):
 	
 	
 	## Define the objective function
-	def f( x ):
+	def f_volume( x ):
 		Vinv = unpack( x )
 		
 		# invvol = abs( numpy.linalg.det( Vinv ) )
@@ -56,15 +56,16 @@ def MVES( pts, initial_guess_vertices = None ):
 		
 		return -invvol
 	
-	def f_grad( x ):
+	def f_volume_grad( x ):
 		Vinv = unpack( x )
+		
 		invvol = numpy.linalg.det( Vinv )
 		## From: http://www.ee.ic.ac.uk/hp/staff/dmb/matrix/calculus.html#deriv_linear
 		return ( -invvol*numpy.linalg.inv(Vinv).T ).ravel()
 	
 	## It's less work to compute the function and gradient at the same time.
 	## Both need the determinant, which is as expensive as matrix inversion.
-	def f_with_grad( x ):
+	def f_volume_with_grad( x ):
 		Vinv = unpack( x )
 		
 		# invvol = abs( numpy.linalg.det( Vinv ) )
@@ -79,9 +80,32 @@ def MVES( pts, initial_guess_vertices = None ):
 	
 	if DEBUG:
 		## Check the gradient.
-		err = scipy.optimize.check_grad( f, f_grad, numpy.random.random( (n+1,n+1) ).ravel() )
+		err = scipy.optimize.check_grad( f_volume, f_volume_grad, numpy.random.random( (n+1,n+1) ).ravel() )
 		print( 'f gradient is right if this number is ~0:', err )
-		err = scipy.optimize.check_grad( lambda x: f_with_grad(x)[0], lambda x: f_with_grad(x)[1], numpy.random.random( (n+1,n+1) ).ravel() )
+		err = scipy.optimize.check_grad( lambda x: f_volume_with_grad(x)[0], lambda x: f_volume_with_grad(x)[1], numpy.random.random( (n+1,n+1) ).ravel() )
+		print( 'f gradient is right if this number is ~0:', err )
+	
+	## UPDATE: We now want the correctly-signed log determinant for numerical reasons.
+	
+	## Define the objective function
+	def f_log_volume( x ):
+		Vinv = unpack( x )
+		
+		sign, logdet = numpy.linalg.slogdet( Vinv )
+		
+		## We want to maximize this quantity, so return it negated.
+		return -sign*logdet
+	
+	def f_log_volume_grad( x ):
+		Vinv = unpack( x )
+		
+		## For the log determinant, the derivative is simpler:
+		## https://math.stackexchange.com/questions/1233187/compute-the-derivative-of-the-log-of-the-determinant-of-a-with-respect-to-a
+		return ( -numpy.linalg.inv(Vinv).T ).ravel()
+	
+	if DEBUG:
+		## Check the gradient.
+		err = scipy.optimize.check_grad( f_log_volume, f_log_volume_grad, numpy.random.random( (n+1,n+1) ).ravel() )
 		print( 'f gradient is right if this number is ~0:', err )
 	
 	
@@ -173,9 +197,15 @@ def MVES( pts, initial_guess_vertices = None ):
 # 	import pdb; pdb.set_trace()
 	## Solve.
 	if USE_OUR_GRADIENTS:
-		solution = scipy.optimize.minimize( f_with_grad, x0, jac = True, constraints = constraints )
+	    ## Volume:
+		# solution = scipy.optimize.minimize( f_volume_with_grad, x0, jac = True, constraints = constraints )
+		## Log volume:
+		solution = scipy.optimize.minimize( f_log_volume, x0, jac = f_log_volume_grad, constraints = constraints )
 	else:
-		solution = scipy.optimize.minimize( f, x0, constraints = constraints )
+	    ## Volume:
+		# solution = scipy.optimize.minimize( f_volume, x0, constraints = constraints )
+		## Log volume:
+		solution = scipy.optimize.minimize( f_log_volume, x0, constraints = constraints )
 	
 	## Return the solution in a better format.
 	solution.x = numpy.linalg.inv( unpack( solution.x ) )
