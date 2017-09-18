@@ -202,8 +202,8 @@ if __name__ == '__main__':
  
 	## Option 2: compute minimum-volume enclosing simplex
 	import mves2
-# 	solution = mves2.MVES( uncorrelated )
-	solution = mves2.MVES( uncorrelated, project( Tmat ) )
+	solution = mves2.MVES( uncorrelated )
+# 	solution = mves2.MVES( uncorrelated, project( Tmat ) )
 	print( "solution simplex volumn:" )
 	print( simplex_volumn( solution.x[:-1] ) )
 	print( "solution" )

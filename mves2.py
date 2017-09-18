@@ -134,9 +134,12 @@ def MVES( pts, initial_guess_vertices = None ):
 		adj_sum = numpy.sum( adj_pts, axis=1 )
 		ind = numpy.argmax( adj_sum )
 		x0 = numpy.zeros( (n+1, n+1) )
-		x0[:n, :n] = numpy.eye( n )*adj_sum[ ind ]
+		numpy.fill_diagonal( x0[:n, :n], adj_sum[ ind ]+0.1 )
+		x0[-1, :-1].fill( -0.1 )
 		x0[:,:-1] = x0[:,:-1] - translation
 		x0[:,-1] = numpy.ones( n+1 )
+		
+		print( "x0: ", x0 )
 		
 		print( "inital volumn: ", numpy.linalg.det( x0 ) )
 		return numpy.linalg.inv( x0.T ).ravel()
@@ -151,7 +154,7 @@ def MVES( pts, initial_guess_vertices = None ):
 		x0[:,:-1] = initial_guess_vertices
 		x0[:,:-1] = x0[:,:-1] + numpy.random.random( (n+1,n) )*1
 		x0 = numpy.linalg.inv( x0.T ).ravel()
-# 	import pdb; pdb.set_trace()
+
 	## Solve.
 	if USE_OUR_GRADIENTS:
 		solution = scipy.optimize.minimize( f_with_grad, x0, jac = True, constraints = constraints )
@@ -161,6 +164,13 @@ def MVES( pts, initial_guess_vertices = None ):
 	## Return the solution in a better format.
 	solution.x = numpy.linalg.inv( unpack( solution.x ) )
 	# solution.x = unpack( x0 )
+	
+	barycentric = numpy.dot( numpy.linalg.inv( solution.x ), numpy.concatenate( ( pts.T, numpy.ones((1,pts.shape[0])) ), axis=0 ) )
+# 	import pdb; pdb.set_trace()	
+	if numpy.allclose( barycentric.min(1), numpy.zeros(barycentric.shape[0]) ):
+		print( "Initial test succeeds." )
+	else:
+		print( "Initial test fails." )
 	
 	return solution
 
