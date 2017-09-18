@@ -81,9 +81,9 @@ def MVES( pts, initial_guess_vertices = None ):
 	if DEBUG:
 		## Check the gradient.
 		err = scipy.optimize.check_grad( f_volume, f_volume_grad, numpy.random.random( (n+1,n+1) ).ravel() )
-		print( 'f gradient is right if this number is ~0:', err )
+		print( 'f_volume gradient is right if this number is ~0:', err )
 		err = scipy.optimize.check_grad( lambda x: f_volume_with_grad(x)[0], lambda x: f_volume_with_grad(x)[1], numpy.random.random( (n+1,n+1) ).ravel() )
-		print( 'f gradient is right if this number is ~0:', err )
+		print( 'f_volume gradient is right if this number is ~0:', err )
 	
 	## UPDATE: We now want the correctly-signed log determinant for numerical reasons.
 	
@@ -105,8 +105,9 @@ def MVES( pts, initial_guess_vertices = None ):
 	
 	if DEBUG:
 		## Check the gradient.
+		print( "Checking the log volume." )
 		err = scipy.optimize.check_grad( f_log_volume, f_log_volume_grad, numpy.random.random( (n+1,n+1) ).ravel() )
-		print( 'f gradient is right if this number is ~0:', err )
+		print( 'f_log_volume gradient is right if this number is ~0:', err )
 	
 	
 	## Set up the constraints.
@@ -204,7 +205,7 @@ def MVES( pts, initial_guess_vertices = None ):
 		x0 = numpy.linalg.inv( x0.T ).ravel()
 
 	## Solve.
-	if USE_OUR_GRADIENTS:
+	if False: # USE_OUR_GRADIENTS:
 	    ## Volume:
 		# solution = scipy.optimize.minimize( f_volume_with_grad, x0, jac = True, constraints = constraints )
 		## Log volume:
