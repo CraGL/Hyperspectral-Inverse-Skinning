@@ -32,6 +32,8 @@ def MVES( pts, initial_guess_vertices = None ):
 		always be 1.
 	'''
 	
+	pts = numpy.asfarray( pts )
+	
 	n, data = points_to_data( pts )
 	
 	## Our solution is n+1 points, each of which is an n-dimensional points with a 1 appended.
@@ -129,19 +131,41 @@ def MVES( pts, initial_guess_vertices = None ):
 		constraints.append( { 'type': 'eq', 'fun': g_ones } )
 	
 	def valid_initial( pts ):
-		translation = -pts.min(axis=0)
-		adj_pts = pts + translation
-		adj_sum = numpy.sum( adj_pts, axis=1 )
-		ind = numpy.argmax( adj_sum )
+	    ## pts has each n-dimensional point as a row.
+		origin = pts.min(axis=0)
+		## Offset the points so that they are bounded on all-but-one side by the
+		## axis-aligned planes through the origin.
+		adj_pts = pts - origin
+		## Find the offset of the diagonal plane (x1+x2+x3+x4 ... - D = 0)
+		## that puts all offset points under the plane.
+		D = adj_pts.sum( axis=1 ).max()
+		## Now make the n+1 initial guess points with each point as a row.
 		x0 = numpy.zeros( (n+1, n+1) )
-		numpy.fill_diagonal( x0[:n, :n], adj_sum[ ind ]+0.1 )
-		x0[-1, :-1].fill( -0.1 )
-		x0[:,:-1] = x0[:,:-1] - translation
-		x0[:,-1] = numpy.ones( n+1 )
+
+# 		numpy.fill_diagonal( x0[:n, :n], adj_sum[ ind ]+0.1 )
+# 		x0[-1, :-1].fill( -0.1 )
+# 		x0[:,:-1] = x0[:,:-1] - translation
+# 		x0[:,-1] = numpy.ones( n+1 )
+
+
+		## We have an extra column that should be all 1's for the homogeneous coordinate.
+		x0[:,-1] = 1.
+		## The simplex is the origin and all points (c,0,0,...), (0,c,0,0,...), (0,0,c,0,0,...), ...
+		## The first n points are D along the coordinate axes.
+		x0[:n, :n] = numpy.eye( n )*D
+		## The last point is the origin (the array was initialized to zeros).
+		## Offset all points so that 0 is the origin.
+		x0[:,:-1] += origin
 		
-		print( "x0: ", x0 )
+		## Verify that all points are inside.
+		bary = numpy.linalg.inv( x0.T ).dot( data )
+		eps = 1e-8
+		assert ( bary >= -eps ).all()
+		assert ( bary <= 1+eps ).all()
+		assert ( abs( bary.sum(0) - 1.0 ) < eps ).all()
 		
-		print( "inital volumn: ", numpy.linalg.det( x0 ) )
+		print( "inital volume:", numpy.linalg.det( x0 ) )
+
 		return numpy.linalg.inv( x0.T ).ravel()
 	
 	## Make an initial guess.
@@ -175,25 +199,30 @@ def MVES( pts, initial_guess_vertices = None ):
 	return solution
 
 def test():
-	# pts = [ [ 0,1 ], [ 1,0 ], [ -2,0 ], [ 0, 0 ] ]
+	pts = [ [ 0,1 ], [ 1,0 ], [ -2,0 ], [ 0, 0 ] ]
 	# pts = [ [ 0,.9 ], [.1,.9], [ 1,0 ], [ 0, 0 ] ]
-	numpy.random.seed(0)
-	pts = numpy.random.random_sample((20000, 16))
+	print( 'pts:', pts )
+	#numpy.random.seed(0)
+	#pts = numpy.random.random_sample((200, 16))
 	solution = MVES( pts )
 	print( 'solution' )
 	print( solution )
 
 	print( 'solution * data', '(', len(pts), 'data points)' )
 	n, data = points_to_data( pts )
-	print( numpy.dot( solution.x, data ) )
+	print( numpy.dot( numpy.linalg.inv( solution.x ), data ) )
 
-	simplex = numpy.linalg.inv( solution.x )
+	# simplex = numpy.linalg.inv( solution.x )
+	simplex = solution.x
 	print( 'solution simplex', simplex.shape[1], 'points' )
 	print( simplex.round(2) )
 
 if __name__ == '__main__':
 	import sys
 	argv = sys.argv[1:]
+	
+	# test()
+	# sys.exit(0)
 	
 	import scipy.io 
 	import DMAT2MATLAB
@@ -205,8 +234,8 @@ if __name__ == '__main__':
 	print( 'T_mat' )
 	print(T_mat)
 	
-	from convex_hull import uncorrellated_space
-	project, unproject = uncorrellated_space( X )
+	from simplex_hull import uncorrellated_space
+	project, unproject, scale = uncorrellated_space( X )
 	
 	# solution = MVES( project( X ), project( T_mat ) )
 	solution = MVES( project( X ) )
@@ -216,6 +245,6 @@ if __name__ == '__main__':
 	print( 'solution.T (rows are points)' )
 	# print( unproject( solution.x[:-1].T ) - T_mat )
 	print( unproject( solution.x[:-1].T ).round(3) )
-	print( 'solution.T 0-th point compared to ground truth 1-st point:' )
+	# print( 'solution.T 0-th point compared to ground truth 1-st point:' )
 	## For the example above, these match:
-	print( unproject( solution.x[:-1].T )[0] - T_mat[1] )
+	# print( unproject( solution.x[:-1].T )[0] - T_mat[1] )
