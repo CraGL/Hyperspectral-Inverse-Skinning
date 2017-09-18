@@ -165,6 +165,13 @@ def MVES( pts, initial_guess_vertices = None ):
 		D = adj_pts.sum( axis=1 ).max()
 		## Now make the n+1 initial guess points with each point as a row.
 		x0 = numpy.zeros( (n+1, n+1) )
+
+# 		numpy.fill_diagonal( x0[:n, :n], adj_sum[ ind ]+0.1 )
+# 		x0[-1, :-1].fill( -0.1 )
+# 		x0[:,:-1] = x0[:,:-1] - translation
+# 		x0[:,-1] = numpy.ones( n+1 )
+
+
 		## We have an extra column that should be all 1's for the homogeneous coordinate.
 		x0[:,-1] = 1.
 		## The simplex is the origin and all points (c,0,0,...), (0,c,0,0,...), (0,0,c,0,0,...), ...
@@ -182,6 +189,7 @@ def MVES( pts, initial_guess_vertices = None ):
 		assert ( abs( bary.sum(0) - 1.0 ) < eps ).all()
 		
 		print( "inital volume:", numpy.linalg.det( x0 ) )
+
 		return numpy.linalg.inv( x0.T ).ravel()
 	
 	## Make an initial guess.
@@ -194,7 +202,7 @@ def MVES( pts, initial_guess_vertices = None ):
 		x0[:,:-1] = initial_guess_vertices
 		x0[:,:-1] = x0[:,:-1] + numpy.random.random( (n+1,n) )*1
 		x0 = numpy.linalg.inv( x0.T ).ravel()
-# 	import pdb; pdb.set_trace()
+
 	## Solve.
 	if USE_OUR_GRADIENTS:
 	    ## Volume:
@@ -210,6 +218,13 @@ def MVES( pts, initial_guess_vertices = None ):
 	## Return the solution in a better format.
 	solution.x = numpy.linalg.inv( unpack( solution.x ) )
 	# solution.x = unpack( x0 )
+	
+	barycentric = numpy.dot( numpy.linalg.inv( solution.x ), numpy.concatenate( ( pts.T, numpy.ones((1,pts.shape[0])) ), axis=0 ) )
+# 	import pdb; pdb.set_trace()	
+	if numpy.allclose( barycentric.min(1), numpy.zeros(barycentric.shape[0]) ):
+		print( "Initial test succeeds." )
+	else:
+		print( "Initial test fails." )
 	
 	return solution
 
