@@ -80,6 +80,7 @@ def MVES( pts, initial_guess_vertices = None ):
 	
 	if DEBUG:
 		## Check the gradient.
+		print( "Checking the volume gradient." )
 		err = scipy.optimize.check_grad( f_volume, f_volume_grad, numpy.random.random( (n+1,n+1) ).ravel() )
 		print( 'f_volume gradient is right if this number is ~0:', err )
 		err = scipy.optimize.check_grad( lambda x: f_volume_with_grad(x)[0], lambda x: f_volume_with_grad(x)[1], numpy.random.random( (n+1,n+1) ).ravel() )
@@ -94,7 +95,8 @@ def MVES( pts, initial_guess_vertices = None ):
 		sign, logdet = numpy.linalg.slogdet( Vinv )
 		
 		## We want to maximize this quantity, so return it negated.
-		return -sign*logdet
+		# return -sign*logdet
+		return -logdet
 	
 	def f_log_volume_grad( x ):
 		Vinv = unpack( x )
@@ -105,9 +107,17 @@ def MVES( pts, initial_guess_vertices = None ):
 	
 	if DEBUG:
 		## Check the gradient.
-		print( "Checking the log volume." )
-		err = scipy.optimize.check_grad( f_log_volume, f_log_volume_grad, numpy.random.random( (n+1,n+1) ).ravel() )
+		print( "Checking the log volume gradient." )
+		R = (numpy.random.random( (n+1,n+1) )*2).ravel()
+		err = scipy.optimize.check_grad( f_log_volume, f_log_volume_grad, R )
 		print( 'f_log_volume gradient is right if this number is ~0:', err )
+		# print( 'f_volume:', f_volume( R ) )
+		# print( 'f_log_volume:', f_log_volume( R ) )
+		# print( 'det:', numpy.linalg.det( R.reshape(n+1,n+1) ) )
+		# print( 'slogdet:', numpy.linalg.slogdet( R.reshape(n+1,n+1) ) )
+		# print( 'slogdet:', numpy.linalg.slogdet( R.reshape(n+1,n+1) )[0]*numpy.exp(numpy.linalg.slogdet( R.reshape(n+1,n+1) )[1]) )
+		# print( scipy.optimize.approx_fprime( R, f_log_volume, numpy.sqrt(numpy.finfo(float).eps) ) )
+		# print( f_log_volume_grad( R ) )
 	
 	
 	## Set up the constraints.
@@ -125,6 +135,7 @@ def MVES( pts, initial_guess_vertices = None ):
 		return numpy.kron( numpy.identity(n+1), data.T )
 	
 	if DEBUG:
+		print( "Checking the positive barycentric coordinate constraint gradient." )
 		for i in range(n+1):
 			err = scipy.optimize.check_grad( lambda x: g_bary(x)[i], lambda x: g_bary_jac(x)[i], numpy.random.random( (n+1,n+1) ).ravel() )
 			print( 'g_bary gradient is right if this number is ~0:', err )
@@ -146,6 +157,7 @@ def MVES( pts, initial_guess_vertices = None ):
 		return numpy.kron( numpy.ones((1,n+1)), numpy.identity(n+1) )
 	
 	if DEBUG:
+		print( "Checking the homogeneous coordinate constraint gradient." )
 		for i in range(n+1):
 			err = scipy.optimize.check_grad( lambda x: g_ones(x)[i], lambda x: g_ones_jac(x)[i], numpy.random.random( (n+1,n+1) ).ravel() )
 			print( 'g_ones gradient is right if this number is ~0:', err )
@@ -156,7 +168,7 @@ def MVES( pts, initial_guess_vertices = None ):
 		constraints.append( { 'type': 'eq', 'fun': g_ones } )
 	
 	def valid_initial( pts ):
-	    ## pts has each n-dimensional point as a row.
+		## pts has each n-dimensional point as a row.
 		origin = pts.min(axis=0)
 		## Offset the points so that they are bounded on all-but-one side by the
 		## axis-aligned planes through the origin.
@@ -167,10 +179,10 @@ def MVES( pts, initial_guess_vertices = None ):
 		## Now make the n+1 initial guess points with each point as a row.
 		x0 = numpy.zeros( (n+1, n+1) )
 
-# 		numpy.fill_diagonal( x0[:n, :n], adj_sum[ ind ]+0.1 )
-# 		x0[-1, :-1].fill( -0.1 )
-# 		x0[:,:-1] = x0[:,:-1] - translation
-# 		x0[:,-1] = numpy.ones( n+1 )
+#		numpy.fill_diagonal( x0[:n, :n], adj_sum[ ind ]+0.1 )
+#		x0[-1, :-1].fill( -0.1 )
+#		x0[:,:-1] = x0[:,:-1] - translation
+#		x0[:,-1] = numpy.ones( n+1 )
 
 
 		## We have an extra column that should be all 1's for the homogeneous coordinate.
@@ -196,7 +208,7 @@ def MVES( pts, initial_guess_vertices = None ):
 	## Make an initial guess.
 	if initial_guess_vertices is None:
 		x0 = valid_initial( pts )
-# 		x0 = numpy.identity(n+1).ravel()
+#		x0 = numpy.identity(n+1).ravel()
 		# x0 = numpy.random.random( (n,n+1) ).ravel()
 	else:
 		x0 = numpy.ones( (n+1, n+1) )
@@ -205,13 +217,13 @@ def MVES( pts, initial_guess_vertices = None ):
 		x0 = numpy.linalg.inv( x0.T ).ravel()
 
 	## Solve.
-	if False: # USE_OUR_GRADIENTS:
-	    ## Volume:
+	if USE_OUR_GRADIENTS:
+		## Volume:
 		# solution = scipy.optimize.minimize( f_volume_with_grad, x0, jac = True, constraints = constraints )
 		## Log volume:
 		solution = scipy.optimize.minimize( f_log_volume, x0, jac = f_log_volume_grad, constraints = constraints )
 	else:
-	    ## Volume:
+		## Volume:
 		# solution = scipy.optimize.minimize( f_volume, x0, constraints = constraints )
 		## Log volume:
 		solution = scipy.optimize.minimize( f_log_volume, x0, constraints = constraints )
@@ -221,7 +233,7 @@ def MVES( pts, initial_guess_vertices = None ):
 	# solution.x = unpack( x0 )
 	
 	barycentric = numpy.dot( numpy.linalg.inv( solution.x ), numpy.concatenate( ( pts.T, numpy.ones((1,pts.shape[0])) ), axis=0 ) )
-# 	import pdb; pdb.set_trace()	
+#	import pdb; pdb.set_trace() 
 	if numpy.allclose( barycentric.min(1), numpy.zeros(barycentric.shape[0]) ):
 		print( "Initial test succeeds." )
 	else:
@@ -252,12 +264,12 @@ if __name__ == '__main__':
 	import sys
 	argv = sys.argv[1:]
 	
-	# test()
-	# sys.exit(0)
+	test()
+	sys.exit(0)
 	
 	import scipy.io 
 	import DMAT2MATLAB
-# 	X = scipy.io.loadmat(argv[0])['X'].T
+#	X = scipy.io.loadmat(argv[0])['X'].T
 	X = DMAT2MATLAB.load_DMAT(argv[0]).T
 	print( 'X.shape:', X.shape )
 	T_mat = DMAT2MATLAB.load_Tmat(argv[1]).T
