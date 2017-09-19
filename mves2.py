@@ -215,18 +215,23 @@ def MVES( pts, initial_guess_vertices = None ):
 		x0[:,:-1] = initial_guess_vertices
 		x0[:,:-1] = x0[:,:-1] + numpy.random.random( (n+1,n) )*1
 		x0 = numpy.linalg.inv( x0.T ).ravel()
-
+	
+	iteration = [0]
+	def show_progress( x ):
+	    iteration[0] += 1
+	    print("Iteration", iteration[0])
+	
 	## Solve.
 	if USE_OUR_GRADIENTS:
 		## Volume:
 		# solution = scipy.optimize.minimize( f_volume_with_grad, x0, jac = True, constraints = constraints )
 		## Log volume:
-		solution = scipy.optimize.minimize( f_log_volume, x0, jac = f_log_volume_grad, constraints = constraints )
+		solution = scipy.optimize.minimize( f_log_volume, x0, jac = f_log_volume_grad, constraints = constraints, callback = show_progress )
 	else:
 		## Volume:
 		# solution = scipy.optimize.minimize( f_volume, x0, constraints = constraints )
 		## Log volume:
-		solution = scipy.optimize.minimize( f_log_volume, x0, constraints = constraints )
+		solution = scipy.optimize.minimize( f_log_volume, x0, constraints = constraints, callback = show_progress )
 	
 	## Return the solution in a better format.
 	solution.x = numpy.linalg.inv( unpack( solution.x ) )
