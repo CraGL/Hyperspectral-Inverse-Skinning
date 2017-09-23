@@ -1,5 +1,6 @@
 from __future__ import print_function, division
 
+# python3 is needed.
 import scipy.optimize, numpy
 
 USE_OUR_GRADIENTS = True
@@ -20,7 +21,44 @@ def points_to_data( pts ):
 	
 	return n, data
 
-def MVES( pts, initial_guess_vertices = None ):
+#### find points that has each channel's max and min value. totally 2*L points (may duplicate)
+def min_max( data ):
+	### data shape is N*L, L is dimensions. N is data point number
+	indices = []
+	L = data.shape[1]
+	for i in range( L ):
+		min_ind = numpy.argmin( data[:,i] )
+		max_ind = numpy.argmax( data[:,i] )
+		indices.append( min_ind )
+		indices.append( max_ind )
+	
+#	indices, unique_indices = numpy.unique( indices, True )
+	endmembers = numpy.asarray(list(set([tuple(data[i]) for i in indices])))
+
+	return endmembers
+
+def cull_interior_points( pts ):
+	'''
+	Given:
+		pts: A sequence of n-dimensional points (e.g. points are rows)
+	Returns:
+		A subset of the points with some points inside the convex hull removed.
+	'''
+	dim = pts.shape[1]
+	bounded = min_max( pts )
+	import scipy.cluster.vq
+	clusters = scipy.cluster.vq.kmeans( bounded, dim+1 )
+#	import pdb; pdb.set_trace()
+
+	import scipy.spatial
+	D = scipy.spatial.Delaunay( clusters[0] )
+
+#	D = scipy.spatial.Delaunay( bounded[:dim+1] )
+	bary = D.find_simplex( pts )
+	
+	return numpy.concatenate( (pts[ ( bary < 0 ) ], bounded), axis=0 )
+
+def MVES( all_pts, initial_guess_vertices = None ):
 	'''
 	Given:
 		pts: A sequence of n-dimensional points (e.g. points are rows)
@@ -32,7 +70,14 @@ def MVES( pts, initial_guess_vertices = None ):
 		always be 1.
 	'''
 	
-	pts = numpy.asfarray( pts )
+	all_pts = numpy.asfarray( all_pts )
+	print( "All pts #: ", len(all_pts) )
+#	unique_pts = numpy.unique( all_pts, axis=0 )
+#	print( "unique pts #: ", len(unique_pts) )
+	## only the surface points matters.
+#	pts = cull_interior_points( unique_pts )
+#	print( "After culling pts #: ", len(pts) )
+	pts = all_pts
 	
 	n, data = points_to_data( pts )
 	
@@ -201,8 +246,8 @@ def MVES( pts, initial_guess_vertices = None ):
 		assert ( bary <= 1+eps ).all()
 		assert ( abs( bary.sum(0) - 1.0 ) < eps ).all()
 		
-		print( "inital volume:", numpy.linalg.det( x0 ) )
-
+		print( "inital volume:", f_volume( x0 ) )
+		print( "inital log volume:", f_log_volume( x0 ) )
 		return numpy.linalg.inv( x0.T ).ravel()
 	
 	## Make an initial guess.
@@ -215,18 +260,63 @@ def MVES( pts, initial_guess_vertices = None ):
 		x0[:,:-1] = initial_guess_vertices
 		x0[:,:-1] = x0[:,:-1] + numpy.random.random( (n+1,n) )*1
 		x0 = numpy.linalg.inv( x0.T ).ravel()
+		
+	def callback_volume(xk):
+		Vinv = numpy.linalg.inv( unpack( xk ) )
+		print( "current volume: ", numpy.linalg.det( Vinv ) )
 
 	## Solve.
-	if USE_OUR_GRADIENTS:
-		## Volume:
-		# solution = scipy.optimize.minimize( f_volume_with_grad, x0, jac = True, constraints = constraints )
-		## Log volume:
-		solution = scipy.optimize.minimize( f_log_volume, x0, jac = f_log_volume_grad, constraints = constraints )
+	USE_IPOPT = False
+	if USE_IPOPT:		
+		import pyipopt
+		pyipopt.set_loglevel( 2 ) # 1: moderate log level of PyIPOPT
+		class IPOPT_SOLUTION:
+			def __init__(self):
+				pass
+		solution = IPOPT_SOLUTION()				
+		nvar = (n+1)*(n+1)
+		x_L = numpy.ones( nvar )*pyipopt.NLP_LOWER_BOUND_INF
+		x_U = numpy.ones( nvar )*pyipopt.NLP_UPPER_BOUND_INF
+		nieq = (n+1)*pts.shape[0]
+		neq = n+1
+		ncon = neq + nieq
+		g_L = numpy.zeros( ncon )
+		g_U = numpy.ones( ncon )
+		g_U[-neq:].fill(0.)
+		
+		from scipy.sparse import csr_matrix
+		sp_g_ones_jac = csr_matrix(g_ones_jac(x0))
+		nnzj = ncon*nvar #nieq*(n+1) + sp_g_ones_jac.getnnz()
+		nnzh = 0 #int((n+1)*(n+2)/2)
+		eval_f = f_log_volume
+		eval_grad_f = f_log_volume_grad
+		def eval_g(x):
+			return numpy.concatenate((g_bary(x)[:nieq], g_ones(x)))
+		def eval_jac_g(x, flag):
+			if flag: 
+				pattern = numpy.array([range(nvar)])
+				return ( numpy.repeat(pattern,ncon,axis=1).ravel(), numpy.repeat(pattern,ncon,axis=0).ravel() )
+			else:
+				return numpy.concatenate((g_bary_jac(x)[:nieq],g_ones_jac(x)), axis=0).ravel()
+				
+		nlp = pyipopt.create(nvar, x_L, x_U, ncon, g_L, g_U, nnzj, nnzh, eval_f, eval_grad_f, eval_g, eval_jac_g)
+		nlp.int_option('max_iter', 20)
+		
+		solution.x, solution.zl, solution.zu, solution.constraint_multipliers, solution.obj, solution.status \
+			= nlp.solve( x0 )
+		print( solution )
+	
 	else:
-		## Volume:
-		# solution = scipy.optimize.minimize( f_volume, x0, constraints = constraints )
-		## Log volume:
-		solution = scipy.optimize.minimize( f_log_volume, x0, constraints = constraints )
+		if USE_OUR_GRADIENTS:
+			## Volume:
+			# solution = scipy.optimize.minimize( f_volume_with_grad, x0, jac = True, constraints = constraints )
+			## Log volume:
+			solution = scipy.optimize.minimize( f_log_volume, x0, jac = f_log_volume_grad, constraints = constraints, callback = callback_volume )
+		else:
+			## Volume:
+			# solution = scipy.optimize.minimize( f_volume, x0, constraints = constraints )
+			## Log volume:
+			solution = scipy.optimize.minimize( f_log_volume, x0, constraints = constraints )
 	
 	## Return the solution in a better format.
 	solution.x = numpy.linalg.inv( unpack( solution.x ) )
