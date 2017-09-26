@@ -269,7 +269,25 @@ def MVES( all_pts, initial_guess_vertices = None ):
 	def show_progress( x ):
 	    iteration[0] += 1
 	    print("Iteration", iteration[0])
-
+	
+	## Linear test:
+	import cvxopt
+	while True:
+	    G = -g_bary_jac( x0 )
+	    h = numpy.zeros( G.shape[0] )
+	    A = g_ones_jac( x0 )
+	    b = numpy.zeros( A.shape[0] )
+	    b[-1] = 1
+	    solution = cvxopt.solvers.lp( cvxopt.matrix(f_log_volume_grad(x0)), cvxopt.matrix(G), cvxopt.matrix(h), cvxopt.matrix(A), cvxopt.matrix(b), solver='glpk' )
+	    print( solution )
+	    print( solution['x'] )
+	    if( numpy.allclose( numpy.array( solution['x'] ), x0 ) ):
+	        break
+	    x0 = numpy.array( solution['x'] )
+	print( "Final x:", x0 )
+	print( "Final x inverse:" )
+	print( numpy.linalg.inv( x0.reshape( n+1, n+1 ) ) )
+	
 	## Solve.
 	USE_IPOPT = False
 	if USE_IPOPT:		

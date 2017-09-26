@@ -245,11 +245,14 @@ def divide_mesh_into_small_sets( mesh, Ts, MAX_DIMENSION = 5 ):
 				break
 
 		# Add the convex hull of the current vertex set to the list of small_sets
-		if( len( current_vertex_set + expansion_set ) > Ts.shape[1] ):
-			current_points = numpy.take( Ts, current_vertex_set + expansion_set, axis=0 )
-			hull = ConvexHull( current_points )
-			hull_vertices = numpy.take( hull.points, hull.vertices, axis=0 )
-			small_sets.append( hull_vertices )
+		current_points = numpy.take( Ts, current_vertex_set + expansion_set, axis=0 )
+		small_sets.append( current_points )
+		
+# 		if( len( current_vertex_set + expansion_set ) > Ts.shape[1] ):
+# 			current_points = numpy.take( Ts, current_vertex_set + expansion_set, axis=0 )
+# 			hull = ConvexHull( current_points )
+# 			hull_vertices = numpy.take( hull.points, hull.vertices, axis=0 )
+# 			small_sets.append( hull_vertices )
 		
 # 		if( len( current_vertex_set + expansion_set ) > MAX_DIMENSION+1 ):
 # 			current_points = numpy.take( Ts, current_vertex_set + expansion_set, axis=0 )
@@ -283,9 +286,9 @@ if __name__ == '__main__':
 	uncorrelated = Ts_mapper.project( Ts )
 	print( "uncorrelated data shape" )
 	print( uncorrelated.shape )
-	Ts_sets = divide_mesh_into_small_sets(meshes[0], uncorrelated)
-#	N = len( uncorrelated )
-#	Ts_sets = [ uncorrelated[:N/4], uncorrelated[N/4:N/2], uncorrelated[N/2:N*3/4], uncorrelated[N*3/4:] ]
+# 	Ts_sets = divide_mesh_into_small_sets(meshes[0], uncorrelated, 2)
+# 	N = len( uncorrelated )
+# 	Ts_sets = [ uncorrelated[:N/4], uncorrelated[N/4:N/2], uncorrelated[N/2:N*3/4], uncorrelated[N*3/4:] ]
 # 	print( "# small sets: ", len( Ts_sets ) )
 	print("\nDividing mesh into small sets costs: %.2f seconds" % (time.time() - startTime))
 	startTime = time.time()
@@ -314,28 +317,50 @@ if __name__ == '__main__':
  
 	## Compute minimum-volume enclosing simplex
 	import mves2
-# 	solution = mves2.MVES( uncorrelated )
-# 	print( "solution 1: ", solution )
-
+	solution = mves2.MVES( uncorrelated )
+	
+	'''
 	## Option 1: Run MVES on the union of convex hull vertices:
 	good_verts = []
 	for verts in Ts_sets:
 		mapper = SpaceMapper.Uncorrellated_Space( verts, False )
-		hull = ConvexHull( mapper.project( verts ) )
-		projected_verts = numpy.take( hull.points, hull.vertices, axis=0 )
-		if good_verts == []: 
-			good_verts = mapper.unproject( projected_verts )
+		projected_verts = mapper.project( verts )
+		if len( projected_verts ) > mapper.stop_s+1:
+			hull = ConvexHull( projected_verts )
+			projected_hulls = numpy.take( hull.points, hull.vertices, axis=0 )
+			if good_verts == []: 
+				good_verts = mapper.unproject( projected_hulls )
+			else:
+				good_verts = numpy.concatenate( (good_verts, mapper.unproject( projected_hulls )), axis=0 )
 		else:
-			good_verts = numpy.concatenate( (good_verts, mapper.unproject( projected_verts )), axis=0 )
+			if good_verts == []:
+				good_verts = projected_verts
+			else:
+				good_verts = numpy.concatenate( (good_verts, mapper.unproject( projected_verts )), axis=0 )
+	print( "option 1: # vertices is ", len(good_verts) )
 	solution = mves2.MVES( good_verts )
+	'''
 	
 	## Option 2: Run MVES on the small sets
 # 	good_verts = []
 # 	for verts in Ts_sets:
-# 		if good_verts == []:
-# 			good_verts = mves2.MVES( verts ).x[:-1].T
+# 		mapper = SpaceMapper.Uncorrellated_Space( verts, False )
+# 		projected_verts = mapper.project( verts )
+# 		if len( projected_verts ) > mapper.stop_s+1:
+# 			hull = ConvexHull( projected_verts )
+# 			projected_hull = numpy.take( hull.points, hull.vertices, axis=0 )
+# 			restored_hull = mapper.unproject( mves2.MVES( projected_hull ).x[:-1].T )
+# 			if good_verts == []:
+# 				good_verts =  restored_hull
+# 			else:
+# 				good_verts = numpy.concatenate( (good_verts, restored_hull), axis=0 )
 # 		else:
-# 			good_verts = numpy.concatenate( (good_verts, mves2.MVES( verts ).x[:-1].T), axis=0 )
+# 			restored_verts = mapper.unproject( mves2.MVES( projected_verts ).x[:-1].T )
+# 			if good_verts == []:
+# 				good_verts = mapper.unproject( restored_verts )
+# 			else:
+# 				good_verts = numpy.concatenate( (good_verts, restored_verts), axis=0 )
+# 	
 # 	solution = mves2.MVES( good_verts )
 	
 	print( "solution" )
