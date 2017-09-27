@@ -178,18 +178,19 @@ def MVES( all_pts, initial_guess_vertices = None ):
 		return result.T.reshape( bigdim, n+1, n+1 ).transpose((0,2,1)).reshape( bigdim, bigdim ).T
 	
 	'''
-	n = 2
+	n = 3
 	numpy.random.seed(0)
 	R = numpy.random.random( ( n+1, n+1 ) ).ravel()
 	
 	hess = f_log_volume_hess( R )
 	print( "Hess inverse? (should show identity)" )
 	hessinv = f_log_volume_hess_inv(R)
-	print( hess.dot( hessinv ) )
+	print( numpy.abs( hess.dot( hessinv ) - numpy.identity(hess.shape[0]) ).sum() )
 	print( "Hess symmetric?", numpy.abs( hess - hess.T ).sum() )
 	print( "Hess OK?" )
 	import hessian
-	Hfd = hessian.hessian( R, grad = f_log_volume_grad )
+	# Hfd = hessian.hessian( R, grad = f_log_volume_grad )
+	Hfd = hessian.hessian( R, f = f_log_volume, epsilon = 1e-5 )
 	print( numpy.average( numpy.abs( ( Hfd - hess ) ) ) )
 	
 	import sys
