@@ -156,6 +156,46 @@ def MVES( all_pts, initial_guess_vertices = None ):
 		## https://math.stackexchange.com/questions/1233187/compute-the-derivative-of-the-log-of-the-determinant-of-a-with-respect-to-a
 		return ( -numpy.linalg.inv(Vinv).T ).ravel()
 	
+	def f_log_volume_hess( x ):
+		Vinv = unpack( x )
+		
+		## For the log determinant, the derivative is simpler:
+		## https://math.stackexchange.com/questions/1233187/compute-the-derivative-of-the-log-of-the-determinant-of-a-with-respect-to-a
+		# return ( -numpy.linalg.inv(Vinv).T ).ravel()
+		## And then the second derivative:
+		## http://www.ee.ic.ac.uk/hp/staff/dmb/matrix/calculus.html#deriv_det
+		Vinvinv = numpy.linalg.inv(Vinv)
+		result = ( numpy.kron( Vinvinv.T, Vinvinv ) )
+		## WHY OH WHY DO WE HAVE TO DO THIS CRAZY RESHAPE AND TRANSPOSE THING?
+		bigdim = (n+1)*(n+1)
+		return result.reshape( bigdim, n+1, n+1 ).transpose((0,2,1)).reshape( bigdim, bigdim )
+	
+	def f_log_volume_hess_inv( x ):
+		Vinv = unpack( x )
+		result = ( numpy.kron( Vinv.T, Vinv ) )
+		## WHY OH WHY DO WE HAVE TO DO THIS CRAZY RESHAPE AND TRANSPOSE THING?
+		bigdim = (n+1)*(n+1)
+		return result.T.reshape( bigdim, n+1, n+1 ).transpose((0,2,1)).reshape( bigdim, bigdim ).T
+	
+	'''
+	n = 2
+	numpy.random.seed(0)
+	R = numpy.random.random( ( n+1, n+1 ) ).ravel()
+	
+	hess = f_log_volume_hess( R )
+	print( "Hess inverse? (should show identity)" )
+	hessinv = f_log_volume_hess_inv(R)
+	print( hess.dot( hessinv ) )
+	print( "Hess symmetric?", numpy.abs( hess - hess.T ).sum() )
+	print( "Hess OK?" )
+	import hessian
+	Hfd = hessian.hessian( R, grad = f_log_volume_grad )
+	print( numpy.average( numpy.abs( ( Hfd - hess ) ) ) )
+	
+	import sys
+	sys.exit(0)
+	'''
+	
 	if DEBUG:
 		## Check the gradient.
 		print( "Checking the log volume gradient." )
