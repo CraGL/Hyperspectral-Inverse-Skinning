@@ -2,11 +2,12 @@ from __future__ import print_function, division
 
 # python3 is needed.
 import scipy.optimize, numpy
+import scipy.sparse
 
 USE_OUR_GRADIENTS = True
 if USE_OUR_GRADIENTS:
 	print( "Using our gradient functions, not automatic finite differencing ones." )
-DEBUG = True	
+DEBUG = False	
 
 def points_to_data( pts ):
 	## pts should be a sequence of n-dimensional points.
@@ -57,6 +58,11 @@ def cull_interior_points( pts ):
 	bary = D.find_simplex( pts )
 	
 	return numpy.concatenate( (pts[ ( bary < 0 ) ], bounded), axis=0 )
+
+def to_spmatrix( M ):
+	M = scipy.sparse.coo_matrix( M )
+	import cvxopt
+	return cvxopt.spmatrix( M.data, numpy.asarray( M.row, dtype = int ), numpy.asarray( M.col, dtype = int ) )
 
 def MVES( all_pts, initial_guess_vertices = None ):
 	'''
@@ -176,7 +182,9 @@ def MVES( all_pts, initial_guess_vertices = None ):
 		bary = numpy.dot( Vinv, data )
 		return bary.ravel()
 	def g_bary_jac( x ):
-		## From: http://www.ee.ic.ac.uk/hp/staff/dmb/matrix/calculus.html#deriv_linear
+		## From: http://www.ee.ic.ac.uk/hp/staff/dmb/matrix/calculus.html#deriv_linear 
+		return scipy.sparse.kron( scipy.sparse.identity(n+1), data.T )
+	def g_bary_jac_dense( x ):
 		return numpy.kron( numpy.identity(n+1), data.T )
 	
 	if DEBUG:
@@ -184,12 +192,6 @@ def MVES( all_pts, initial_guess_vertices = None ):
 		for i in range(n+1):
 			err = scipy.optimize.check_grad( lambda x: g_bary(x)[i], lambda x: g_bary_jac(x)[i], numpy.random.random( (n+1,n+1) ).ravel() )
 			print( 'g_bary gradient is right if this number is ~0:', err )
-	
-	if USE_OUR_GRADIENTS:
-		constraints.append( { 'type': 'ineq', 'fun': g_bary, 'jac': g_bary_jac } )
-	else:
-		constraints.append( { 'type': 'ineq', 'fun': g_bary } )
-	
 	
 	## Constrain the bottom row of the inverse (aka the homogeneous coordinates) to be all ones.
 	def g_ones( x ):
@@ -199,6 +201,8 @@ def MVES( all_pts, initial_guess_vertices = None ):
 		return dp
 	def g_ones_jac( x ):
 		## From: http://www.ee.ic.ac.uk/hp/staff/dmb/matrix/calculus.html#deriv_linear
+		return scipy.sparse.kron( numpy.ones((1,n+1)), scipy.sparse.identity(n+1) )
+	def g_ones_jac_dense( x ):
 		return numpy.kron( numpy.ones((1,n+1)), numpy.identity(n+1) )
 	
 	if DEBUG:
@@ -206,11 +210,6 @@ def MVES( all_pts, initial_guess_vertices = None ):
 		for i in range(n+1):
 			err = scipy.optimize.check_grad( lambda x: g_ones(x)[i], lambda x: g_ones_jac(x)[i], numpy.random.random( (n+1,n+1) ).ravel() )
 			print( 'g_ones gradient is right if this number is ~0:', err )
-	
-	if USE_OUR_GRADIENTS:
-		constraints.append( { 'type': 'eq', 'fun': g_ones, 'jac': g_ones_jac } )
-	else:
-		constraints.append( { 'type': 'eq', 'fun': g_ones } )
 	
 	def valid_initial( pts ):
 		## pts has each n-dimensional point as a row.
@@ -267,36 +266,17 @@ def MVES( all_pts, initial_guess_vertices = None ):
 		
 	iteration = [0]
 	def show_progress( x ):
-	    iteration[0] += 1
-	    print("Iteration", iteration[0])
+		iteration[0] += 1
+		print("Iteration", iteration[0])
 	
-	## Linear test:
-	import cvxopt
-	while True:
-	    G = -g_bary_jac( x0 )
-	    h = numpy.zeros( G.shape[0] )
-	    A = g_ones_jac( x0 )
-	    b = numpy.zeros( A.shape[0] )
-	    b[-1] = 1
-	    solution = cvxopt.solvers.lp( cvxopt.matrix(f_log_volume_grad(x0)), cvxopt.matrix(G), cvxopt.matrix(h), cvxopt.matrix(A), cvxopt.matrix(b), solver='glpk' )
-	    print( solution )
-	    print( solution['x'] )
-	    if( numpy.allclose( numpy.array( solution['x'] ), x0 ) ):
-	        break
-	    x0 = numpy.array( solution['x'] )
-	print( "Final x:", x0 )
-	print( "Final x inverse:" )
-	print( numpy.linalg.inv( x0.reshape( n+1, n+1 ) ) )
-	
+	solvers = ["IPOPT", "MOSEK", "SCIPY"]
+	used_solver = "MOSEK"
+	# x0 = numpy.load('x0.npy')
+
 	## Solve.
-	USE_IPOPT = False
-	if USE_IPOPT:		
+	if used_solver == "IPOPT":		
 		import pyipopt
-		pyipopt.set_loglevel( 2 ) # 1: moderate log level of PyIPOPT
-		class IPOPT_SOLUTION:
-			def __init__(self):
-				pass
-		solution = IPOPT_SOLUTION()				
+		pyipopt.set_loglevel( 2 ) # 1: moderate log level of PyIPOPT				
 		nvar = (n+1)*(n+1)
 		x_L = numpy.ones( nvar )*pyipopt.NLP_LOWER_BOUND_INF
 		x_U = numpy.ones( nvar )*pyipopt.NLP_UPPER_BOUND_INF
@@ -323,13 +303,46 @@ def MVES( all_pts, initial_guess_vertices = None ):
 				return numpy.concatenate((g_bary_jac(x)[:nieq],g_ones_jac(x)), axis=0).ravel()
 				
 		nlp = pyipopt.create(nvar, x_L, x_U, ncon, g_L, g_U, nnzj, nnzh, eval_f, eval_grad_f, eval_g, eval_jac_g)
-		nlp.int_option('max_iter', 20)
+		nlp.int_option('max_iter', 50)
 		
-		solution.x, solution.zl, solution.zu, solution.constraint_multipliers, solution.obj, solution.status \
-			= nlp.solve( x0 )
-		print( solution )
-	
-	else:
+		x, zl, zu, constraint_multipliers, obj, status = nlp.solve( x0 )
+		solution = x
+	elif used_solver == "MOSEK":
+		## Linear test:
+		import cvxopt
+		x0 = x0[:,numpy.newaxis]
+		iter_num = 0
+		G = -g_bary_jac( x0 )
+		h = numpy.zeros( G.shape[0] )
+		A = g_ones_jac( x0 )
+		b = numpy.zeros( A.shape[0] )
+		b[-1] = 1 
+		sparse_G = to_spmatrix(G)
+		sparse_A = to_spmatrix(A)
+		while True:
+			c = f_log_volume_grad(x0)
+			# solution = cvxopt.solvers.lp( cvxopt.matrix(c), cvxopt.matrix(G), cvxopt.matrix(h), cvxopt.matrix(A), cvxopt.matrix(b), solver='glpk' )
+			solution = cvxopt.solvers.lp( cvxopt.matrix(c), sparse_G, cvxopt.matrix(h), sparse_A, cvxopt.matrix(b), solver='mosek' )
+			x = solution['x']
+			print( solution )
+			iter_num += 1
+			if( numpy.allclose( numpy.array( x ), x0, rtol=1e-03, atol=1e-06 ) or iter_num > 50):
+				print("all close!")
+				break
+			x0 += 0.9*(numpy.array(x) - x0)
+			# numpy.save('x0.npy', x0)
+		print( "# LP Iteration: ", iter_num )
+		print( "Final x:", x0 )
+		print( "Final x inverse:" )
+		print( numpy.linalg.inv( x0.reshape( n+1, n+1 ) ) )
+		solution = numpy.linalg.inv( unpack( x0 ) )	
+	else:			
+		if USE_OUR_GRADIENTS:
+			constraints.append( { 'type': 'ineq', 'fun': g_bary, 'jac': g_bary_jac_dense } )
+			constraints.append( { 'type': 'eq', 'fun': g_ones, 'jac': g_ones_jac_dense } )
+		else:
+			constraints.append( { 'type': 'ineq', 'fun': g_bary } )
+			constraints.append( { 'type': 'eq', 'fun': g_ones } )
 		if USE_OUR_GRADIENTS:
 			## Volume:
 			# solution = scipy.optimize.minimize( f_volume_with_grad, x0, jac = True, constraints = constraints )
@@ -340,12 +353,11 @@ def MVES( all_pts, initial_guess_vertices = None ):
 			# solution = scipy.optimize.minimize( f_volume, x0, constraints = constraints )
 			## Log volume:
 			solution = scipy.optimize.minimize( f_log_volume, x0, constraints = constraints, callback = show_progress )
+		solution = numpy.linalg.inv( unpack( solution.x ) )
 	
 	## Return the solution in a better format.
-	solution.x = numpy.linalg.inv( unpack( solution.x ) )
-	# solution.x = unpack( x0 )
 	
-	barycentric = numpy.dot( numpy.linalg.inv( solution.x ), numpy.concatenate( ( pts.T, numpy.ones((1,pts.shape[0])) ), axis=0 ) )
+	barycentric = numpy.dot( numpy.linalg.inv( solution ), numpy.concatenate( ( pts.T, numpy.ones((1,pts.shape[0])) ), axis=0 ) )
 #	import pdb; pdb.set_trace() 
 	if numpy.allclose( barycentric.min(1), numpy.zeros(barycentric.shape[0]) ):
 		print( "Initial test succeeds." )
@@ -400,7 +412,7 @@ if __name__ == '__main__':
 	
 	print( 'solution.T (rows are points)' )
 	# print( unproject( solution.x[:-1].T ) - T_mat )
-	print( unproject( solution.x[:-1].T ).round(3) )
+	print( unproject( solution[:-1].T ).round(3) )
 	# print( 'solution.T 0-th point compared to ground truth 1-st point:' )
 	## For the example above, these match:
 	# print( unproject( solution.x[:-1].T )[0] - T_mat[1] )

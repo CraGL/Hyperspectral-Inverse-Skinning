@@ -366,9 +366,9 @@ if __name__ == '__main__':
 	print( "solution" )
 	print( solution )
 	print("\nOptimization costs: %.2f seconds" % (time.time() - startTime))
-	print( "solution simplex volumn: ", simplex_volumn( solution.x[:-1] ) )
+	print( "solution simplex volumn: ", simplex_volumn( solution[:-1] ) )
 	
-	recovered = Ts_mapper.unproject( solution.x[:-1].T )
+	recovered = Ts_mapper.unproject( solution[:-1].T )
 #	print( 'recovered' )
 #	print( recovered.round(3) )
 	
@@ -376,7 +376,7 @@ if __name__ == '__main__':
 		flags = numpy.zeros( len(Tmat), dtype = bool )
 		for i, ht in enumerate( recovered ):
 			for j, gt in enumerate( ground ):
-				if numpy.allclose(ht, gt, atol=1e-3):
+				if numpy.allclose(ht, gt, rtol=1e-1, atol=1e-2):
 					flags[i] = True
 					ground = numpy.delete(ground, j, 0)
 					break
