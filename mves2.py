@@ -314,7 +314,7 @@ def MVES( all_pts, initial_guess_vertices = None ):
 	
 	solvers = ["IPOPT", "MOSEK", "SCIPY"]
 	used_solver = "MOSEK"
-	used_solver = "BINARY"
+	# used_solver = "BINARY"
 	# x0 = numpy.load('x0.npy')
 
 	## Solve.
