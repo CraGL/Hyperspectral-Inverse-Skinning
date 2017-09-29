@@ -178,22 +178,25 @@ def MVES( all_pts, initial_guess_vertices = None ):
 		return result.T.reshape( bigdim, n+1, n+1 ).transpose((0,2,1)).reshape( bigdim, bigdim ).T
 	
 	'''
-	n = 2
-	numpy.random.seed(0)
-	R = numpy.random.random( ( n+1, n+1 ) ).ravel()
-	
-	hess = f_log_volume_hess( R )
-	print( "Hess inverse? (should show identity)" )
-	hessinv = f_log_volume_hess_inv(R)
-	print( hess.dot( hessinv ) )
-	print( "Hess symmetric?", numpy.abs( hess - hess.T ).sum() )
-	print( "Hess OK?" )
-	import hessian
-	Hfd = hessian.hessian( R, grad = f_log_volume_grad )
-	print( numpy.average( numpy.abs( ( Hfd - hess ) ) ) )
-	
-	import sys
-	sys.exit(0)
+	def test_hessian():
+		n = 3
+		numpy.random.seed(0)
+		R = numpy.random.random( ( n+1, n+1 ) ).ravel()
+		
+		hess = f_log_volume_hess( R )
+		print( "Hess inverse? (should show identity)" )
+		hessinv = f_log_volume_hess_inv(R)
+		print( numpy.abs( hess.dot( hessinv ) - numpy.identity(hess.shape[0]) ).sum() )
+		print( "Hess symmetric?", numpy.abs( hess - hess.T ).sum() )
+		print( "Hess OK?" )
+		import hessian
+		# Hfd = hessian.hessian( R, grad = f_log_volume_grad )
+		Hfd = hessian.hessian( R, f = f_log_volume, epsilon = 1e-5 )
+		print( numpy.average( numpy.abs( ( Hfd - hess ) ) ) )
+		
+		import sys
+		sys.exit(0)
+	test_hessian()
 	'''
 	
 	if DEBUG:
@@ -309,8 +312,8 @@ def MVES( all_pts, initial_guess_vertices = None ):
 		iteration[0] += 1
 		print("Iteration", iteration[0])
 	
-	solvers = ["IPOPT", "CVXOPT", "MOSEK", "SCIPY"]
-	used_solver = "CVXOPT"
+	solvers = ["IPOPT", "MOSEK", "SCIPY", "BINARY"]
+	used_solver = "MOSEK"
 	# x0 = numpy.load('x0.npy')
 
 	## Solve.
@@ -348,7 +351,7 @@ def MVES( all_pts, initial_guess_vertices = None ):
 		
 		x, zl, zu, constraint_multipliers, obj, status = nlp.solve( x0 )
 		solution = x
-	elif used_solver == "CVXOPT":
+	elif used_solver == "MOSEK":
 		## Linear test:
 		import cvxopt
 		x0 = x0[:,numpy.newaxis]
@@ -381,17 +384,27 @@ def MVES( all_pts, initial_guess_vertices = None ):
 		print( "Final x inverse:" )
 		print( numpy.linalg.inv( x0.reshape( n+1, n+1 ) ) )
 		solution = numpy.linalg.inv( unpack( x0 ) )	
-	elif used_solver == "MOSEK":
-		import mosek, sys
-		def streamprinter(msg):
-			sys.stdout.write (msg)
-			sys.stdout.flush ()
-		# Make mosek environment
-		with mosek.Env() as env:
-			# Create a task object
-			with env.Task(0,0) as task:
-			# Attach a log stream printer to the task
-				task.set_Stream (mosek.streamtype.log, streamprinter)
+	elif used_solver == "BINARY":
+		## Binary search
+		G = -g_bary_jac( x0 )
+		h = numpy.zeros( G.shape[0] )
+		A = g_ones_jac( x0 ).todense()
+		b = numpy.zeros( A.shape[0] )
+		b[-1] = 1
+		from binary_search_opt import min_quad_with_linear_constraints, binary_search
+		while True:
+			print("Binary outer iteration")
+			print( "f(x):", f_log_volume(x0) )
+			direction = min_quad_with_linear_constraints( f_log_volume_hess(x0), f_log_volume_grad(x0), A, b )
+			x = binary_search( x0, direction, 1.0, G, h, epsilon = 1e-10 )
+			if numpy.allclose( x, x0, rtol=1e-03, atol=1e-06 ):
+				print("all close!")
+				break
+			x0 = x
+		print( "Final x:", x0 )
+		print( "Final x inverse:" )
+		print( numpy.linalg.inv( x0.reshape( n+1, n+1 ) ) )
+		solution = numpy.linalg.inv( unpack( x0 ) )
 	else:			
 		if USE_OUR_GRADIENTS:
 			constraints.append( { 'type': 'ineq', 'fun': g_bary, 'jac': g_bary_jac_dense } )
