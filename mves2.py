@@ -309,11 +309,12 @@ def MVES( all_pts, initial_guess_vertices = None ):
 		iteration[0] += 1
 		print("Iteration", iteration[0])
 	
-	solvers = ["IPOPT", "MOSEK", "SCIPY"]
-	used_solver = "MOSEK"
+	solvers = ["IPOPT", "CVXOPT", "MOSEK", "SCIPY"]
+	used_solver = "CVXOPT"
 	# x0 = numpy.load('x0.npy')
 
 	## Solve.
+	solution = numpy.linalg.inv( unpack( x0 ) )
 	if used_solver == "IPOPT":		
 		import pyipopt
 		pyipopt.set_loglevel( 2 ) # 1: moderate log level of PyIPOPT				
@@ -343,11 +344,11 @@ def MVES( all_pts, initial_guess_vertices = None ):
 				return numpy.concatenate((g_bary_jac(x)[:nieq],g_ones_jac(x)), axis=0).ravel()
 				
 		nlp = pyipopt.create(nvar, x_L, x_U, ncon, g_L, g_U, nnzj, nnzh, eval_f, eval_grad_f, eval_g, eval_jac_g)
-		nlp.int_option('max_iter', 50)
+		nlp.int_option('max_iter', 30)
 		
 		x, zl, zu, constraint_multipliers, obj, status = nlp.solve( x0 )
 		solution = x
-	elif used_solver == "MOSEK":
+	elif used_solver == "CVXOPT":
 		## Linear test:
 		import cvxopt
 		x0 = x0[:,numpy.newaxis]
@@ -360,13 +361,17 @@ def MVES( all_pts, initial_guess_vertices = None ):
 		sparse_G = to_spmatrix(G)
 		sparse_A = to_spmatrix(A)
 		while True:
-			c = f_log_volume_grad(x0)
-			# solution = cvxopt.solvers.lp( cvxopt.matrix(c), cvxopt.matrix(G), cvxopt.matrix(h), cvxopt.matrix(A), cvxopt.matrix(b), solver='glpk' )
-			solution = cvxopt.solvers.lp( cvxopt.matrix(c), sparse_G, cvxopt.matrix(h), sparse_A, cvxopt.matrix(b), solver='mosek' )
+			Hc = numpy.dot( f_log_volume_hess_inv( x0 ), f_log_volume_grad( x0 ) )
+			print( "Hessian direction: ", Hc )
+			c = f_log_volume_grad( x0 )
+			print( "gradian direction: ", c )
+# 			solution = cvxopt.solvers.lp( cvxopt.matrix(c), sparse_G, cvxopt.matrix(h), sparse_A, cvxopt.matrix(b), solver='glpk' )
+			solution = cvxopt.solvers.lp( cvxopt.matrix(Hc*0.9+c*0.1), sparse_G, cvxopt.matrix(h), sparse_A, cvxopt.matrix(b), solver='mosek' )
 			x = solution['x']
+			print( "Current log volume: ", f_log_volume( numpy.array(x) ) )
 			print( solution )
 			iter_num += 1
-			if( numpy.allclose( numpy.array( x ), x0, rtol=1e-03, atol=1e-06 ) or iter_num > 50):
+			if( numpy.allclose( numpy.array( x ), x0, rtol=1e-03, atol=1e-06 ) or iter_num > 30):
 				print("all close!")
 				break
 			x0 += 0.9*(numpy.array(x) - x0)
@@ -376,6 +381,17 @@ def MVES( all_pts, initial_guess_vertices = None ):
 		print( "Final x inverse:" )
 		print( numpy.linalg.inv( x0.reshape( n+1, n+1 ) ) )
 		solution = numpy.linalg.inv( unpack( x0 ) )	
+	elif used_solver == "MOSEK":
+		import mosek, sys
+		def streamprinter(msg):
+			sys.stdout.write (msg)
+			sys.stdout.flush ()
+		# Make mosek environment
+		with mosek.Env() as env:
+			# Create a task object
+			with env.Task(0,0) as task:
+			# Attach a log stream printer to the task
+				task.set_Stream (mosek.streamtype.log, streamprinter)
 	else:			
 		if USE_OUR_GRADIENTS:
 			constraints.append( { 'type': 'ineq', 'fun': g_bary, 'jac': g_bary_jac_dense } )
@@ -418,10 +434,10 @@ def test():
 
 	print( 'solution * data', '(', len(pts), 'data points)' )
 	n, data = points_to_data( pts )
-	print( numpy.dot( numpy.linalg.inv( solution.x ), data ) )
+	print( numpy.dot( numpy.linalg.inv( solution ), data ) )
 
 	# simplex = numpy.linalg.inv( solution.x )
-	simplex = solution.x
+	simplex = solution
 	print( 'solution simplex', simplex.shape[1], 'points' )
 	print( simplex.round(2) )
 
