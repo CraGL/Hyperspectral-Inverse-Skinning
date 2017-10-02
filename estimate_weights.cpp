@@ -414,11 +414,12 @@ void solve_weights_locally(
 
 namespace
 {
-void usage( const char* argv0 ) {
-    std::cerr<<"Usage:"<<std::endl<<"    " << argv0 << " pos1.obj pos2.obj pos3.obj ... pos1.Tmat pos2.Tmat pos3.Tmat ... \
-    	[--weights path/to/weights_ground_truth.DMAT]"<< std::endl;
-    // exit(0) means success. Anything else means failure.
-    exit(-1);
+	void usage( const char* argv0 ) {
+		std::cerr<<"Usage:"<<std::endl<<"    " << argv0 << " pos1.obj pos2.obj pos3.obj ... pos1.Tmat pos2.Tmat pos3.Tmat ... \
+			[--weights path/to/weigvhts_ground_truth.DMAT]"<< std::endl;
+		// exit(0) means success. Anything else means failure.
+		exit(-1);
+	}
 }
 
 int main(int argc, char* argv[]) {
@@ -432,7 +433,7 @@ int main(int argc, char* argv[]) {
 	const bool found_weight_param = get_optional_parameter( args, "--weight", weight_path );
 	if(found_weight_param && !igl::readDMAT(weight_path, W)) {
 		cerr << "Cannot read weights from " + weight_path << endl;
-		usage(args[0]);
+		usage(argv[0]);
 	}
 		
 	assert(args.size() >= 4 && args.size()%2 == 0);

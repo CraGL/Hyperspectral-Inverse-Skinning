@@ -90,8 +90,8 @@ target_link_libraries(estimate_weights
 	${NON_GUI_LIBS}
 )
 
-## A simple viewer
 include_directories( "." )
+## A simple viewer
 add_executable(viewer
 	viewer.cpp
 	jsoncpp.cpp
@@ -106,4 +106,12 @@ add_executable(viewer
 	)
 target_link_libraries(viewer
 	${GUI_LIBS}
+)
+
+## Weight manipulator
+add_executable(weight_manipulator
+	weight_manipulator.cpp
+	)
+target_link_libraries(weight_manipulator
+	${LIBIGL_LIBRARIES}
 )
