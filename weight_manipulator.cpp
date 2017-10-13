@@ -40,6 +40,8 @@ int main(int argc, char * argv[])
 // 	cout << "Before touch: " << endl;
 // 	cout << W << endl;
 	
+	int N = W.cols();
+	int num_fixed = args.size()/2;
 	for( int i=0; i<args.size(); i+=2 ) {
 		int index = stoi( args[i] );
 		double w = stod( args[i+1] );
@@ -50,7 +52,7 @@ int main(int argc, char * argv[])
 		W.col(index) = W.col(index)*w/max_w;
 	}
 	
-	for( int i=0; i<W.cols(); i++ )
+	for( int i=0; i<N; i++ )
 		cout << W.col(i).maxCoeff() << " ";
 	cout << endl;
 	
@@ -68,8 +70,13 @@ int main(int argc, char * argv[])
 					W(i,j) *= ratio;
 			}
 		}
-		else
-			W.row(i) /=  W.row(i).sum();
+		else {
+			for( int j=0; j<W.cols(); j++ ) {
+				if( unfixed[j] == true )
+					W(i,j) = (1-sum_fixed) / (N-num_fixed);
+			}
+		}
+		assert( W.row(i).sum() == 1 );	
 	}
 	
 // 	cout << "After touch: " << endl;

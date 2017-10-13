@@ -132,8 +132,9 @@ class SpaceMapper( object ):
 		if scale is not None:
 			return numpy.dot( numpy.divide( uncorrellated_poses, scale ), V[:stop_s] ) + Xavg
 		else:
-			return numpy.dot( uncorrellated_poses, V[:stop_s] ) + Xavg 
-	
+			return numpy.dot( uncorrellated_poses, V[:stop_s] ) + Xavg
+			 
+	@staticmethod
 	def PCA_Dimension( X, threshold = 1e-6 ):
 		## Subtract the average.
 		X = numpy.array( X )
@@ -147,9 +148,10 @@ class SpaceMapper( object ):
 		
 		return stop_s
 	
-	PCA_Dimension = staticmethod( PCA_Dimension )
+# 	PCA_Dimension = staticmethod( PCA_Dimension )
 	
 	## Formalize the above with functions, from Yotam's experiments
+	@staticmethod
 	def Uncorrellated_Space( X, enable_scale=True, threshold = 1e-6 ):
 		space_mapper = SpaceMapper()
 	
@@ -179,7 +181,7 @@ class SpaceMapper( object ):
 	
 		return space_mapper
 		
-	Uncorrellated_Space = staticmethod( Uncorrellated_Space )
+# 	Uncorrellated_Space = staticmethod( Uncorrellated_Space )
 
 def simplex_volumn( pts ):
 	'''
@@ -304,8 +306,6 @@ if __name__ == '__main__':
 #	scipy.io.savemat( outpath, { 'X': uncorrelated } )
 	
 	numpy.set_printoptions(precision=4, suppress=True)
-	print( "ground truth simplex volumn:" )
-	print( simplex_volumn( Ts_mapper.project( Tmat ).T ) )
  
 	## plot uncorrelated data
 #	import matplotlib.pyplot as plt
@@ -366,7 +366,8 @@ if __name__ == '__main__':
 	print( "solution" )
 	print( solution )
 	print("\nOptimization costs: %.2f seconds" % (time.time() - startTime))
-	print( "solution simplex volumn: ", simplex_volumn( solution[:-1] ) )
+	print( "ground truth simplex volumn: ", simplex_volumn( Ts_mapper.project( Tmat ).T ).round(4) )
+	print( "solution simplex volumn: ", simplex_volumn( solution[:-1] ).round(4) )
 	
 	recovered = Ts_mapper.unproject( solution[:-1].T )
 #	print( 'recovered' )
@@ -374,15 +375,21 @@ if __name__ == '__main__':
 	
 	def check_recovered( recovered, ground ):
 		flags = numpy.zeros( len(Tmat), dtype = bool )
+		dists = numpy.zeros( len(Tmat) )
 		for i, ht in enumerate( recovered ):
-			for j, gt in enumerate( ground ):
+			min_dist = numpy.linalg.norm( ht - ground[0] )
+			for j, gt in enumerate( ground ): 
+				min_dist = min( min_dist, numpy.linalg.norm( ht - gt ) )
 				if numpy.allclose(ht, gt, rtol=1e-1, atol=1e-2):
 					flags[i] = True
 					ground = numpy.delete(ground, j, 0)
 					break
-		return flags, ground
+			dists[i] = min_dist
+		return flags, ground, dists
 	
-	status, remains = check_recovered( recovered, Tmat )
+	status, remains, dists = check_recovered( recovered, Tmat )
+	print( "recovered deviation: ", dists )
+	print( "Average recovered deviation: ", dists.mean().round(4) )
 	if( all( status ) ):	print( "match ground truth" )
 	else:
 		print( "#unmatched: ", numpy.nonzero( ~status ) )
@@ -390,6 +397,7 @@ if __name__ == '__main__':
 		print( recovered[ numpy.nonzero( ~status ) ].round(4) )
 		print( "Unmatched ground truth: " )
 		print( remains.round(4) )
+	
 
 	
 

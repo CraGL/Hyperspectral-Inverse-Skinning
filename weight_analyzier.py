@@ -30,7 +30,10 @@ if __name__ == '__main__':
 	print( numpy.amin( W, axis = 1 ) )
 	
 	print( "Sum weight per vertex: " )
-	print( numpy.sum( W, axis = 0 ) )
+	sum_weight_per_handle = numpy.sum( W, axis = 0 )
+	assert( numpy.allclose( sum_weight_per_handle, numpy.ones( len(sum_weight_per_handle) ) ) )
+	print( sum_weight_per_handle )
+	
 	
 	import simplex_hull
 	NN = simplex_hull.SpaceMapper.PCA_Dimension( W )

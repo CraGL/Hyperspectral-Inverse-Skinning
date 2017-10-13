@@ -363,27 +363,42 @@ def MVES( all_pts, initial_guess_vertices = None ):
 		b[-1] = 1 
 		sparse_G = to_spmatrix(G)
 		sparse_A = to_spmatrix(A)
+		all_x = {f_log_volume( x0 ): x0}
+		MAX_ITER = 20
 		while True:
 			Hc = numpy.dot( f_log_volume_hess_inv( x0 ), f_log_volume_grad( x0 ) )
-			print( "Hessian direction: ", Hc )
+# 			print( "Hessian direction: ", Hc )
 			c = f_log_volume_grad( x0 )
-			print( "gradian direction: ", c )
+# 			print( "gradian direction: ", c )
 # 			solution = cvxopt.solvers.lp( cvxopt.matrix(c), sparse_G, cvxopt.matrix(h), sparse_A, cvxopt.matrix(b), solver='glpk' )
 			solution = cvxopt.solvers.lp( cvxopt.matrix(Hc*0.9+c*0.1), sparse_G, cvxopt.matrix(h), sparse_A, cvxopt.matrix(b), solver='mosek' )
 			x = solution['x']
 			print( "Current log volume: ", f_log_volume( numpy.array(x) ) )
-			print( solution )
+# 			print( solution )
 			iter_num += 1
-			if( numpy.allclose( numpy.array( x ), x0, rtol=1e-03, atol=1e-06 ) or iter_num > 30):
+			if( numpy.allclose( numpy.array( x ), x0, rtol=1e-02, atol=1e-05 ) ):
+				print("all close!")
+				break
+			elif iter_num >= MAX_ITER:
+				print("Exceed the maximum number of iterations!")
+				break
+			all_x[f_log_volume( numpy.array(x) ) ] = x
+			if( numpy.allclose( numpy.array( 0.1*x0+0.9*x ), x0, rtol=1e-02, atol=1e-05 ) ):
 				print("all close!")
 				break
 			x0 += 0.9*(numpy.array(x) - x0)
 			# numpy.save('x0.npy', x0)
 		print( "# LP Iteration: ", iter_num )
-		print( "Final x:", x0 )
-		print( "Final x inverse:" )
-		print( numpy.linalg.inv( x0.reshape( n+1, n+1 ) ) )
-		solution = numpy.linalg.inv( unpack( x0 ) )	
+		if iter_num >= MAX_ITER:
+			curr_volume = f_log_volume( x0 )
+			for v, x in all_x.items():
+				if v < curr_volume:
+					curr_volume = v
+					x0 = x
+		print( "Final log volume:", f_log_volume( numpy.array(x0) ) )
+# 		print( "Final x inverse:" )
+# 		print( numpy.linalg.inv( x0.reshape( n+1, n+1 ) ) )
+		solution = numpy.linalg.inv( unpack( numpy.array(x0) ) )	
 	elif used_solver == "BINARY":
 		## Binary search
 		G = -g_bary_jac( x0 )
