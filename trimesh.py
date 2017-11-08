@@ -404,7 +404,7 @@ class TriMesh( object ):
 				vertex2outgoing_boundary_hei[ he.to_vertex ].remove( outgoing_hei )
 				break
 		
-		assert False not in [ 0 == len( out_heis ) for out_heis in vertex2outgoing_boundary_hei.itervalues() ]
+		assert False not in [ 0 == len( out_heis ) for out_heis in vertex2outgoing_boundary_hei.values() ]
 	
 	def he_index2directed_edge( self, he_index ):
 		'''

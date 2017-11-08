@@ -477,11 +477,11 @@ if __name__ == '__main__':
 	sys.exit(0)
 	
 	import scipy.io 
-	import DMAT2MATLAB
+	import format_loader
 #	X = scipy.io.loadmat(argv[0])['X'].T
-	X = DMAT2MATLAB.load_DMAT(argv[0]).T
+	X = format_loader.load_DMAT(argv[0]).T
 	print( 'X.shape:', X.shape )
-	T_mat = DMAT2MATLAB.load_Tmat(argv[1]).T
+	T_mat = format_loader.load_Tmat(argv[1]).T
 	print( 'T_mat.shape:', T_mat.shape )
 	print( 'T_mat' )
 	print(T_mat)

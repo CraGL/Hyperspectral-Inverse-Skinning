@@ -14,15 +14,14 @@ import time
 import numpy
 import scipy
 
-import obj_reader
 from trimesh import TriMesh
 from scipy.spatial import ConvexHull
 import glob
+from space_mapper import SpaceMapper
 
 def create_parser():
 	""" Creates an ArgumentParser for this command line tool. """
-	parser = argparse.ArgumentParser(description = "Minimize the difference " +
-		"in sampled values along texture edge pairs.",
+	parser = argparse.ArgumentParser(description = "From per-vertex transformations to per-bone transformations. ",
 		formatter_class=argparse.ArgumentDefaultsHelpFormatter,
 		usage="%(prog)s path/to/input_model_folder")
 	parser.add_argument("pose_folder", metavar="path/to/input_models_folder",
@@ -84,15 +83,14 @@ def parse_args(parser=None):
 #	  if( path[-1] != '/' ):	path.append('/')
 	in_meshes = glob.glob(path + "/*.obj")
 	for in_mesh in in_meshes:	print(in_mesh)
-#	meshes = [ obj_reader.quads_to_triangles(obj_reader.load_obj(in_mesh)) for in_mesh in in_meshes ]
 	meshes = [ TriMesh.FromOBJ_FileName(in_mesh) for in_mesh in in_meshes ]
 	
 	in_transformations = glob.glob(path + "/*.DMAT")
-	import DMAT2MATLAB
-	Ts = numpy.array([ DMAT2MATLAB.load_DMAT(transform_path).T for transform_path in in_transformations ])
+	import format_loader
+	Ts = numpy.array([ format_loader.load_DMAT(transform_path).T for transform_path in in_transformations ])
 	
 	handle_trans = glob.glob(path + "/*.Tmat")
-	Tmat = numpy.array([ DMAT2MATLAB.load_Tmat(transform_path).T for transform_path in handle_trans ])
+	Tmat = numpy.array([ format_loader.load_Tmat(transform_path).T for transform_path in handle_trans ])
 	
 	num_poses = Ts.shape[0]
 	num_verts = Ts.shape[1]
@@ -104,84 +102,6 @@ def parse_args(parser=None):
 	Tmat = Tmat.reshape(Tmat.shape[0], Tmat.shape[1]*Tmat.shape[2])
 	
 	return (meshes, Ts, Tmat)
-
-class SpaceMapper( object ):
-	def __init__( self ):
-		self.Xavg_ = None
-		self.U_ = None
-		self.s_ = None
-		self.V_ = None
-		self.stop_s = None
-		self.scale = None
-	
-	def project( self, correllated_poses ):
-		scale = self.scale
-		stop_s = self.stop_s
-		V = self.V_
-		Xavg = self.Xavg_
-		if scale is not None:
-			return numpy.multiply( numpy.dot( correllated_poses - Xavg, V[:stop_s].T ), scale )
-		else:
-			return numpy.dot( correllated_poses - Xavg, V[:stop_s].T )
-
-	def unproject( self, uncorrellated_poses ):
-		scale = self.scale
-		stop_s = self.stop_s
-		V = self.V_
-		Xavg = self.Xavg_
-		if scale is not None:
-			return numpy.dot( numpy.divide( uncorrellated_poses, scale ), V[:stop_s] ) + Xavg
-		else:
-			return numpy.dot( uncorrellated_poses, V[:stop_s] ) + Xavg
-			 
-	@staticmethod
-	def PCA_Dimension( X, threshold = 1e-6 ):
-		## Subtract the average.
-		X = numpy.array( X )
-		Xavg = numpy.average( X, axis = 0 )[numpy.newaxis,:]
-		Xp = X - Xavg
-	
-		U, s, V = numpy.linalg.svd( Xp, full_matrices = False, compute_uv = True )
-	
-		## The first index less than threshold
-		stop_s = len(s) - numpy.searchsorted( s[::-1], threshold )
-		
-		return stop_s
-	
-# 	PCA_Dimension = staticmethod( PCA_Dimension )
-	
-	## Formalize the above with functions, from Yotam's experiments
-	@staticmethod
-	def Uncorrellated_Space( X, enable_scale=True, threshold = 1e-6 ):
-		space_mapper = SpaceMapper()
-	
-		## Subtract the average.
-		Xavg = numpy.average( X, axis = 0 )[numpy.newaxis,:]
-		# print("Xavg: ", Xavg)
-		Xp = X - Xavg
-		space_mapper.Xavg_ = Xavg
-	
-		U, s, V = numpy.linalg.svd( Xp, full_matrices = False, compute_uv = True )
-		space_mapper.U_ = U
-		space_mapper.s_ = s
-		space_mapper.V_ = V
-	
-		## The first index less than threshold
-		stop_s = len(s) - numpy.searchsorted( s[::-1], threshold )
-		# print( "s: ", s )
-		# print( "stop_s: ", stop_s )
-		space_mapper.stop_s = stop_s
-	
-		## Change scale to something that makes the projection of the points
-		## have unit size in each dimension...
-		if enable_scale:
-			scale = numpy.array( [1./(max(x)-min(x)) for x in numpy.dot( Xp, V[:stop_s].T ).T ] )
-			# print( "scale: ", scale )
-			space_mapper.scale = scale 
-	
-		return space_mapper
-		
-# 	Uncorrellated_Space = staticmethod( Uncorrellated_Space )
 
 def simplex_volumn( pts ):
 	'''
