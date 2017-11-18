@@ -185,6 +185,22 @@ def divide_mesh_into_small_sets( mesh, Ts, MAX_DIMENSION = 5 ):
 
 	return numpy.array( small_sets )
 
+def write_result(path, res):
+	B = len(res)
+	res = res.reshape(B,-1,12)
+	nframes = len(res[0])
+	with open( path, 'w' ) as f:
+		f.write("#####################################################\n")
+		for i in range(B):
+			f.write("*BONEANIMATION, BONEINDEX=" + str(i) + ", NFRAMES=" + str(nframes) + "\n")
+			for j in range(nframes):
+				s = str(j)
+				for k in range( 12 ):
+					s = s + " " + str(res[i,j,k])
+				s += " 0 0 0 1\n"
+				f.write(s)
+			f.write("#####################################################\n")
+
 ########################################
 # CMD-line tool for getting filenames. #
 ########################################
@@ -290,8 +306,12 @@ if __name__ == '__main__':
 	print( "solution simplex volumn: ", simplex_volumn( solution[:-1] ).round(4) )
 	
 	recovered = Ts_mapper.unproject( solution[:-1].T )
-#	print( 'recovered' )
-#	print( recovered.round(3) )
+	print( 'recovered', recovered.shape )
+	print( recovered.round(3) )
+	
+	output_path = "./" + sys.argv[1] + "/result.txt"
+	print( output_path )
+	write_result(output_path, recovered.round(6))
 	
 	def check_recovered( recovered, ground ):
 		flags = numpy.zeros( len(Tmat), dtype = bool )
@@ -317,6 +337,7 @@ if __name__ == '__main__':
 		print( recovered[ numpy.nonzero( ~status ) ].round(4) )
 		print( "Unmatched ground truth: " )
 		print( remains.round(4) )
+		
 	
 
 	
