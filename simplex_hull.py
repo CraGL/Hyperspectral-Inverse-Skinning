@@ -313,6 +313,8 @@ if __name__ == '__main__':
 	print( output_path )
 	write_result(output_path, recovered.round(6))
 	
+# 	import pdb; pdb.set_trace()
+	
 	def check_recovered( recovered, ground ):
 		flags = numpy.zeros( len(Tmat), dtype = bool )
 		dists = numpy.zeros( len(Tmat) )

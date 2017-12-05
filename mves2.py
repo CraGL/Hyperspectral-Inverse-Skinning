@@ -312,8 +312,8 @@ def MVES( all_pts, initial_guess_vertices = None ):
 		iteration[0] += 1
 		print("Iteration", iteration[0])
 	
-	solvers = ["IPOPT", "MOSEK", "SCIPY", "BINARY"]
-	used_solver = "MOSEK"
+	solvers = ["IPOPT", "CVXOPT_IP", "SCIPY", "BINARY", "CVXOPT_QP"]
+	used_solver = "SCIPY"
 	# x0 = numpy.load('x0.npy')
 
 	## Solve.
@@ -351,7 +351,7 @@ def MVES( all_pts, initial_guess_vertices = None ):
 		
 		x, zl, zu, constraint_multipliers, obj, status = nlp.solve( x0 )
 		solution = x
-	elif used_solver == "MOSEK":
+	elif used_solver == "CVXOPT_IP":
 		## Linear test:
 		import cvxopt
 		x0 = x0[:,numpy.newaxis]
@@ -367,7 +367,6 @@ def MVES( all_pts, initial_guess_vertices = None ):
 		MAX_ITER = 20
 		while True:
 			Hc = numpy.dot( f_log_volume_hess_inv( x0 ), f_log_volume_grad( x0 ) )
-# 			print( "Hessian direction: ", Hc )
 			c = f_log_volume_grad( x0 )
 # 			print( "gradian direction: ", c )
 # 			solution = cvxopt.solvers.lp( cvxopt.matrix(c), sparse_G, cvxopt.matrix(h), sparse_A, cvxopt.matrix(b), solver='glpk' )
@@ -396,9 +395,50 @@ def MVES( all_pts, initial_guess_vertices = None ):
 					curr_volume = v
 					x0 = x
 		print( "Final log volume:", f_log_volume( numpy.array(x0) ) )
-# 		print( "Final x inverse:" )
-# 		print( numpy.linalg.inv( x0.reshape( n+1, n+1 ) ) )
-		solution = numpy.linalg.inv( unpack( numpy.array(x0) ) )	
+		solution = numpy.linalg.inv( unpack( numpy.array(x0) ) )
+		
+	elif used_solver == "CVXOPT_QP":	
+		import cvxopt
+		x0 = x0[:,numpy.newaxis]
+		iter_num = 0
+		G = -g_bary_jac( x0 )
+		h = numpy.zeros( G.shape[0] )
+		A = g_ones_jac( x0 )
+		b = numpy.zeros( A.shape[0] )
+		b[-1] = 1 
+		sparse_G = to_spmatrix(G)
+		sparse_A = to_spmatrix(A)
+		all_x = {f_log_volume( x0 ): x0}
+		MAX_ITER = 20
+		while True:
+			P = f_log_volume_hess( x0 )
+			q = f_log_volume_grad( x0 )
+# 			import pdb; pdb.set_trace()
+			solution = cvxopt.solvers.qp( cvxopt.matrix(P), cvxopt.matrix(q), sparse_G, cvxopt.matrix(h), sparse_A, cvxopt.matrix(b) )
+			x = solution['x']
+			print( "Current log volume: ", f_log_volume( numpy.array(x) ) )
+			iter_num += 1
+			if( numpy.allclose( numpy.array( x ), x0, rtol=1e-02, atol=1e-05 ) ):
+				print("all close!")
+				break
+			elif iter_num >= MAX_ITER:
+				print("Exceed the maximum number of iterations!")
+				break
+			all_x[f_log_volume( numpy.array(x) ) ] = x
+			if( numpy.allclose( numpy.array( 0.1*x0+0.9*x ), x0, rtol=1e-02, atol=1e-05 ) ):
+				print("all close!")
+				break
+			x0 += 0.9*(numpy.array(x) - x0)
+		print( "# QP Iteration: ", iter_num )
+		if iter_num >= MAX_ITER:
+			curr_volume = f_log_volume( x0 )
+			for v, x in all_x.items():
+				if v < curr_volume:
+					curr_volume = v
+					x0 = x
+		print( "Final log volume:", f_log_volume( numpy.array(x0) ) )
+		solution = numpy.linalg.inv( unpack( numpy.array(x0) ) )
+		
 	elif used_solver == "BINARY":
 		## Binary search
 		G = -g_bary_jac( x0 )
