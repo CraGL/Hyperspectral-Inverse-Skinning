@@ -380,7 +380,7 @@ def MVES( all_pts, initial_guess_vertices = None ):
 			if( numpy.allclose( numpy.array( x ), x0, rtol=1e-02, atol=1e-05 ) ):
 				print("all close!")
 				break
-			elif( abs( fx - f_log_volume(x0) ) <= 1e-1 ):
+			elif( iter_num>MAX_ITER/2 and abs( fx - f_log_volume(x0) ) <= 0.1 ):
 				print("log volume is close!")
 				break
 			elif iter_num >= MAX_ITER:
