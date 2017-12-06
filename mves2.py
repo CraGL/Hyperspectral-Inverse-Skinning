@@ -372,31 +372,33 @@ def MVES( all_pts, initial_guess_vertices = None ):
 			c = f_log_volume_grad( x0 )
 # 			solution = cvxopt.solvers.lp( cvxopt.matrix(c), sparse_G, cvxopt.matrix(h), sparse_A, cvxopt.matrix(b), solver='glpk' )
 			solution = cvxopt.solvers.lp( cvxopt.matrix(Hc*0.9+c*0.1), sparse_G, cvxopt.matrix(h), sparse_A, cvxopt.matrix(b), solver='mosek' )
-# 			solution = cvxopt.solvers.lp( cvxopt.matrix(Hc), sparse_G, cvxopt.matrix(h), sparse_A, cvxopt.matrix(b), solver='mosek' )
 			x = solution['x']
-			print( "Current log volume: ", f_log_volume( numpy.array(x) ) )
-			all_x.append( ( f_log_volume(numpy.array(x)), x ) )
+			fx = f_log_volume( numpy.array(x) )
+			print( "Current log volume: ", fx  )
+			all_x.append( ( fx, x ) )
 			iter_num += 1
 			if( numpy.allclose( numpy.array( x ), x0, rtol=1e-02, atol=1e-05 ) ):
 				print("all close!")
+				break
+			elif( abs( fx - f_log_volume(x0) ) <= 1e-1 ):
+				print("log volume is close!")
 				break
 			elif iter_num >= MAX_ITER:
 				print("Exceed the maximum number of iterations!")
 				break
 
-			x0 = numpy.array( x )
 			x0 += 0.9*(numpy.array(x) - x0)
 				
 		print( "# LP Iteration: ", iter_num )
 		if iter_num >= MAX_ITER:
-			curr_volume = f_log_volume( x )
+			curr_volume = f_log_volume( x0 )
 			for i, item in enumerate(all_x):
 				if item[0] < curr_volume:
 					curr_volume = item[0]
-					x = item[1]
+					x0 = item[1]
 # 		import pdb; pdb.set_trace()	
-		print( "Final log volume:", f_log_volume( numpy.array(x) ) )
-		solution = numpy.linalg.inv( unpack( numpy.array(x) ) )
+		print( "Final log volume:", f_log_volume( numpy.array(x0) ) )
+		solution = numpy.linalg.inv( unpack( numpy.array(x0) ) )
 		
 	elif used_solver == "CVXOPT_QP":	
 		import cvxopt
@@ -435,8 +437,7 @@ def MVES( all_pts, initial_guess_vertices = None ):
 			if( numpy.allclose( numpy.array( 0.1*x0+0.9*x ), x0, rtol=1e-02, atol=1e-05 ) ):
 				print("all close!")
 				break
-			x0 = numpy.array(x)
-# 			x0 += 0.9*(numpy.array(x) - x0)
+			x0 += 0.9*(numpy.array(x) - x0)
 		print( "# QP Iteration: ", iter_num )
 		if iter_num >= MAX_ITER:
 			curr_volume = f_log_volume( x0 )
