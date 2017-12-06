@@ -313,7 +313,7 @@ def MVES( all_pts, initial_guess_vertices = None ):
 		print("Iteration", iteration[0])
 	
 	solvers = ["IPOPT", "CVXOPT_IP", "SCIPY", "BINARY", "CVXOPT_QP"]
-	used_solver = "SCIPY"
+	used_solver = "CVXOPT_IP"
 	# x0 = numpy.load('x0.npy')
 
 	## Solve.

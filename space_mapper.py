@@ -55,7 +55,7 @@ class SpaceMapper( object ):
 	
 	## Formalize the above with functions, from Yotam's experiments
 	@staticmethod
-	def Uncorrellated_Space( X, enable_scale=True, threshold = 1e-6 ):
+	def Uncorrellated_Space( X, enable_scale=False, threshold = 1e-6 ):
 		space_mapper = SpaceMapper()
 	
 		## Subtract the average.

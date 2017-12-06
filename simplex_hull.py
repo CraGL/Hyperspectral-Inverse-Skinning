@@ -82,14 +82,17 @@ def parse_args(parser=None):
 	path = args.pose_folder	 
 #	  if( path[-1] != '/' ):	path.append('/')
 	in_meshes = glob.glob(path + "/*.obj")
+	in_meshes.sort()
 	for in_mesh in in_meshes:	print(in_mesh)
 	meshes = [ TriMesh.FromOBJ_FileName(in_mesh) for in_mesh in in_meshes ]
 	
 	in_transformations = glob.glob(path + "/*.DMAT")
+	in_transformations.sort()
 	import format_loader
 	Ts = numpy.array([ format_loader.load_DMAT(transform_path).T for transform_path in in_transformations ])
 	
 	handle_trans = glob.glob(path + "/*.Tmat")
+	handle_trans.sort()
 	Tmat = numpy.array([ format_loader.load_Tmat(transform_path).T for transform_path in handle_trans ])
 	
 	num_poses = Ts.shape[0]
@@ -309,11 +312,9 @@ if __name__ == '__main__':
 	print( 'recovered', recovered.shape )
 	print( recovered.round(3) )
 	
-	output_path = "./" + sys.argv[1] + "/result.txt"
-	print( output_path )
-	write_result(output_path, recovered.round(6))
-	
-# 	import pdb; pdb.set_trace()
+# 	output_path = "./" + sys.argv[1] + "/result.txt"
+# 	print( output_path )
+# 	write_result(output_path, recovered.round(6))
 	
 	def check_recovered( recovered, ground ):
 		flags = numpy.zeros( len(Tmat), dtype = bool )

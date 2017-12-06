@@ -110,6 +110,7 @@ if __name__ == '__main__':
 	base_dir = sys.argv[1]
 	## mesh at rest pose
 	gt = glob.glob(base_dir + "/*.Tmat")
+	gt.sort()
 	gt_bones = np.array([ format_loader.load_Tmat(transform_path).T for transform_path in gt ])
 	gt_bones = np.swapaxes(gt_bones, 0, 1)
 	
