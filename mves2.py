@@ -356,6 +356,10 @@ def MVES( all_pts, initial_guess_vertices = None ):
 		import cvxopt
 		x0 = x0[:,numpy.newaxis]
 		iter_num = 0
+		all_x = [ (f_log_volume( numpy.array(x0) ), x0) ]
+		MAX_ITER = 20
+		
+		## set invariant parameters
 		G = -g_bary_jac( x0 )
 		h = numpy.zeros( G.shape[0] )
 		A = g_ones_jac( x0 )
@@ -363,17 +367,15 @@ def MVES( all_pts, initial_guess_vertices = None ):
 		b[-1] = 1 
 		sparse_G = to_spmatrix(G)
 		sparse_A = to_spmatrix(A)
-		all_x = {f_log_volume( x0 ): x0}
-		MAX_ITER = 20
-		while True:
+		while True:		
 			Hc = numpy.dot( f_log_volume_hess_inv( x0 ), f_log_volume_grad( x0 ) )
 			c = f_log_volume_grad( x0 )
-# 			print( "gradian direction: ", c )
 # 			solution = cvxopt.solvers.lp( cvxopt.matrix(c), sparse_G, cvxopt.matrix(h), sparse_A, cvxopt.matrix(b), solver='glpk' )
 			solution = cvxopt.solvers.lp( cvxopt.matrix(Hc*0.9+c*0.1), sparse_G, cvxopt.matrix(h), sparse_A, cvxopt.matrix(b), solver='mosek' )
+# 			solution = cvxopt.solvers.lp( cvxopt.matrix(Hc), sparse_G, cvxopt.matrix(h), sparse_A, cvxopt.matrix(b), solver='mosek' )
 			x = solution['x']
 			print( "Current log volume: ", f_log_volume( numpy.array(x) ) )
-# 			print( solution )
+			all_x.append( ( f_log_volume(numpy.array(x)), x ) )
 			iter_num += 1
 			if( numpy.allclose( numpy.array( x ), x0, rtol=1e-02, atol=1e-05 ) ):
 				print("all close!")
@@ -381,39 +383,44 @@ def MVES( all_pts, initial_guess_vertices = None ):
 			elif iter_num >= MAX_ITER:
 				print("Exceed the maximum number of iterations!")
 				break
-			all_x[f_log_volume( numpy.array(x) ) ] = x
-			if( numpy.allclose( numpy.array( 0.1*x0+0.9*x ), x0, rtol=1e-02, atol=1e-05 ) ):
-				print("all close!")
-				break
+
+			x0 = numpy.array( x )
 			x0 += 0.9*(numpy.array(x) - x0)
-			# numpy.save('x0.npy', x0)
+				
 		print( "# LP Iteration: ", iter_num )
 		if iter_num >= MAX_ITER:
-			curr_volume = f_log_volume( x0 )
-			for v, x in all_x.items():
-				if v < curr_volume:
-					curr_volume = v
-					x0 = x
-		print( "Final log volume:", f_log_volume( numpy.array(x0) ) )
-		solution = numpy.linalg.inv( unpack( numpy.array(x0) ) )
+			curr_volume = f_log_volume( x )
+			for i, item in enumerate(all_x):
+				if item[0] < curr_volume:
+					curr_volume = item[0]
+					x = item[1]
+# 		import pdb; pdb.set_trace()	
+		print( "Final log volume:", f_log_volume( numpy.array(x) ) )
+		solution = numpy.linalg.inv( unpack( numpy.array(x) ) )
 		
 	elif used_solver == "CVXOPT_QP":	
 		import cvxopt
 		x0 = x0[:,numpy.newaxis]
 		iter_num = 0
+		all_x = {f_log_volume( x0 ): x0}
+		MAX_ITER = 20
+		
+		## set invariant parameters
 		G = -g_bary_jac( x0 )
+		Gd = -g_bary_jac_dense( x0 )
 		h = numpy.zeros( G.shape[0] )
 		A = g_ones_jac( x0 )
+		Ad = g_ones_jac_dense( x0 )
 		b = numpy.zeros( A.shape[0] )
 		b[-1] = 1 
 		sparse_G = to_spmatrix(G)
 		sparse_A = to_spmatrix(A)
-		all_x = {f_log_volume( x0 ): x0}
-		MAX_ITER = 20
+			
 		while True:
+			## update solver parameters.
 			P = f_log_volume_hess( x0 )
-			q = f_log_volume_grad( x0 )
-# 			import pdb; pdb.set_trace()
+			q = f_log_volume_grad( x0 )			
+			## solve
 			solution = cvxopt.solvers.qp( cvxopt.matrix(P), cvxopt.matrix(q), sparse_G, cvxopt.matrix(h), sparse_A, cvxopt.matrix(b) )
 			x = solution['x']
 			print( "Current log volume: ", f_log_volume( numpy.array(x) ) )
@@ -428,7 +435,8 @@ def MVES( all_pts, initial_guess_vertices = None ):
 			if( numpy.allclose( numpy.array( 0.1*x0+0.9*x ), x0, rtol=1e-02, atol=1e-05 ) ):
 				print("all close!")
 				break
-			x0 += 0.9*(numpy.array(x) - x0)
+			x0 = numpy.array(x)
+# 			x0 += 0.9*(numpy.array(x) - x0)
 		print( "# QP Iteration: ", iter_num )
 		if iter_num >= MAX_ITER:
 			curr_volume = f_log_volume( x0 )
