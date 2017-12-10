@@ -64,7 +64,7 @@ def to_spmatrix( M ):
 	import cvxopt
 	return cvxopt.spmatrix( M.data, numpy.asarray( M.row, dtype = int ), numpy.asarray( M.col, dtype = int ) )
 
-def MVES( all_pts, initial_guess_vertices = None ):
+def MVES( pts, initial_guess_vertices = None ):
 	'''
 	Given:
 		pts: A sequence of n-dimensional points (e.g. points are rows)
@@ -76,14 +76,8 @@ def MVES( all_pts, initial_guess_vertices = None ):
 		always be 1.
 	'''
 	
-	all_pts = numpy.asfarray( all_pts )
-	print( "All pts #: ", len(all_pts) )
-#	unique_pts = numpy.unique( all_pts, axis=0 )
-#	print( "unique pts #: ", len(unique_pts) )
-	## only the surface points matters.
-#	pts = cull_interior_points( unique_pts )
-#	print( "After culling pts #: ", len(pts) )
-	pts = all_pts
+	pts = numpy.asfarray( pts )
+	print( "All pts #: ", len(pts) )
 	
 	n, data = points_to_data( pts )
 	
@@ -314,7 +308,8 @@ def MVES( all_pts, initial_guess_vertices = None ):
 	
 	solvers = ["IPOPT", "CVXOPT_IP", "SCIPY", "BINARY", "CVXOPT_QP"]
 	used_solver = "CVXOPT_IP"
-	# x0 = numpy.load('x0.npy')
+	iter_num = 0
+	MAX_ITER = 20
 
 	## Solve.
 	solution = numpy.linalg.inv( unpack( x0 ) )
@@ -347,7 +342,7 @@ def MVES( all_pts, initial_guess_vertices = None ):
 				return numpy.concatenate((g_bary_jac(x)[:nieq],g_ones_jac(x)), axis=0).ravel()
 				
 		nlp = pyipopt.create(nvar, x_L, x_U, ncon, g_L, g_U, nnzj, nnzh, eval_f, eval_grad_f, eval_g, eval_jac_g)
-		nlp.int_option('max_iter', 30)
+		nlp.int_option('max_iter', MAX_ITER)
 		
 		x, zl, zu, constraint_multipliers, obj, status = nlp.solve( x0 )
 		solution = x
@@ -355,9 +350,7 @@ def MVES( all_pts, initial_guess_vertices = None ):
 		## Linear test:
 		import cvxopt
 		x0 = x0[:,numpy.newaxis]
-		iter_num = 0
 		all_x = [ (f_log_volume( numpy.array(x0) ), x0) ]
-		MAX_ITER = 20
 		
 		## set invariant parameters
 		G = -g_bary_jac( x0 )
@@ -403,16 +396,14 @@ def MVES( all_pts, initial_guess_vertices = None ):
 	elif used_solver == "CVXOPT_QP":	
 		import cvxopt
 		x0 = x0[:,numpy.newaxis]
-		iter_num = 0
-		all_x = {f_log_volume( x0 ): x0}
-		MAX_ITER = 20
+		all_x = [ (f_log_volume( numpy.array(x0) ), x0) ]
 		
 		## set invariant parameters
 		G = -g_bary_jac( x0 )
-		Gd = -g_bary_jac_dense( x0 )
+# 		Gd = -g_bary_jac_dense( x0 )
 		h = numpy.zeros( G.shape[0] )
 		A = g_ones_jac( x0 )
-		Ad = g_ones_jac_dense( x0 )
+# 		Ad = g_ones_jac_dense( x0 )
 		b = numpy.zeros( A.shape[0] )
 		b[-1] = 1 
 		sparse_G = to_spmatrix(G)
@@ -424,27 +415,30 @@ def MVES( all_pts, initial_guess_vertices = None ):
 			q = f_log_volume_grad( x0 )			
 			## solve
 			solution = cvxopt.solvers.qp( cvxopt.matrix(P), cvxopt.matrix(q), sparse_G, cvxopt.matrix(h), sparse_A, cvxopt.matrix(b) )
+			# solution = cvxopt.solvers.qp( -cvxopt.matrix(P), cvxopt.matrix(q), sparse_G, cvxopt.matrix(h), sparse_A, cvxopt.matrix(b), kktsolver='ldl' )
 			x = solution['x']
-			print( "Current log volume: ", f_log_volume( numpy.array(x) ) )
+			fx = f_log_volume( numpy.array(x) )
+			print( "Current log volume: ", fx )
 			iter_num += 1
 			if( numpy.allclose( numpy.array( x ), x0, rtol=1e-02, atol=1e-05 ) ):
 				print("all close!")
 				break
+			elif( iter_num>MAX_ITER/2 and abs( fx - f_log_volume(x0) ) <= 0.1 ):
+				print("log volume is close!")
+				break
 			elif iter_num >= MAX_ITER:
 				print("Exceed the maximum number of iterations!")
 				break
-			all_x[f_log_volume( numpy.array(x) ) ] = x
-			if( numpy.allclose( numpy.array( 0.1*x0+0.9*x ), x0, rtol=1e-02, atol=1e-05 ) ):
-				print("all close!")
-				break
-			x0 += 0.9*(numpy.array(x) - x0)
+			all_x.append( ( fx, x ) )
+# 			x0 += 0.9*(numpy.array(x) - x0)
+			x0 = numpy.array(x)
 		print( "# QP Iteration: ", iter_num )
 		if iter_num >= MAX_ITER:
 			curr_volume = f_log_volume( x0 )
-			for v, x in all_x.items():
-				if v < curr_volume:
-					curr_volume = v
-					x0 = x
+			for i, item in enumerate(all_x):
+				if item[0] < curr_volume:
+					curr_volume = item[0]
+					x0 = item[1]
 		print( "Final log volume:", f_log_volume( numpy.array(x0) ) )
 		solution = numpy.linalg.inv( unpack( numpy.array(x0) ) )
 		
@@ -491,13 +485,12 @@ def MVES( all_pts, initial_guess_vertices = None ):
 	## Return the solution in a better format.
 	
 	barycentric = numpy.dot( numpy.linalg.inv( solution ), numpy.concatenate( ( pts.T, numpy.ones((1,pts.shape[0])) ), axis=0 ) )
-#	import pdb; pdb.set_trace() 
 	if numpy.allclose( barycentric.min(1), numpy.zeros(barycentric.shape[0]) ):
-		print( "Initial test succeeds." )
+		print( "weight test succeeds." )
 	else:
-		print( "Initial test fails." )
+		print( "weight test fails." )
 	
-	return solution
+	return solution, barycentric.T, iter_num
 
 def test():
 	pts = [ [ 0,1 ], [ 1,0 ], [ -2,0 ], [ 0, 0 ] ]

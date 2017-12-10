@@ -188,11 +188,17 @@ def divide_mesh_into_small_sets( mesh, Ts, MAX_DIMENSION = 5 ):
 
 	return numpy.array( small_sets )
 
-def write_result(path, res):
+def write_result(path, res, weights, iter_num, time):
 	B = len(res)
 	res = res.reshape(B,-1,12)
 	nframes = len(res[0])
 	with open( path, 'w' ) as f:
+		f.write("#####################################################\n")
+		f.write("# (C) Songrun (songruner@gmail.com)\n")
+		f.write("#\n")
+		f.write("# Running time: " + str(round(time, 3)) + " (s)\n")
+		f.write("# Repeat      : " + str(iter_num) + "\n")
+		f.write("#\n")
 		f.write("#####################################################\n")
 		for i in range(B):
 			f.write("*BONEANIMATION, BONEINDEX=" + str(i) + ", NFRAMES=" + str(nframes) + "\n")
@@ -203,6 +209,18 @@ def write_result(path, res):
 				s += " 0 0 0 1\n"
 				f.write(s)
 			f.write("#####################################################\n")
+			
+		## write weights
+		m, n = weights.shape[0], weights.shape[1]
+		f.write("*VERTEXWEIGHTS, NVERTICES=" + str(m) + "  #(vtx0Based bone0 w0 bone1 w1 ... )\n")	
+		for i in range(m):
+			s = str(i)+" "
+			for j in range(n):
+				s = s + " " + str(j) + " " + str(weights[i,j])
+			s += "\n"
+			f.write(s)
+		f.write("#####################################################\n")
+			
 
 ########################################
 # CMD-line tool for getting filenames. #
@@ -256,7 +274,7 @@ if __name__ == '__main__':
  
 	## Compute minimum-volume enclosing simplex
 	import mves2
-	solution = mves2.MVES( uncorrelated )
+	solution, weights, iter_num = mves2.MVES( uncorrelated )
 	
 	'''
 	## Option 1: Run MVES on the union of convex hull vertices:
@@ -304,7 +322,8 @@ if __name__ == '__main__':
 	
 	print( "solution" )
 	print( solution )
-	print("\nOptimization costs: %.2f seconds" % (time.time() - startTime))
+	running_time = time.time() - startTime
+	print("\nOptimization costs: %.2f seconds" %running_time)
 	print( "ground truth simplex volumn: ", simplex_volumn( Ts_mapper.project( Tmat ).T ).round(4) )
 	print( "solution simplex volumn: ", simplex_volumn( solution[:-1] ).round(4) )
 	
@@ -312,9 +331,10 @@ if __name__ == '__main__':
 	print( 'recovered', recovered.shape )
 	print( recovered.round(3) )
 	
-# 	output_path = "./" + sys.argv[1] + "/result.txt"
-# 	print( output_path )
-# 	write_result(output_path, recovered.round(6))
+	
+	output_path = "./" + sys.argv[1] + "/result.txt"
+	print( output_path )
+	write_result(output_path, recovered.round(6), weights.round(6), iter_num, running_time)
 	
 	def check_recovered( recovered, ground ):
 		flags = numpy.zeros( len(Tmat), dtype = bool )

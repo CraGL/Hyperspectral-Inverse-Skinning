@@ -14,6 +14,7 @@ if __name__ == "__main__":
 	dir_path, output = sys.argv[1], sys.argv[2]
 	
 	mesh_paths = glob.glob(dir_path + "/*.obj")
+	mesh_paths.sort()
 	
 	data_set = []
 	for path in mesh_paths:	

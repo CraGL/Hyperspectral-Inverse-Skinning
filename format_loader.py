@@ -51,31 +51,47 @@ def load_poses( path ):
 	M = asarray( M )
 	return M
 	
-def load_ssd_result( path ):
+def load_result( path ):
+	## M is Bone-by-Frame-by-12
 	M = []
-	count, B, nframes = 0, 0, 0
+	W = None
+	section = None
+	count, B, nframes, rows = 0, 0, 0, 0
 	with open( path ) as f:
-		for i, line in enumerate( f ):
+		for line in f:
 			words = line.strip().split(", ")
-			
-			if count < nframes:
-				words = line.strip().split(" ")
-				assert( len(words) == 17 )
-				M.append( list( map(float, words[1:13] ) ) )
-				count+=1
 					
 			if len(words) == 3 and words[0] == "*BONEANIMATION":
+				section = "bone"
 				nframes = int(words[2][len("NFRAMES="):])
 				count=0
 				B += 1
 				
-			if len(words) > 0 and words[0] == "*VERTEXWEIGHTS":
-				break
+			elif len(words) > 0 and words[0] == "*VERTEXWEIGHTS":
+				section = "weight"
+				rows = int(words[1].split(" ")[0].split("=")[1])
+				W = zeros((rows, B))
+				count = 0
+			
+			elif section == "bone" and count < nframes:
+				words = line.strip().split(" ")
+				assert( len(words) == 17 )
+				M.append( list( map(float, words[1:13] ) ) )
+				count+=1
+			
+			elif section == "weight" and count < rows:
+				words = line.strip().split(" ")
+				assert( len( words ) % 2 == 0 )
+				ridx = int( words[0] )
+				for i in range( int(len(words[2:])/2) ):
+					cidx = int( words[i*2+2] )
+					val = float( words[i*2+3] )
+					W[ridx, cidx] = val
+				count+=1
 	
 	M = asarray( M ).reshape(B,-1,12)
-# 	M = swapaxes(M,0,1)
 	
-	return M
+	return M, W.T
 
 
 ## test load DMAT
