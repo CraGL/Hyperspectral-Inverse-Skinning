@@ -209,7 +209,7 @@ def optimize(x0, vertices1, vertices2, Smooth_Matrix, weights, control_level):
 
 	res = scipy.optimize.minimize(objective_func, x0, args=(vertices1, vertices2, Smooth_Matrix, weights, control_level)
 			,jac = gradient_objective_func
-			# ,options={'gtol':1e-4, 'ftol': 1e-4}
+			# ,options={'gtol':1e-7, 'ftol': 1e-7}
 			,method='L-BFGS-B'
 		 )
 
@@ -291,7 +291,7 @@ def run_one(mesh1, mesh2_list, outprefix, weights, initials=None, option=3):
 			after=M-1
 
 			while True:
-				i=(before+after)/2
+				i=(before+after)//2
 				print( "round: ", i+1 )
 				x0_copy=x0.copy()
 				### directly on minimize() with L-BFGS-B
@@ -316,7 +316,7 @@ def run_one(mesh1, mesh2_list, outprefix, weights, initials=None, option=3):
 					before=i
 				rmse_list.append(rmse)
 				
-				if i==(before+after)/2:
+				if i==(before+after)//2:
 					break
 			
   
@@ -383,7 +383,7 @@ def run_one(mesh1, mesh2_list, outprefix, weights, initials=None, option=3):
 	elif option==2: ##### suitable for small w_svd value.
 		
 		for i in range(M):
-			print( "round: ", i )
+			print( "round: ", i+1 )
 			### directly on minimize() with L-BFGS-B
 			transformation_matrix=optimize(x0, vertices1, vertices2, Smooth_Matrix, weights, i+1)
 

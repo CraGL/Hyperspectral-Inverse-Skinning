@@ -245,7 +245,7 @@ def run_one(mesh1, mesh2, outprefix, weights, initials=None):
         print weights
 
         for i in range(M):
-            print "round: ", i
+            print "round: ", i+1
             x0_copy=x0.copy()
             ### directly on minimize() with L-BFGS-B
             transformation_matrix=optimize(x0, vertices1, vertices2, Smooth_Matrix, weights, i+1)
