@@ -209,7 +209,7 @@ def optimize(x0, vertices1, vertices2, Smooth_Matrix, weights, control_level):
 
 	res = scipy.optimize.minimize(objective_func, x0, args=(vertices1, vertices2, Smooth_Matrix, weights, control_level)
 			,jac = gradient_objective_func
-			# ,options={'gtol':1e-7, 'ftol': 1e-7}
+			,options={'gtol':1e-7, 'ftol': 1e-7}
 			,method='L-BFGS-B'
 		 )
 
