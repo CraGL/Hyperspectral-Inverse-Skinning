@@ -210,21 +210,15 @@ if __name__ == '__main__':
 
 	name = sys.argv[2].split("/")[-1]
 	gt_fs = rest_mesh.faces
-	def write_OBJ( path, vs, fs ):
-		with open( path, 'w' ) as file:
-			for v in vs:
-				file.write("v " + str(v[0]) + " " + str(v[1]) + " " + str(v[2]) + "\n")	
-			for f in fs:
-				file.write("f " + str(f[0]+1) + " " + str(f[1]+1) + " " + str(f[2]+1) + "\n")
 	
 # 	import pdb; pdb.set_trace()
 	for i, vs in enumerate(ssd_vs):
 		output_path = "SSD_res/recon_ssd_P"+str(i)+"_"+name
-		write_OBJ( output_path, vs.round(6), gt_fs )
+		format_loader.write_OBJ( output_path, vs.round(6), gt_fs )
 	
 	for i, vs in enumerate(rev_vs):
 		output_path = "SSD_res/recon_rev_P"+str(i)+"_"+name
-		write_OBJ( output_path, vs.round(6), gt_fs )
+		format_loader.write_OBJ( output_path, vs.round(6), gt_fs )
 		
 # 	plot(gt_bones, ssd_bones, rev_bones )	
  

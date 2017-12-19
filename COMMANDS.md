@@ -11,9 +11,16 @@ skinning weights. The result has a consistent format as the SSD program's result
 ### Convert our pose settings to SSD input settings
 Convert a set of OBJ files of poses in pose folder into a txt file, which is the input file of the SSD program. Place it in the pose folder.
 
-	python dataset_maker.py path/to/pose-folder base-name
+	python serialize_pose.py path/to/pose-folder base-name
 	e.g.
-	python dataset_maker.py models/cube4/poses-1 cube4-1
+	python serialize_pose.py models/cube4/poses-1 cube4-1
+	
+### Convert the SSD input settings to a folder containing a sequence of pose meshes.
+SSD input includes a rest pose OBJ file and a TXT file containing pose information.
+
+	python unserialize_pose.py path/to/SSD_input.obj path/to/SSD_input.txt path/to/folder
+	e.g.
+	python unserialize_pose.py SSD_Data/cat-poses.obj SSD_Data/cat-poses.txt models/cat
 	
 ### Compare our result with SSD result, both numerically and by generating reconstructed meshes.
 

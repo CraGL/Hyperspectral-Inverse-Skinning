@@ -48,10 +48,7 @@ if __name__ == '__main__':
 	mesh_List = []
 	if args[1] == '--ssd':
 		print("Import poses: ", args[2])
-		poses = load_poses( args[2] )
-		for i in range( len(poses) ):
-			mesh_List.append( poses[i].reshape(-1,3) )
-			
+		mesh_List = load_poses( args[2] )
 		start=time.time()
 		res=run_one_ssd(mesh, mesh_List, output_prefix, weights, None)
 		res=res.reshape((N,-1))

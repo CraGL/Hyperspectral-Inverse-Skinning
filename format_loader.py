@@ -39,7 +39,11 @@ def load_Tmat( path ):
 	return M
 	
 def load_poses( path ):	
+	'''
+	Load the SSD input txt file.
+	'''
 	M = []
+	dims = None
 	with open( path ) as f:
 		for i, line in enumerate( f ):
 			if i == 0:
@@ -49,9 +53,14 @@ def load_poses( path ):
 				M.append( list( map( float, line.strip().split() ) ) )
 	
 	M = asarray( M )
+	M = M.reshape( (dims[0], -1, 3) )
+	
 	return M
 	
 def load_result( path ):
+	'''
+	Load the SSD output output.
+	'''
 	## M is Bone-by-Frame-by-12
 	M = []
 	W = None
@@ -93,29 +102,13 @@ def load_result( path ):
 	
 	return M, W.T
 
+def write_OBJ( path, vs, fs ):
+	with open( path, 'w' ) as file:
+		for v in vs:
+			file.write("v " + str(v[0]) + " " + str(v[1]) + " " + str(v[2]) + "\n")	
+		for f in fs:
+			file.write("f " + str(f[0]+1) + " " + str(f[1]+1) + " " + str(f[2]+1) + "\n")
 
-## test load DMAT
-# if __name__ == '__main__':
-#	if len( sys.argv ) != 3:
-#		print( 'Usage:', sys.argv[0], 'path/to/input.DMAT path/to/output.mat [matlab_variable_name]', file = sys.stderr )
-#		sys.exit(-1)
-# 
-#	argv = list( sys.argv[1:] )
-#	inpath = argv.pop(0)
-#	outpath = argv.pop(0)
-# 
-#	matlab_variable_name = 'X'
-#	if len( argv ) > 0:
-#		matlab_variable_name = argv.pop(0)
-# 
-#	assert len( argv ) == 0
-# 
-#	print( "Loading:", inpath )
-#	X = load_DMAT( inpath )
-#	print( "Loaded:", inpath )
-#	print( "Saving:", outpath )
-#	scipy.io.savemat( outpath, { matlab_variable_name: X } )
-#	print( "Saved:", outpath )
 
 ## test load poses
 if __name__ == '__main__':
