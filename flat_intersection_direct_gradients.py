@@ -5,7 +5,8 @@ by www.matrixcalculus.org
 
 from input
 
-d/dB norm2(v*(p+B*inv(B'*v'*v*B)*B'*v'*(v*p-w))-w) = 1/norm2((p'+(v*p-w)'*v*B*inv((v*B)'*v*B)*B')*v'+(-w)')*v'*(v*(p+B*inv((v*B)'*v*B)*B'*v'*(v*p-w))-w)*((v*p-w)'*v*B*inv((v*B)'*v*B))-(1/norm2(v*(p+B*inv((v*B)'*v*B)*B'*v'*(v*p-w))-w)*v'*v*B*inv((v*B)'*v*B)*B'*v'*(v*p-w)*(((p'+(v*p-w)'*v*B*inv((v*B)'*v*B)*B')*v'+(-w)')*v*B*inv((v*B)'*v*B))+1/norm2((p'+(v*p-w)'*v*B*inv((v*B)'*v*B)*B')*v'+(-w)')*v'*v*B*inv((v*B)'*v*B)*B'*v'*(v*(p+B*inv((v*B)'*v*B)*B'*v'*(v*p-w))-w)*((v*p-w)'*v*B*inv((v*B)'*v*B)))+1/norm2(v*(p+B*inv((v*B)'*v*B)*B'*v'*(v*p-w))-w)*v'*(v*p-w)*(((p'+(v*p-w)'*v*B*inv((v*B)'*v*B)*B')*v'+(-w)')*v*B*inv((v*B)'*v*B))
+d/dB norm2(v*(p+B*-inv(B'*v'*v*B)*B'*v'*(v*p-w))-w) = -(1/norm2((p'-(v*p-w)'*v*B*inv((v*B)'*v*B)*B')*v'+(-w)')*v'*(v*(p-B*inv((v*B)'*v*B)*B'*v'*(v*p-w))-w)*((v*p-w)'*v*B*inv((v*B)'*v*B))-(1/norm2(v*(p-B*inv((v*B)'*v*B)*B'*v'*(v*p-w))-w)*v'*v*B*inv((v*B)'*v*B)*B'*v'*(v*p-w)*(((p'-(v*p-w)'*v*B*inv((v*B)'*v*B)*B')*v'+(-w)')*v*B*inv((v*B)'*v*B))+1/norm2((p'-(v*p-w)'*v*B*inv((v*B)'*v*B)*B')*v'+(-w)')*v'*v*B*inv((v*B)'*v*B)*B'*v'*(v*(p-B*inv((v*B)'*v*B)*B'*v'*(v*p-w))-w)*((v*p-w)'*v*B*inv((v*B)'*v*B)))+1/norm2(v*(p-B*inv((v*B)'*v*B)*B'*v'*(v*p-w))-w)*v'*(v*p-w)*(((p'-(v*p-w)'*v*B*inv((v*B)'*v*B)*B')*v'+(-w)')*v*B*inv((v*B)'*v*B)))
+d/dp norm2(v*(p+B*-inv(B'*v'*v*B)*B'*v'*(v*p-w))-w) = 1/norm2((p'-(v*p-w)'*v*B*inv((v*B)'*v*B)*B')*v'+(-w)')*v'*(v*(p-B*inv((v*B)'*v*B)*B'*v'*(v*p-w))-w)-1/norm2((p'-(v*p-w)'*v*B*inv((v*B)'*v*B)*B')*v'+(-w)')*v'*v*B*inv((v*B)'*v*B)*B'*v'*(v*(p-B*inv((v*B)'*v*B)*B'*v'*(v*p-w))-w)
 
 where
 
@@ -181,17 +182,26 @@ def f_and_dfdp_and_dfdB_dumb( p, B, vbar, vprime ):
 	return f, dp, dB
 
 def generateRandomData():
-	np.random.seed(0)
-	B = np.random.randn(3, 3)
-	p = np.random.randn(3)
-	v = np.random.randn(3, 3)
-	w = np.random.randn(3)
+	#np.random.seed(0)
+	P = 1
+	handles = 2
+	B = np.random.randn(12*P, handles)
+	p = np.random.randn(12*P)
+	v = np.random.randn(3*P, 12*P)
+	w = np.random.randn(3*P)
 	return B, p, v, w
 
 if __name__ == '__main__':
 	B, p, v, w = generateRandomData()
-	functionValue, gradientp, gradientB = f_and_dfdp_and_dfdB(B, p, v, w)
+	functionValue, gradientp, gradientB = f_and_dfdp_and_dfdB(p, B, v, w)
+	functionValue_dumb, gradientp_dumb, gradientB_dumb = f_and_dfdp_and_dfdB_dumb(p, B, v, w)
 	print('functionValue = ', functionValue)
 	print('gradient p = ', gradientp)
 	print('gradient B = ', gradientB)
-
+	print('functionValue_dumb = ', functionValue_dumb)
+	print('gradient p dumb = ', gradientp_dumb)
+	print('gradient B dumb = ', gradientB_dumb)
+	
+	print( "Function value matches if zero:", abs( functionValue - functionValue ) )
+	print( "gradient p matches if zero:", abs( gradientp - gradientp_dumb ).max() )
+	print( "gradient B matches if zero:", abs( gradientB - gradientB_dumb ).max() )

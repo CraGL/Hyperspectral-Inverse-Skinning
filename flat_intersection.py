@@ -188,7 +188,7 @@ def zero_energy_test(base_dir):
 	
 		return MT
 
-	gt_bone_paths = glob.glob(base_dir + "*.Tmat")
+	gt_bone_paths = glob.glob(base_dir + "/*.Tmat")
 	gt_bone_paths.sort()
 	gt_bones = np.array([ load_perbone_tranformation(transform_path) for transform_path in gt_bone_paths ])
 	gt_bones = np.swapaxes(gt_bones, 0, 1)
@@ -211,13 +211,16 @@ def zero_energy_test(base_dir):
 	
 		return MT
 	
-	gt_vertex_paths = glob.glob(base_dir + "*.DMAT")
+	gt_vertex_paths = glob.glob(base_dir + "/*.DMAT")
 	gt_vertex_paths.sort()
 	gt_vertices = np.array([ load_pervertex_transformation(path) for path in gt_vertex_paths ])
 	gt_vertices = np.swapaxes(gt_vertices, 0, 1)
 	gt_vertices = gt_vertices.reshape( len(gt_vertices), -1 )
 	
-	return gt_bones, gt_vertices
+	gt_W_path = "models/cheburashka/cheburashka.DMAT"
+	gt_W = np.array( format_loader.load_DMAT(gt_W_path) ).T
+	
+	return gt_bones, gt_vertices, gt_W
 	
 # def zero_energy_test(base_dir):
 # 	gt_bone_paths = glob.glob(base_dir + "*.DMAT")
@@ -228,26 +231,40 @@ def zero_energy_test(base_dir):
 # 	
 # 	return gt_bones
 	
-def optimize_nullspace_directly(P, seed, row_mats, deformed_vs):
+def optimize_nullspace_directly(P, H, row_mats, deformed_vs, ground_truth_path = None, recovery_test = None ):
 
 	## 0 energy test
-	gt_bones, gt_vertices = zero_energy_test("models/cube4/poses-1/")
+	if ground_truth_path is not None:
+		gt_bones, gt_vertices, gt_W = zero_energy_test(ground_truth_path)
 
 	def f_point_distance_sum(x):
 		dist = 0
 		pt, B = unpack(x,P)
+		num_underconstrained = 0
 		for j, vs in enumerate(deformed_vs):
 			vprime = vs.reshape((3*P,1))	
 			vbar = row_mats[j]
-			lh = np.dot( np.dot(B.T, np.dot(vbar.T, vbar)), B )
-			rh = -np.dot( np.dot(B.T, vbar.T), np.dot(vbar, pt) - vprime )
-			z = np.linalg.solve(lh, rh)
+			vB = np.dot( vbar, B )
+			lh = np.dot( vB.T, vB )
+			rh = -np.dot( vB.T, np.dot(vbar, pt) - vprime )
+			## lh should be well-behaved. Its smallest singular value should not be zero.
+			if np.linalg.svd( lh, compute_uv = False )[-1] < 1e-7:
+				num_underconstrained += 1
+				# z = np.dot( np.linalg.pinv(lh), rh )
+				## Solve still works better without complaining. I guess it's not zero enough.
+				z = np.linalg.solve(lh, rh)
+			else:
+				z = np.linalg.solve(lh, rh)
 			z = z.reshape(-1,1)
 			
+			# assert( abs(np.dot( x.reshape(-1,12).T, gt_W[j] ).ravel() - gt_vertices[j]).max() < 1e-6 )
 			# assert( abs((pt+np.dot(B, z)).ravel() - gt_vertices[j]).max() < 1e-4 )
 			dist += np.linalg.norm(np.dot(vbar, pt+np.dot(B, z)) - vprime)
+			# dist += np.linalg.norm(np.dot(vbar, gt_vertices[j]) - vprime)
 	
 		# print( "f:", dist )
+		# if num_underconstrained > 0:
+		print( "Underconstrained vertices:", num_underconstrained )
 		
 		return dist
 		
@@ -283,41 +300,69 @@ def optimize_nullspace_directly(P, seed, row_mats, deformed_vs):
 		
 		return f, pack( grad_p, grad_B )
 	
-	for H in range(4, MAX_H):
-		print("#handles: ", H)
-		x0 = np.random.rand(H*12*P)
+	print("#handles: ", H)
+	x0 = np.random.rand(H*12*P)
+	
+	## zero energy test for cube4
+	if ground_truth_path is not None:
+		pt = gt_bones[0]
+		B = (gt_bones[1:] - pt).T
+		x0 = pack( pt, B )
+		## Recovery test
+		if recovery_test is not None:
+			x0 += + recovery_test*x0
 		
-		## zero energy test for cube4
-		if H == 4: 
-			pt = gt_bones[0]
-			B = (gt_bones[1:] - pt).T
-			x0 = pack( pt, B ) + 1e-5*x0
-		
-		## Without gradients:
-		print( "f_point_distance_sum value at x0:", f_point_distance_sum( x0 ) )
-		# solution = scipy.optimize.minimize( f_sum_and_gradient, x0, jac = True, constraints = constraints, callback = show_progress, options={'maxiter':10, 'disp':True} )
-		# solution = scipy.optimize.minimize( f_sum_and_gradient, x0, jac = True, constraints = constraints, method = 'L-BFGS-B', callback = show_progress, options={'maxiter':10, 'disp':True} )
-		## With gradients:
-		print( "f_point_distance_sum_and_gradient value at x0:", f_point_distance_sum_and_gradient( x0 )[0] )
-		# solution = scipy.optimize.minimize( f_point_distance_sum_and_gradient, x0, jac = True, method = 'L-BFGS-B', callback = show_progress, options={'disp':True} )
-		solution = scipy.optimize.minimize( f_point_distance_sum_and_gradient, x0, jac = True, callback = show_progress, options={'disp':True} )
-		# grad_err = scipy.optimize.check_grad( lambda x: f_point_distance_sum_and_gradient(x)[0], lambda x: f_point_distance_sum_and_gradient(x)[1], x0 )
-		# print( "scipy.optimize.check_grad() error:", grad_err )
-		
-		if( abs( f_point_distance_sum( solution.x ) ) < 1e-2 ):
-			print("find #handles: ", H)
-			return solution.x
+		print( "There are", len(gt_bones), "ground truth bones." )
+		print( "If they are linearly independent, then the following has no zeros:", np.linalg.svd( B.T, compute_uv = False ) )
+	
+	## Without gradients:
+	print( "f_point_distance_sum value at x0:", f_point_distance_sum( x0 ) )
+	# solution = scipy.optimize.minimize( f_sum_and_gradient, x0, jac = True, constraints = constraints, callback = show_progress, options={'maxiter':10, 'disp':True} )
+	# solution = scipy.optimize.minimize( f_sum_and_gradient, x0, jac = True, constraints = constraints, method = 'L-BFGS-B', callback = show_progress, options={'maxiter':10, 'disp':True} )
+	## With gradients:
+	print( "f_point_distance_sum_and_gradient value at x0:", f_point_distance_sum_and_gradient( x0 )[0] )
+	# solution = scipy.optimize.minimize( f_point_distance_sum_and_gradient, x0, jac = True, method = 'L-BFGS-B', callback = show_progress, options={'disp':True} )
+	solution = scipy.optimize.minimize( f_point_distance_sum_and_gradient, x0, jac = True, callback = show_progress, options={'disp':True} )
+	# grad_err = scipy.optimize.check_grad( lambda x: f_point_distance_sum_and_gradient(x)[0], lambda x: f_point_distance_sum_and_gradient(x)[1], x0 )
+	# print( "scipy.optimize.check_grad() error:", grad_err )
+	
+	if( abs( f_point_distance_sum( solution.x ) ) < 1e-2 ):
+		print("find #handles: ", H)
+		return solution.x
 			
 	print("Exceed Maximum #handles ", MAX_H)
 	return solution.x	
 		
 if __name__ == '__main__':
-	if len(sys.argv) != 3:
-		print( 'Usage:', sys.argv[0], 'path/to/rest_pose.obj', 'path/to/input.txt', file = sys.stderr )
+	argv = list( sys.argv )[1:]
+	
+	H = None
+	try:
+		index = argv.index("--H")
+		H = int( argv[index+1] )
+		del argv[index:index+2]
+	except ValueError: pass
+	
+	ground_truth_path = None
+	try:
+		index = argv.index("--GT")
+		ground_truth_path = argv[index+1]
+		del argv[index:index+2]
+	except ValueError: pass
+	
+	recovery_test = None
+	try:
+		index = argv.index("--recovery")
+		recovery_test = float( argv[index+1] )
+		del argv[index:index+2]
+	except ValueError: pass
+	
+	if len(argv) != 2:
+		print( 'Usage:', sys.argv[0], 'path/to/rest_pose.obj', 'path/to/input.txt', '--handles H', '--GT path', '--recovery epsilon', file = sys.stderr )
 		exit(-1)
 	
-	rest_mesh = TriMesh.FromOBJ_FileName( sys.argv[1] )
-	deformed_vs = format_loader.load_poses( sys.argv[2] )
+	rest_mesh = TriMesh.FromOBJ_FileName( argv[0] )
+	deformed_vs = format_loader.load_poses( argv[1] )
 	
 	## build flats
 	assert( len(deformed_vs.shape) == 3 )
@@ -336,7 +381,7 @@ if __name__ == '__main__':
 		for j in range(P):
 			for k in range(3):
 				unit_left_m[j*3+k, j*12+k*4:j*12+k*4+4] = pos_h/nm
-				left_m[j*3+k, j*12+k*4:j*12+k*4+4] = pos_h
+				left_m     [j*3+k, j*12+k*4:j*12+k*4+4] = pos_h
 				
 		all_rights[i] /= nm
 		assert( np.allclose( np.dot(unit_left_m, unit_left_m.T), np.eye(3*P) ) )
@@ -364,7 +409,9 @@ if __name__ == '__main__':
 	assert( np.max( abs( np.dot(all_flats[0], seed[0].reshape(-1,1)) - all_rights[0].reshape(-1,1) ) ) < 1e-10 )
 	
 # 	optimize_flat_intersection(P, all_flats, seed)
-	optimize_nullspace_directly(P, seed, all_R_mats, deformed_vs)
-
-
-		
+	if H is None:
+		Hs = range(1, MAX_H)
+	else:
+		Hs = [H]
+	for H in Hs:
+		optimize_nullspace_directly(P, H, all_R_mats, deformed_vs, ground_truth_path = ground_truth_path, recovery_test = recovery_test )
