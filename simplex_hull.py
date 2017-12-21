@@ -93,7 +93,7 @@ def parse_args(parser=None):
 	
 	handle_trans = glob.glob(path + "/*.Tmat")
 	handle_trans.sort()
-	Tmat = numpy.array([ format_loader.load_Tmat(transform_path).T for transform_path in handle_trans ])
+	Tmat = numpy.array([ format_loader.load_Tmat(transform_path) for transform_path in handle_trans ])
 	
 	num_poses = Ts.shape[0]
 	num_verts = Ts.shape[1]

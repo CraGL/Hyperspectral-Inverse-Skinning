@@ -60,13 +60,13 @@ def f_and_dfdp_and_dfdB(p, B, vbar, vprime):
 	## 12p-vector = 12p-by-handles * handles-by-handles * handles-by-12p * 12p-vector
 	t_3 = np.dot(B, np.dot(T_1, np.dot(B.T, t_2)))
 	## 3p-vector
-	t_4 = (np.dot(v, (p + t_3)) - w)
+	t_4 = (np.dot(v, (p - t_3)) - w)
 	## handles-vector = 3p-vector * 3p-by-handles * handles-by-handles
 	t_5 = np.dot(np.dot(t_0, vB), T_1)
 	## scalar
 	t_6 = np.linalg.norm(t_4)
 	## scalar
-	if abs( t_6 ) > 1e-6:
+	if abs( t_6 ) > 1e-10:
 		t_8 = (1 / t_6)
 	else:
 		t_8 = 1.
@@ -84,16 +84,101 @@ def f_and_dfdp_and_dfdB(p, B, vbar, vprime):
 	functionValue = t_6
 	
 	# gradientB = (((t_8 * np.multiply.outer(t_9, t_5)) - ((t_8 * np.multiply.outer(np.dot(v.T, np.dot(v, t_3)), t_11)) + (t_8 * np.multiply.outer(np.dot(v.T, np.dot(v, np.dot(B, np.dot(T_1, np.dot(B.T, t_9))))), t_5)))) + (t_8 * np.multiply.outer(t_2, t_11)))
-	gradientB = t_8 * (((np.multiply.outer(t_9, t_5)) - ((np.multiply.outer(np.dot(v.T, np.dot(v, t_3)), t_11)) + (np.multiply.outer(np.dot(v.T, np.dot(vB, np.dot(T_1, np.dot(B.T, t_9)))), t_5)))) + (np.multiply.outer(t_2, t_11)))
+	gradientB = -t_8 * (((np.multiply.outer(t_9, t_5)) - ((np.multiply.outer(np.dot(v.T, np.dot(v, t_3)), t_11)) + (np.multiply.outer(np.dot(v.T, np.dot(vB, np.dot(T_1, np.dot(B.T, t_9)))), t_5)))) + (np.multiply.outer(t_2, t_11)))
 
 	tp_2 = t_4
 	tp_4 = t_9
 	# gradientp = ((tp_3 * tp_4) + (tp_3 * np.dot(v.T, np.dot(v, np.dot(B, np.dot(T_1, np.dot(B.T, tp_4)))))))
-	gradientp = t_8 * ((tp_4) + (np.dot(v.T, np.dot(vB, np.dot(T_1, np.dot(B.T, tp_4))))))
+	gradientp = t_8 * ((tp_4) - (np.dot(v.T, np.dot(vB, np.dot(T_1, np.dot(B.T, tp_4))))))
 
 	return functionValue, gradientp, gradientB
 
+def fAndGB(p, B, vbar, vprime):
+	v = vbar
+	w = vprime
+	
+	assert(type(B) == np.ndarray)
+	dim = B.shape
+	assert(len(dim) == 2)
+	B_rows = dim[0]
+	B_cols = dim[1]
+	assert(type(p) == np.ndarray)
+	dim = p.shape
+	assert(len(dim) == 1)
+	p_rows = dim[0]
+	assert(type(v) == np.ndarray)
+	dim = v.shape
+	assert(len(dim) == 2)
+	v_rows = dim[0]
+	v_cols = dim[1]
+	assert(type(w) == np.ndarray)
+	dim = w.shape
+	assert(len(dim) == 1)
+	w_rows = dim[0]
+	assert(p_rows == v_cols == B_rows)
+	assert(B_cols)
+	assert(w_rows == v_rows)
 
+	t_0 = (np.dot(v, p) - w)
+	T_1 = np.linalg.inv(np.dot(np.dot(np.dot(v, B).T, v), B))
+	t_2 = np.dot(v.T, t_0)
+	t_3 = np.dot(B, np.dot(T_1, np.dot(B.T, t_2)))
+	t_4 = (np.dot(v, (p - t_3)) - w)
+	t_5 = np.dot(np.dot(np.dot(t_0, v), B), T_1)
+	t_6 = np.linalg.norm(t_4)
+	t_7 = (np.dot((p - np.dot(t_5, B.T)), v.T) + -w)
+	t_8 = (1 / np.linalg.norm(t_7))
+	t_9 = np.dot(v.T, t_4)
+	t_10 = (1 / t_6)
+	t_11 = np.dot(np.dot(np.dot(t_7, v), B), T_1)
+	functionValue = t_6
+	gradient = -(((t_8 * np.multiply.outer(t_9, t_5)) - ((t_10 * np.multiply.outer(np.dot(v.T, np.dot(v, t_3)), t_11)) + (t_8 * np.multiply.outer(np.dot(v.T, np.dot(v, np.dot(B, np.dot(T_1, np.dot(B.T, t_9))))), t_5)))) + (t_10 * np.multiply.outer(t_2, t_11)))
+
+	return functionValue, gradient
+
+def fAndGp(p, B, vbar, vprime):
+	v = vbar
+	w = vprime
+	
+	assert(type(B) == np.ndarray)
+	dim = B.shape
+	assert(len(dim) == 2)
+	B_rows = dim[0]
+	B_cols = dim[1]
+	assert(type(p) == np.ndarray)
+	dim = p.shape
+	assert(len(dim) == 1)
+	p_rows = dim[0]
+	assert(type(v) == np.ndarray)
+	dim = v.shape
+	assert(len(dim) == 2)
+	v_rows = dim[0]
+	v_cols = dim[1]
+	assert(type(w) == np.ndarray)
+	dim = w.shape
+	assert(len(dim) == 1)
+	w_rows = dim[0]
+	assert(p_rows == v_cols == B_rows)
+	assert(B_cols)
+	assert(w_rows == v_rows)
+
+	t_0 = (np.dot(v, p) - w)
+	T_1 = np.linalg.inv(np.dot(np.dot(np.dot(v, B).T, v), B))
+	t_2 = (np.dot(v, (p - np.dot(B, np.dot(T_1, np.dot(B.T, np.dot(v.T, t_0)))))) - w)
+	t_3 = (1 / np.linalg.norm((np.dot((p - np.dot(np.dot(np.dot(np.dot(t_0, v), B), T_1), B.T)), v.T) + -w)))
+	t_4 = np.dot(v.T, t_2)
+	functionValue = np.linalg.norm(t_2)
+	gradient = ((t_3 * t_4) - (t_3 * np.dot(v.T, np.dot(v, np.dot(B, np.dot(T_1, np.dot(B.T, t_4)))))))
+
+	return functionValue, gradient
+
+def f_and_dfdp_and_dfdB_dumb( p, B, vbar, vprime ):
+	f, dp = fAndGp( p, B, vbar, vprime )
+	f2, dB = fAndGB( p, B, vbar, vprime )
+	
+	assert abs( f - f2 ) < 1e-10
+	
+	return f, dp, dB
 
 def generateRandomData():
 	np.random.seed(0)

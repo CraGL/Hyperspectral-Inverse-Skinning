@@ -10,7 +10,10 @@ import os
 import sys
 import argparse
 import time
-import numpy as np
+import glob
+# import numpy as np
+import autograd.numpy as np
+from autograd import grad
 from numpy.linalg import svd
 import scipy.optimize
 
@@ -116,7 +119,7 @@ def intersect_all_flats( flats ):
 def pack( point, B ):
 	'''
 	`point` is a 12P-by-1 column matrix.
-	`B` is a 12P-by-#handles matrix.
+	`B` is a 12P-by-#(handles-1) matrix.
 	Returns them packed so that unpack( pack( point, B ) ) == point, B.
 	'''
 	p12 = B.shape[0]
@@ -128,14 +131,14 @@ def pack( point, B ):
 
 def unpack( X, poses ):
 	'''
-	X is a flattened array with (#handle+1)*12P entries.
+	X is a flattened array with #handle*12P entries.
 	The first 12*P entries are `point`.
-	The remaining entries are the 12P-by-#handles matrix B.
+	The remaining entries are the 12P-by-#(handles-1) matrix B.
 	
 	where P = poses.
 	'''
 	point = X[:12*P].reshape(12*P, 1)
-	B = X[12*P:].reshape(-1, 12*P).T
+	B = X[12*P:].reshape(-1,12*P).T
 
 	return point, B
 
@@ -169,8 +172,66 @@ def optimize_flat_intersection(P, all_flats, seed):
 			
 	print("Exceed Maximum #handles ", MAX_H)
 	return solution.x
+
+def zero_energy_test(base_dir):
+	def load_perbone_tranformation( path ):	
+		with open( path ) as f:
+			v = []
+			for i, line in enumerate( f ):
+				v = v + list( map( float, line.strip().split() ) )
+		 
+			M = np.array(v)
+	
+		M = M.reshape( -1, 4, 3 )
+		MT = np.swapaxes(M, 1, 2)
+		MT = MT.reshape(-1, 12)
+	
+		return MT
+
+	gt_bone_paths = glob.glob(base_dir + "*.Tmat")
+	gt_bone_paths.sort()
+	gt_bones = np.array([ load_perbone_tranformation(transform_path) for transform_path in gt_bone_paths ])
+	gt_bones = np.swapaxes(gt_bones, 0, 1)
+	gt_bones = gt_bones.reshape( len(gt_bones), -1 )
+	
+	
+	def load_pervertex_transformation( path ):
+		with open( path ) as f:
+			for i, line in enumerate( f ):
+				if i == 0:
+					dims = list( map( int, line.strip().split() ) )
+					M = np.zeros( np.prod( dims ) )
+			
+				else:
+					M[i-1] = float( line )
+	
+		M = M.reshape( dims ).T.reshape(-1,4,3)
+		MT = np.swapaxes(M, 1, 2)
+		MT = MT.reshape(-1, 12)
+	
+		return MT
+	
+	gt_vertex_paths = glob.glob(base_dir + "*.DMAT")
+	gt_vertex_paths.sort()
+	gt_vertices = np.array([ load_pervertex_transformation(path) for path in gt_vertex_paths ])
+	gt_vertices = np.swapaxes(gt_vertices, 0, 1)
+	gt_vertices = gt_vertices.reshape( len(gt_vertices), -1 )
+	
+	return gt_bones, gt_vertices
+	
+# def zero_energy_test(base_dir):
+# 	gt_bone_paths = glob.glob(base_dir + "*.DMAT")
+# 	gt_bone_paths.sort()
+# 	gt_bones = np.array([ format_loader.load_Tmat(transform_path) for transform_path in gt_bone_paths ])
+# 	gt_bones = np.swapaxes(gt_bones, 0, 1)
+# 	gt_bones = gt_bones.reshape( len(gt_bones), -1 )
+# 	
+# 	return gt_bones
 	
 def optimize_nullspace_directly(P, seed, row_mats, deformed_vs):
+
+	## 0 energy test
+	gt_bones, gt_vertices = zero_energy_test("models/cube4/poses-1/")
 
 	def f_point_distance_sum(x):
 		dist = 0
@@ -179,15 +240,25 @@ def optimize_nullspace_directly(P, seed, row_mats, deformed_vs):
 			vprime = vs.reshape((3*P,1))	
 			vbar = row_mats[j]
 			lh = np.dot( np.dot(B.T, np.dot(vbar.T, vbar)), B )
-			rh = np.dot( np.dot(B.T, vbar.T), np.dot(vbar, pt) - vprime )
+			rh = -np.dot( np.dot(B.T, vbar.T), np.dot(vbar, pt) - vprime )
 			z = np.linalg.solve(lh, rh)
 			z = z.reshape(-1,1)
 			
+			# assert( abs((pt+np.dot(B, z)).ravel() - gt_vertices[j]).max() < 1e-4 )
 			dist += np.linalg.norm(np.dot(vbar, pt+np.dot(B, z)) - vprime)
+	
+		# print( "f:", dist )
 		
 		return dist
-	
-	from flat_intersection_direct_gradients import f_and_dfdp_and_dfdB
+		
+	def f_point_distance_sum_gradient(x):
+		g = grad(f_point_distance_sum,0)
+		return g(x)
+		
+	def f_sum_and_gradient(x):
+		return 	f_point_distance_sum(x), f_point_distance_sum_gradient(x)
+		
+	from flat_intersection_direct_gradients import f_and_dfdp_and_dfdB, f_and_dfdp_and_dfdB_dumb
 	def f_point_distance_sum_and_gradient(x):
 		pt, B = unpack(x,P)
 		pt = pt.squeeze()
@@ -200,32 +271,45 @@ def optimize_nullspace_directly(P, seed, row_mats, deformed_vs):
 			vprime = vs.ravel()
 			vbar = row_mats[j]
 			fj, gradj_p, gradj_B = f_and_dfdp_and_dfdB( pt, B, vbar, vprime )
+			# fj2, gradj_p2, gradj_B2 = f_and_dfdp_and_dfdB_dumb( pt, B, vbar, vprime )
+			# assert "f close?:" and abs( fj - fj2 ).max() < 1e-6
+			# assert "gp close?:" and abs( gradj_p - gradj_p2 ).max() < 1e-6
+			# assert "gB close?:" and abs( gradj_B - gradj_B2 ).max() < 1e-6
 			f += fj
 			grad_p += gradj_p
 			grad_B += gradj_B
 		
-		print( "f:", f )
+		# print( "f:", f )
 		
 		return f, pack( grad_p, grad_B )
 	
 	for H in range(4, MAX_H):
 		print("#handles: ", H)
-		x0 = np.random.rand((H+1)*12*P)
-		x0[:12*P] = seed[0]
+		x0 = np.random.rand(H*12*P)
+		
+		## zero energy test for cube4
+		if H == 4: 
+			pt = gt_bones[0]
+			B = (gt_bones[1:] - pt).T
+			x0 = pack( pt, B ) + 1e-5*x0
 		
 		## Without gradients:
-		# solution = scipy.optimize.minimize( f_point_distance_sum, x0, constraints = constraints, callback = show_progress, options={'maxiter':10, 'disp':True} )
+		print( "f_point_distance_sum value at x0:", f_point_distance_sum( x0 ) )
+		# solution = scipy.optimize.minimize( f_sum_and_gradient, x0, jac = True, constraints = constraints, callback = show_progress, options={'maxiter':10, 'disp':True} )
+		# solution = scipy.optimize.minimize( f_sum_and_gradient, x0, jac = True, constraints = constraints, method = 'L-BFGS-B', callback = show_progress, options={'maxiter':10, 'disp':True} )
 		## With gradients:
+		print( "f_point_distance_sum_and_gradient value at x0:", f_point_distance_sum_and_gradient( x0 )[0] )
 		# solution = scipy.optimize.minimize( f_point_distance_sum_and_gradient, x0, jac = True, method = 'L-BFGS-B', callback = show_progress, options={'disp':True} )
 		solution = scipy.optimize.minimize( f_point_distance_sum_and_gradient, x0, jac = True, callback = show_progress, options={'disp':True} )
-		if( abs( f_point_distance_sum( solution.x ) ) < 1e-3 ):
+		# grad_err = scipy.optimize.check_grad( lambda x: f_point_distance_sum_and_gradient(x)[0], lambda x: f_point_distance_sum_and_gradient(x)[1], x0 )
+		# print( "scipy.optimize.check_grad() error:", grad_err )
+		
+		if( abs( f_point_distance_sum( solution.x ) ) < 1e-2 ):
 			print("find #handles: ", H)
 			return solution.x
 			
 	print("Exceed Maximum #handles ", MAX_H)
 	return solution.x	
-	
-	
 		
 if __name__ == '__main__':
 	if len(sys.argv) != 3:

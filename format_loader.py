@@ -34,7 +34,7 @@ def load_Tmat( path ):
 		 
 		M = array(v)
 	
-	M = M.reshape( -1, 12 ).T
+	M = M.reshape( -1, 12 )
 	
 	return M
 	
