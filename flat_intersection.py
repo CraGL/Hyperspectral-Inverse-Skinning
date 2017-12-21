@@ -17,6 +17,8 @@ from autograd import grad
 from numpy.linalg import svd
 import scipy.optimize
 
+np.set_printoptions( linewidth = 2000 )
+
 import format_loader
 from trimesh import TriMesh
 
@@ -143,10 +145,12 @@ def unpack( X, poses ):
 	return point, B
 
 iteration = [0]
+def reset_progress():
+	iteration[0] = 0
 def show_progress( x ):
 	iteration[0] += 1
 	print("Iteration", iteration[0])
-		
+
 constraints = []
 			
 def optimize_flat_intersection(P, all_flats, seed):	
@@ -165,6 +169,7 @@ def optimize_flat_intersection(P, all_flats, seed):
 			
 			return dist
 			
+		reset_progress()
 		solution = scipy.optimize.minimize( f_flat_distance_sum, x0, constraints = constraints, callback = show_progress, options={'maxiter':10, 'disp':True} )
 		if( abs( f_flat_distance_sum( solution.x ) ) < 1e-3 ):
 			print("find #handles: ", H)
@@ -237,6 +242,12 @@ def optimize_nullspace_directly(P, H, row_mats, deformed_vs, ground_truth_path =
 	if ground_truth_path is not None:
 		gt_bones, gt_vertices, gt_W = zero_energy_test(ground_truth_path)
 
+	## To make function values comparable, we need to normalize.
+	xyzs = np.asarray([ row_mat[0,:3] for row_mat in row_mats ])
+	diag = xyzs.max( axis = 0 ) - xyzs.min( axis = 0 )
+	diag = np.linalg.norm(diag)
+	normalization = 1./( len(row_mats) * diag )
+	
 	def f_point_distance_sum(x):
 		dist = 0
 		pt, B = unpack(x,P)
@@ -266,7 +277,7 @@ def optimize_nullspace_directly(P, H, row_mats, deformed_vs, ground_truth_path =
 		# if num_underconstrained > 0:
 		print( "Underconstrained vertices:", num_underconstrained )
 		
-		return dist
+		return dist * normalization
 		
 	def f_point_distance_sum_gradient(x):
 		g = grad(f_point_distance_sum,0)
@@ -298,10 +309,21 @@ def optimize_nullspace_directly(P, H, row_mats, deformed_vs, ground_truth_path =
 		
 		# print( "f:", f )
 		
-		return f, pack( grad_p, grad_B )
+		return f * normalization, pack( grad_p * normalization, grad_B * normalization )
 	
 	print("#handles: ", H)
 	x0 = np.random.rand(H*12*P)
+	pt = np.zeros((3,4))
+	pt[:,:3] = np.eye(3)
+	pt = pt.ravel()
+	for i in range(P):
+		x0[12*i: 12*(i+1)] = pt
+	pt, B = unpack( x0, P )
+	for i in range(B.shape[1]):
+		B[:,i] /= np.linalg.norm(B[:,i])
+	x0 = pack( pt, B )
+	print( "Initial pt.T: ", pt.T )
+	print( "Initial B.T: ", repr(B.T) )
 	
 	## zero energy test for cube4
 	if ground_truth_path is not None:
@@ -317,52 +339,38 @@ def optimize_nullspace_directly(P, H, row_mats, deformed_vs, ground_truth_path =
 	
 	## Without gradients:
 	print( "f_point_distance_sum value at x0:", f_point_distance_sum( x0 ) )
+	reset_progress()
 	# solution = scipy.optimize.minimize( f_sum_and_gradient, x0, jac = True, constraints = constraints, callback = show_progress, options={'maxiter':10, 'disp':True} )
 	# solution = scipy.optimize.minimize( f_sum_and_gradient, x0, jac = True, constraints = constraints, method = 'L-BFGS-B', callback = show_progress, options={'maxiter':10, 'disp':True} )
 	## With gradients:
 	print( "f_point_distance_sum_and_gradient value at x0:", f_point_distance_sum_and_gradient( x0 )[0] )
+	reset_progress()
 	# solution = scipy.optimize.minimize( f_point_distance_sum_and_gradient, x0, jac = True, method = 'L-BFGS-B', callback = show_progress, options={'disp':True} )
 	solution = scipy.optimize.minimize( f_point_distance_sum_and_gradient, x0, jac = True, callback = show_progress, options={'disp':True} )
 	# grad_err = scipy.optimize.check_grad( lambda x: f_point_distance_sum_and_gradient(x)[0], lambda x: f_point_distance_sum_and_gradient(x)[1], x0 )
 	# print( "scipy.optimize.check_grad() error:", grad_err )
 	
-	if( abs( f_point_distance_sum( solution.x ) ) < 1e-2 ):
-		print("find #handles: ", H)
-		return solution.x
+	converged = abs( f_point_distance_sum( solution.x ) ) < 1e-2
 			
-	print("Exceed Maximum #handles ", MAX_H)
-	return solution.x	
+	return converged, solution.x	
 		
 if __name__ == '__main__':
-	argv = list( sys.argv )[1:]
+	import argparse
 	
-	H = None
-	try:
-		index = argv.index("--H")
-		H = int( argv[index+1] )
-		del argv[index:index+2]
-	except ValueError: pass
+	parser = argparse.ArgumentParser( description='Solve for transformation subspace.' )
+	parser.add_argument( 'rest_pose', type=str, help='Rest pose (OBJ).')
+	parser.add_argument( 'deformed_vs', type=str, help='Deformed vertices.')
+	parser.add_argument('--handles', '--H', type=int, help='Number of handles.')
+	parser.add_argument('--ground-truth', '--GT', type=str, help='Ground truth data path.')
+	parser.add_argument('--recovery', '--R', type=float, help='Recovery test epsilon (default no recovery test).')
 	
-	ground_truth_path = None
-	try:
-		index = argv.index("--GT")
-		ground_truth_path = argv[index+1]
-		del argv[index:index+2]
-	except ValueError: pass
+	args = parser.parse_args()
+	H = args.handles
+	ground_truth_path = args.ground_truth
+	recovery_test = args.recovery
 	
-	recovery_test = None
-	try:
-		index = argv.index("--recovery")
-		recovery_test = float( argv[index+1] )
-		del argv[index:index+2]
-	except ValueError: pass
-	
-	if len(argv) != 2:
-		print( 'Usage:', sys.argv[0], 'path/to/rest_pose.obj', 'path/to/input.txt', '--handles H', '--GT path', '--recovery epsilon', file = sys.stderr )
-		exit(-1)
-	
-	rest_mesh = TriMesh.FromOBJ_FileName( argv[0] )
-	deformed_vs = format_loader.load_poses( argv[1] )
+	rest_mesh = TriMesh.FromOBJ_FileName( args.rest_pose )
+	deformed_vs = format_loader.load_poses( args.deformed_vs )
 	
 	## build flats
 	assert( len(deformed_vs.shape) == 3 )
@@ -410,8 +418,15 @@ if __name__ == '__main__':
 	
 # 	optimize_flat_intersection(P, all_flats, seed)
 	if H is None:
-		Hs = range(1, MAX_H)
+		Hs = range(2, MAX_H)
 	else:
 		Hs = [H]
 	for H in Hs:
-		optimize_nullspace_directly(P, H, all_R_mats, deformed_vs, ground_truth_path = ground_truth_path, recovery_test = recovery_test )
+		converged, x = optimize_nullspace_directly(P, H, all_R_mats, deformed_vs, ground_truth_path = ground_truth_path, recovery_test = recovery_test )
+		if ground_truth_path is not None and converged:
+			print("Converged at handle #", H)
+			exit(0)
+	
+	if ground_truth_path is not None:
+		print("Exceed Maximum #handles ", MAX_H)
+
