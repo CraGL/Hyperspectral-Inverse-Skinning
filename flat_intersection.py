@@ -236,11 +236,7 @@ def zero_energy_test(base_dir):
 # 	
 # 	return gt_bones
 	
-def optimize_nullspace_directly(P, H, row_mats, deformed_vs, ground_truth_path = None, recovery_test = None ):
-
-	## 0 energy test
-	if ground_truth_path is not None:
-		gt_bones, gt_vertices, gt_W = zero_energy_test(ground_truth_path)
+def optimize_nullspace_directly(P, H, row_mats, deformed_vs, x0):
 
 	## To make function values comparable, we need to normalize.
 	xyzs = np.asarray([ row_mat[0,:3] for row_mat in row_mats ])
@@ -311,32 +307,6 @@ def optimize_nullspace_directly(P, H, row_mats, deformed_vs, ground_truth_path =
 		
 		return f * normalization, pack( grad_p * normalization, grad_B * normalization )
 	
-	print("#handles: ", H)
-	x0 = np.random.rand(H*12*P)
-	pt = np.zeros((3,4))
-	pt[:,:3] = np.eye(3)
-	pt = pt.ravel()
-	for i in range(P):
-		x0[12*i: 12*(i+1)] = pt
-	pt, B = unpack( x0, P )
-	for i in range(B.shape[1]):
-		B[:,i] /= np.linalg.norm(B[:,i])
-	x0 = pack( pt, B )
-	print( "Initial pt.T: ", pt.T )
-	print( "Initial B.T: ", repr(B.T) )
-	
-	## zero energy test for cube4
-	if ground_truth_path is not None:
-		pt = gt_bones[0]
-		B = (gt_bones[1:] - pt).T
-		x0 = pack( pt, B )
-		## Recovery test
-		if recovery_test is not None:
-			x0 += + recovery_test*x0
-		
-		print( "There are", len(gt_bones), "ground truth bones." )
-		print( "If they are linearly independent, then the following has no zeros:", np.linalg.svd( B.T, compute_uv = False ) )
-	
 	## Without gradients:
 	print( "f_point_distance_sum value at x0:", f_point_distance_sum( x0 ) )
 	reset_progress()
@@ -345,15 +315,105 @@ def optimize_nullspace_directly(P, H, row_mats, deformed_vs, ground_truth_path =
 	## With gradients:
 	print( "f_point_distance_sum_and_gradient value at x0:", f_point_distance_sum_and_gradient( x0 )[0] )
 	reset_progress()
-	# solution = scipy.optimize.minimize( f_point_distance_sum_and_gradient, x0, jac = True, method = 'L-BFGS-B', callback = show_progress, options={'disp':True} )
-	solution = scipy.optimize.minimize( f_point_distance_sum_and_gradient, x0, jac = True, callback = show_progress, options={'disp':True} )
+	solution = scipy.optimize.minimize( f_point_distance_sum_and_gradient, x0, jac = True, method = 'L-BFGS-B', callback = show_progress, options={'disp':True} )
+	# solution = scipy.optimize.minimize( f_point_distance_sum_and_gradient, x0, jac = True, callback = show_progress, options={'disp':True} )
 	# grad_err = scipy.optimize.check_grad( lambda x: f_point_distance_sum_and_gradient(x)[0], lambda x: f_point_distance_sum_and_gradient(x)[1], x0 )
 	# print( "scipy.optimize.check_grad() error:", grad_err )
 	
 	converged = abs( f_point_distance_sum( solution.x ) ) < 1e-2
 			
 	return converged, solution.x	
+	
+def optimize_approximated_quadratic(P, H, row_mats, deformed_vs, x0):
+
+	## To make function values comparable, we need to normalize.
+	xyzs = np.asarray([ row_mat[0,:3] for row_mat in row_mats ])
+	diag = xyzs.max( axis = 0 ) - xyzs.min( axis = 0 )
+	diag = np.linalg.norm(diag)
+	normalization = 1./( len(row_mats) * diag )
+	
+	def f_point_distance_sum(x):
+		f = 0
+		xmat = x.copy().reshape(H,12*P)
 		
+		for j in range(H):
+			pt = xmat[j:j+1]
+			B = (np.vstack((xmat[:j], xmat[j+1:]))-pt).T
+			pt = pt.squeeze()
+			
+			Q = np.zeros((12*P, 12*P))
+			L = np.zeros(12*P)
+			C = 0
+			for i, vs in enumerate(deformed_vs):
+				vprime = vs.reshape((3*P,1))
+				vbar = row_mats[i]
+				vB = np.dot( vbar, B )
+				vBBv = np.dot( vB.T, vB )
+				inv_vBBv = np.linalg.pinv(vBBv)
+				A_i = np.dot(np.dot(vB, inv_vBBv), vB.T)
+			
+				foo = np.eye(3*P)-A_i
+				S_i = np.dot(foo, vbar)
+				r_i = np.dot(foo, vprime).ravel()
+
+				Q += np.dot(S_i.T, S_i)
+				L += np.dot(S_i.T, r_i)
+				C += np.dot(r_i.T, r_i)
+			
+			f = normalization * (np.dot(np.dot(pt.T,Q), pt) - 2*np.dot(pt.T,L) + C)
+			pt_new = np.linalg.solve(Q,L)
+			xmat[j] = pt_new
+			xmat[:j] = B.T[:j] + pt_new
+			xmat[j+1:] = B.T[j:] + pt_new
+			
+			print( "Sub-iteration", j, "finished. New function value:", f )
+# 			print( "New x value:", xmat.reshape(-1) )
+		res_x = x.copy()
+		res_x[:12*P] = xmat[-1]
+		res_x[12*P:] = xmat[:-1].reshape(-1)
+		
+		print( "Finished iteration." )
+		return f, res_x
+	
+	f_eps = 1e-10
+	x_eps = 1e-10
+	max_iter = 9999
+	
+	f_prev = None
+	x_prev = x0.copy()
+	iterations = 0
+	converged = False
+	while( True ):
+		iterations += 1
+		if iterations > max_iter:
+			print( "Terminating due to too many iterations." )
+			break
+		
+		print( "Starting iteration", iterations )
+		f, x = f_point_distance_sum(x_prev)
+		## If this is the first iteration, pretend that the old function value was
+		## out of termination range.
+		if f_prev is None: f_prev = f + 100*f_eps
+		
+		if f - f_prev > 0:
+			print( "WARNING: Function value increased." )
+		if abs( f_prev - f ) < f_eps:
+			print( "Function change too small, terminating:", f_prev - f )
+			converged = True
+			break
+		x_change = abs( x_prev - x ).max()
+		if x_change < x_eps:
+			print( "Variables change too small, terminating:", x_change )
+			converged = True
+			break
+		
+		f_prev = f
+		x_prev = x.copy()
+	
+	print( "Terminated after", iterations, "iterations." )
+	
+	return converged, x
+
 if __name__ == '__main__':
 	import argparse
 	
@@ -421,8 +481,46 @@ if __name__ == '__main__':
 		Hs = range(2, MAX_H)
 	else:
 		Hs = [H]
+	
+	x = None
 	for H in Hs:
-		converged, x = optimize_nullspace_directly(P, H, all_R_mats, deformed_vs, ground_truth_path = ground_truth_path, recovery_test = recovery_test )
+	
+		x0 = None
+		## 0 energy test
+		if ground_truth_path is not None:
+			gt_bones, gt_vertices, gt_W = zero_energy_test(ground_truth_path)
+
+			pt = gt_bones[0]
+			B = (gt_bones[1:] - pt).T
+			x0 = pack( pt, B )
+			## Recovery test
+			if recovery_test is not None:
+				x0 += recovery_test*np.random.rand(12*P*H)
+		
+			print( "There are", len(gt_bones), "ground truth bones." )
+			print( "If they are linearly independent, then the following has no zeros:", np.linalg.svd( B.T, compute_uv = False ) )
+
+		else:
+			print("#handles: ", H)
+			x0 = np.random.rand(H*12*P)
+			
+			if x is None:
+				pt = np.zeros((3,4))
+				pt[:,:3] = np.eye(3)
+				pt = pt.ravel()
+				for i in range(P):
+					x0[12*i: 12*(i+1)] = pt
+			else:
+				x0[:12*P*(H-1)] = x
+				
+			pt, B = unpack( x0, P )
+			for i in range(B.shape[1]):
+				B[:,i] /= np.linalg.norm(B[:,i])
+			x0 = pack( pt, B )
+	
+		converged, x = optimize_approximated_quadratic(P, H, all_R_mats, deformed_vs, x0 )
+#		converged, x = optimize_nullspace_directly(P, H, all_R_mats, deformed_vs, x0 )
+# 		converged, x = optimize_nullspace_directly(P, H, all_flats, deformed_vs, x0 )
 		if ground_truth_path is not None and converged:
 			print("Converged at handle #", H)
 			exit(0)
