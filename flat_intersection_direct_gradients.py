@@ -233,14 +233,40 @@ def fAndGpAndHp_fast(p, B, vbar, vprime):
 	return functionValue, gradient, hessian
 
 def generateRandomData():
-	B = np.random.randn(3, 3)
-	p = np.random.randn(3)
-	v = np.random.randn(3, 3)
-	w = np.random.randn(3)
+	#np.random.seed(0)
+	P = 1
+	handles = 2
+	B = np.random.randn(12*P, handles)
+	p = np.random.randn(12*P)
+	v = np.random.randn(3*P, 12*P)
+	w = np.random.randn(3*P)
 	return B, p, v, w
 
 if __name__ == '__main__':
 	B, p, v, w = generateRandomData()
-	functionValue, gradient = fAndG(B, p, v, w)
+	functionValue, gradientp, gradientB = f_and_dfdp_and_dfdB(p, B, v, w)
+	functionValue_dumb, gradientp_dumb, gradientB_dumb = f_and_dfdp_and_dfdB_dumb(p, B, v, w)
+	
 	print('functionValue = ', functionValue)
-	print('gradient = ', gradient)
+	print('gradient p = ', gradientp)
+	print('gradient B = ', gradientB)
+	
+	print('functionValue_dumb = ', functionValue_dumb)
+	print('gradient p dumb = ', gradientp_dumb)
+	print('gradient B dumb = ', gradientB_dumb)
+	
+	print( "Function value matches if zero:", abs( functionValue - functionValue ) )
+	print( "gradient p matches if zero:", abs( gradientp - gradientp_dumb ).max() )
+	print( "gradient B matches if zero:", abs( gradientB - gradientB_dumb ).max() )
+	
+	f_fast, gp_fast, hp_fast = fAndGpAndHp_fast( p, B, v, w )
+	hp_dumb = d2f_dp2_dumb( p, B, v, w )
+	
+	print('functionValue_fast = ', f_fast)
+	print('gradient p fast = ', gp_fast )
+	print('hess p fast = ', hp_fast )
+	print('hess p dumb = ', hp_dumb )
+	
+	print( "Function value matches if zero:", abs( functionValue - f_fast ) )
+	print( "gradient p matches if zero:", abs( gradientp - gp_fast ).max() )
+	print( "hess p matches if zero:", abs( hp_dumb - hp_fast ).max() )
