@@ -153,7 +153,7 @@ def show_progress( x ):
 
 constraints = []
 			
-def optimize_flat_intersection(P, all_flats, seed):	
+def optimize_flat_intersection(P, all_flats, seed): 
 	## Goal function
 	for H in range(1, MAX_H):
 	
@@ -179,7 +179,7 @@ def optimize_flat_intersection(P, all_flats, seed):
 	return solution.x
 
 def zero_energy_test(base_dir):
-	def load_perbone_tranformation( path ):	
+	def load_perbone_tranformation( path ): 
 		with open( path ) as f:
 			v = []
 			for i, line in enumerate( f ):
@@ -228,13 +228,13 @@ def zero_energy_test(base_dir):
 	return gt_bones, gt_vertices, gt_W
 	
 # def zero_energy_test(base_dir):
-# 	gt_bone_paths = glob.glob(base_dir + "*.DMAT")
-# 	gt_bone_paths.sort()
-# 	gt_bones = np.array([ format_loader.load_Tmat(transform_path) for transform_path in gt_bone_paths ])
-# 	gt_bones = np.swapaxes(gt_bones, 0, 1)
-# 	gt_bones = gt_bones.reshape( len(gt_bones), -1 )
-# 	
-# 	return gt_bones
+#	gt_bone_paths = glob.glob(base_dir + "*.DMAT")
+#	gt_bone_paths.sort()
+#	gt_bones = np.array([ format_loader.load_Tmat(transform_path) for transform_path in gt_bone_paths ])
+#	gt_bones = np.swapaxes(gt_bones, 0, 1)
+#	gt_bones = gt_bones.reshape( len(gt_bones), -1 )
+#	
+#	return gt_bones
 	
 def optimize_nullspace_directly(P, H, row_mats, deformed_vs, x0):
 
@@ -266,7 +266,9 @@ def optimize_nullspace_directly(P, H, row_mats, deformed_vs, x0):
 			
 			# assert( abs(np.dot( x.reshape(-1,12).T, gt_W[j] ).ravel() - gt_vertices[j]).max() < 1e-6 )
 			# assert( abs((pt+np.dot(B, z)).ravel() - gt_vertices[j]).max() < 1e-4 )
-			dist += np.linalg.norm(np.dot(vbar, pt+np.dot(B, z)) - vprime)
+			d = (np.dot(vbar, pt+np.dot(B, z)) - vprime).ravel()
+			dist += np.dot(d,d)
+			# dist += np.linalg.norm(np.dot(vbar, pt+np.dot(B, z)) - vprime)
 			# dist += np.linalg.norm(np.dot(vbar, gt_vertices[j]) - vprime)
 	
 		# print( "f:", dist )
@@ -280,9 +282,9 @@ def optimize_nullspace_directly(P, H, row_mats, deformed_vs, x0):
 		return g(x)
 		
 	def f_sum_and_gradient(x):
-		return 	f_point_distance_sum(x), f_point_distance_sum_gradient(x)
+		return	f_point_distance_sum(x), f_point_distance_sum_gradient(x)
 		
-	from flat_intersection_direct_gradients import f_and_dfdp_and_dfdB, f_and_dfdp_and_dfdB_dumb
+	from flat_intersection_direct_gradients import f_and_dfdp_and_dfdB, f_and_dfdp_and_dfdB_dumb, fAndGpAndHp_fast, d2f_dp2_dumb
 	def f_point_distance_sum_and_gradient(x):
 		pt, B = unpack(x,P)
 		pt = pt.squeeze()
@@ -295,6 +297,14 @@ def optimize_nullspace_directly(P, H, row_mats, deformed_vs, x0):
 			vprime = vs.ravel()
 			vbar = row_mats[j]
 			fj, gradj_p, gradj_B = f_and_dfdp_and_dfdB( pt, B, vbar, vprime )
+			
+			## test hessian_p and fast version.
+			# # fj_fast, gradj_p_fast, hessj_p_fast = fAndGpAndHp_fast( pt, B, vbar, vprime )
+			# hessj_p = d2f_dp2_dumb( pt, B, vbar, vprime )
+			# assert "f close?:" and abs( fj - fj_fast ).max() < 1e-6
+			# assert "gp close?:" and abs( gradj_p - gradj_p_fast ).max() < 1e-6
+			# assert "gB close?:" and abs( hessj_p - hessj_p_fast ).max() < 1e-6
+			
 			# fj2, gradj_p2, gradj_B2 = f_and_dfdp_and_dfdB_dumb( pt, B, vbar, vprime )
 			# assert "f close?:" and abs( fj - fj2 ).max() < 1e-6
 			# assert "gp close?:" and abs( gradj_p - gradj_p2 ).max() < 1e-6
@@ -367,7 +377,7 @@ def optimize_approximated_quadratic(P, H, row_mats, deformed_vs, x0):
 			xmat[j+1:] = B.T[j:] + pt_new
 			
 			print( "Sub-iteration", j, "finished. New function value:", f )
-# 			print( "New x value:", xmat.reshape(-1) )
+#			print( "New x value:", xmat.reshape(-1) )
 		res_x = x.copy()
 		res_x[:12*P] = xmat[-1]
 		res_x[12*P:] = xmat[:-1].reshape(-1)
@@ -414,6 +424,12 @@ def optimize_approximated_quadratic(P, H, row_mats, deformed_vs, x0):
 	
 	return converged, x
 
+def optimize(P, H, all_R_mats, deformed_vs, x0):
+	converged, x = optimize_approximated_quadratic(P, H, all_R_mats, deformed_vs, x0 )
+	converged, x = optimize_nullspace_directly(P, H, all_R_mats, deformed_vs, x )
+	return converged, x
+	
+
 if __name__ == '__main__':
 	import argparse
 	
@@ -449,7 +465,7 @@ if __name__ == '__main__':
 		for j in range(P):
 			for k in range(3):
 				unit_left_m[j*3+k, j*12+k*4:j*12+k*4+4] = pos_h/nm
-				left_m     [j*3+k, j*12+k*4:j*12+k*4+4] = pos_h
+				left_m	   [j*3+k, j*12+k*4:j*12+k*4+4] = pos_h
 				
 		all_rights[i] /= nm
 		assert( np.allclose( np.dot(unit_left_m, unit_left_m.T), np.eye(3*P) ) )
@@ -461,11 +477,11 @@ if __name__ == '__main__':
 	print( "The rank of the stack of all pose row matrices is: ", np.linalg.matrix_rank( np.vstack( all_flats ) ) )
 	
 	## find flat intersection
-# 	start_time = time.time()
-# 	intersect = all_flats[0]
-# 	for flat in all_flats[1:]:
-# 		intersect = intersect_flat( intersect, flat )
-# 	print( "Time for intersect all flats iteratively: ", time.time() - start_time )
+#	start_time = time.time()
+#	intersect = all_flats[0]
+#	for flat in all_flats[1:]:
+#		intersect = intersect_flat( intersect, flat )
+#	print( "Time for intersect all flats iteratively: ", time.time() - start_time )
 
 	seed = []
 	for i in range( N ):
@@ -476,7 +492,7 @@ if __name__ == '__main__':
 	seed = np.array( seed ).reshape( N, -1 )	
 	assert( np.max( abs( np.dot(all_flats[0], seed[0].reshape(-1,1)) - all_rights[0].reshape(-1,1) ) ) < 1e-10 )
 	
-# 	optimize_flat_intersection(P, all_flats, seed)
+#	optimize_flat_intersection(P, all_flats, seed)
 	if H is None:
 		Hs = range(2, MAX_H)
 	else:
@@ -517,13 +533,12 @@ if __name__ == '__main__':
 			for i in range(B.shape[1]):
 				B[:,i] /= np.linalg.norm(B[:,i])
 			x0 = pack( pt, B )
-	
-		converged, x = optimize_approximated_quadratic(P, H, all_R_mats, deformed_vs, x0 )
-#		converged, x = optimize_nullspace_directly(P, H, all_R_mats, deformed_vs, x0 )
-# 		converged, x = optimize_nullspace_directly(P, H, all_flats, deformed_vs, x0 )
-		if ground_truth_path is not None and converged:
+		
+		# converged, x = optimize(P, H, all_R_mats, deformed_vs, x0)
+		converged, x = optimize_nullspace_directly(P, H, all_R_mats, deformed_vs, x0)
+		if ground_truth_path is None and converged:
 			print("Converged at handle #", H)
-			exit(0)
+			break
 	
 	if ground_truth_path is not None:
 		print("Exceed Maximum #handles ", MAX_H)
