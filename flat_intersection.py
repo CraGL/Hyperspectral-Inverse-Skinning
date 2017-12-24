@@ -11,9 +11,9 @@ import sys
 import argparse
 import time
 import glob
-# import numpy as np
-import autograd.numpy as np
-from autograd import grad
+import numpy as np
+# import autograd.numpy as np
+# from autograd import grad
 from numpy.linalg import svd
 import scipy.optimize
 
@@ -345,9 +345,10 @@ def optimize_nullspace_directly(P, H, row_mats, deformed_vs, x0, strategy = None
 	## strategies: 'function', 'gradient', 'hessian', 'mixed'
 	if strategy is None: strategy = 'gradient'
 	if strategy == 'function':
-		## Without gradients:
+		## Without gradients (or autograd):
 		# solution = scipy.optimize.minimize( f_sum_and_gradient, x0, jac = True, constraints = constraints, callback = show_progress, options={'maxiter':10, 'disp':True} )
-		solution = scipy.optimize.minimize( f_sum_and_gradient, x0, jac = True, constraints = constraints, method = 'L-BFGS-B', callback = show_progress, options={'maxiter':10, 'disp':True} )
+		# solution = scipy.optimize.minimize( f_sum_and_gradient, x0, jac = True, constraints = constraints, method = 'L-BFGS-B', callback = show_progress, options={'maxiter':10, 'disp':True} )
+		solution = scipy.optimize.minimize( f_point_distance_sum, x0, constraints = constraints, method = 'L-BFGS-B', callback = show_progress, options={'maxiter':10, 'disp':True} )
 	elif strategy == 'gradient':
 		## With gradients:
 		## check_grad() is too slow.
