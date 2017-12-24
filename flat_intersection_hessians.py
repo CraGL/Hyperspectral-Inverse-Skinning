@@ -67,7 +67,12 @@ def f( x, vbar, vprime, poses ):
 	
 	return functionValue
 
-hess = autograd.hessian( f, 0 )
+hess_slow = autograd.hessian( f, 0 )
+
+def hess( *args ):
+    result = hess_slow( *args )
+    # print( "finished one hessian slow" )
+    return result
 
 def fAndGpAndHp_fast(p, B, vbar, vprime):
 	v = vbar
@@ -195,6 +200,8 @@ def hess_fast( x, vbar, vprime, poses ):
 	result[ NP:, NP: ] = dfdB2( xp, xb, vbar, vprime, poses )
 	## dpdB is the transpose of dBdp
 	result[ NP:, :NP ] = result[ :NP, NP: ].T
+	
+	# print( "compute one hessian fast" )
 	
 	return result
 
