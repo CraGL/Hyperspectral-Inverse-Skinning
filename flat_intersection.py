@@ -134,11 +134,12 @@ def pack( point, B ):
 def unpack( X, poses ):
 	'''
 	X is a flattened array with #handle*12P entries.
-	The first 12*P entries are `point`.
+	The first 12*P entries are `point` as a 12*P-by-1 matrix.
 	The remaining entries are the 12P-by-#(handles-1) matrix B.
 	
 	where P = poses.
 	'''
+	P = poses
 	point = X[:12*P].reshape(12*P, 1)
 	B = X[12*P:].reshape(-1,12*P).T
 
@@ -236,7 +237,7 @@ def zero_energy_test(base_dir):
 #	
 #	return gt_bones
 	
-def optimize_nullspace_directly(P, H, row_mats, deformed_vs, x0):
+def optimize_nullspace_directly(P, H, row_mats, deformed_vs, x0, strategy = None):
 
 	## To make function values comparable, we need to normalize.
 	xyzs = np.asarray([ row_mat[0,:3] for row_mat in row_mats ])
@@ -317,24 +318,62 @@ def optimize_nullspace_directly(P, H, row_mats, deformed_vs, x0):
 		
 		return f * normalization, pack( grad_p * normalization, grad_B * normalization )
 	
-	## Without gradients:
+	def f_hess(x):
+		pt, B = unpack(x,P)
+		pt = pt.squeeze()
+		
+		hess = np.eye( len(x) )
+		hess[:len(pt), :len(pt)] = 0.
+		for j, vs in enumerate(deformed_vs):
+			vprime = vs.ravel()
+			vbar = row_mats[j]
+			_, _, hessj_p = fAndGpAndHp_fast( pt, B, vbar, vprime )
+			hess[:len(pt),:len(pt)] += hessj_p
+		
+		return hess
+	
+	## Print the initial function.
 	print( "f_point_distance_sum value at x0:", f_point_distance_sum( x0 ) )
-	reset_progress()
-	# solution = scipy.optimize.minimize( f_sum_and_gradient, x0, jac = True, constraints = constraints, callback = show_progress, options={'maxiter':10, 'disp':True} )
-	# solution = scipy.optimize.minimize( f_sum_and_gradient, x0, jac = True, constraints = constraints, method = 'L-BFGS-B', callback = show_progress, options={'maxiter':10, 'disp':True} )
-	## With gradients:
 	print( "f_point_distance_sum_and_gradient value at x0:", f_point_distance_sum_and_gradient( x0 )[0] )
+	
+	## Optimize the quadratic degrees-of-freedom once.
+	## (It helps a lot once. It helps a lot less in future iterations.)
+	## UPDATE: Actually, this is harmful! This followed by the gradient approach slows things down!
+	# _, x0 = optimize_approximated_quadratic( P, H, row_mats, deformed_vs, x0, max_iter = 1 )
+	
 	reset_progress()
-	solution = scipy.optimize.minimize( f_point_distance_sum_and_gradient, x0, jac = True, method = 'L-BFGS-B', callback = show_progress, options={'disp':True} )
-	# solution = scipy.optimize.minimize( f_point_distance_sum_and_gradient, x0, jac = True, callback = show_progress, options={'disp':True} )
-	# grad_err = scipy.optimize.check_grad( lambda x: f_point_distance_sum_and_gradient(x)[0], lambda x: f_point_distance_sum_and_gradient(x)[1], x0 )
-	# print( "scipy.optimize.check_grad() error:", grad_err )
+	## strategies: 'function', 'gradient', 'hessian', 'mixed'
+	if strategy is None: strategy = 'gradient'
+	if strategy == 'function':
+		## Without gradients:
+		# solution = scipy.optimize.minimize( f_sum_and_gradient, x0, jac = True, constraints = constraints, callback = show_progress, options={'maxiter':10, 'disp':True} )
+		solution = scipy.optimize.minimize( f_sum_and_gradient, x0, jac = True, constraints = constraints, method = 'L-BFGS-B', callback = show_progress, options={'maxiter':10, 'disp':True} )
+	elif strategy == 'gradient':
+		## With gradients:
+		## check_grad() is too slow.
+		# grad_err = scipy.optimize.check_grad( lambda x: f_point_distance_sum_and_gradient(x)[0], lambda x: f_point_distance_sum_and_gradient(x)[1], x0 )
+		# print( "scipy.optimize.check_grad() error:", grad_err )
+		# solution = scipy.optimize.minimize( f_point_distance_sum_and_gradient, x0, jac = True, method = 'L-BFGS-B', callback = show_progress, options={'disp':True} )
+		solution = scipy.optimize.minimize( f_point_distance_sum_and_gradient, x0, jac = True, callback = show_progress, options={'disp':True} )
+	elif strategy == 'hessian':
+		## Use the Hessian:
+		solution = scipy.optimize.minimize( f_point_distance_sum_and_gradient, x0, jac = True, hess = f_hess, method = 'Newton-CG', callback = show_progress, options={'disp':True} )
+	elif strategy == 'mixed':
+		## Mixed with quadratic for p:
+		x = x0.copy()
+		MAX_NONLINEAR_ITER = 10
+		while True:
+			## Optimize quadratic once (more than that is wasted).
+			_, x = optimize_approximated_quadratic( P, H, row_mats, deformed_vs, x, max_iter = 1 )
+			solution = scipy.optimize.minimize( f_point_distance_sum_and_gradient, x, jac = True, method = 'L-BFGS-B', callback = show_progress, options={'disp':True, 'maxiter': MAX_NONLINEAR_ITER} )
+			x = solution.x
+			if solution.success: break
 	
 	converged = abs( f_point_distance_sum( solution.x ) ) < 1e-2
-			
-	return converged, solution.x	
 	
-def optimize_approximated_quadratic(P, H, row_mats, deformed_vs, x0):
+	return converged, solution.x
+
+def optimize_approximated_quadratic(P, H, row_mats, deformed_vs, x0, f_eps = None, x_eps = None, max_iter = None):
 
 	## To make function values comparable, we need to normalize.
 	xyzs = np.asarray([ row_mat[0,:3] for row_mat in row_mats ])
@@ -342,14 +381,48 @@ def optimize_approximated_quadratic(P, H, row_mats, deformed_vs, x0):
 	diag = np.linalg.norm(diag)
 	normalization = 1./( len(row_mats) * diag )
 	
+	def unpack_shifted( x, P, j ):
+		pt, B = unpack( x, P )
+		## Make sure pt is a column matrix.
+		pt = pt.squeeze()[...,np.newaxis]
+		assert len( pt.shape ) == 2
+		assert pt.shape[1] == 1
+		
+		## Switch pt with the j-th column of [p;B].
+		## 1 Convert [pt;B] from an origin and basis to a set of points.
+		W = np.hstack((pt,pt+B))
+		## 2 Get the j-th column as pt.
+		pt = W[:,j:j+1].copy()
+		## 3 Take the remaining columns - pt.
+		W -= pt
+		B = np.hstack( ( W[:,:j], W[:,j+1:] ) )
+		
+		return pt, B
+	
+	def pack_shifted( pt, B, j ):
+		## Make sure pt is a column matrix.
+		pt = pt.squeeze()[...,np.newaxis]
+		assert len( pt.shape ) == 2
+		assert pt.shape[1] == 1
+		
+		## Convert pt + B[:,:j], pt, pt + B[:,j+1:] to a set of points.
+		W = np.hstack(( pt + B[:,:j], pt, pt + B[:,j:] ))
+		pt = W[:,0:1]
+		B = W[:,1:] - pt
+		return pack( pt, B )
+	
+	## Verify that we can unpack and re-pack shifted without changing anything.
+	assert abs( pack_shifted( *( list( unpack_shifted( np.arange(36), 1, 1 ) ) + [ 1 ] ) ) - np.arange(36) ).max() < 1e-10
+	# assert abs( pack_shifted( *( list( unpack_shifted( x0, P, 1 ) ) + [ 1 ] ) ) - x0 ).max() < 1e-10
+	
 	def f_point_distance_sum(x):
 		f = 0
-		xmat = x.copy().reshape(H,12*P)
+		x = x.copy()
 		
-		for j in range(H):
-			pt = xmat[j:j+1]
-			B = (np.vstack((xmat[:j], xmat[j+1:]))-pt).T
-			pt = pt.squeeze()
+		# for j in range(H):
+		## Only once. More than that doesn't help.
+		for j in range(1):
+			pt, B = unpack_shifted( x, P, j )
 			
 			Q = np.zeros((12*P, 12*P))
 			L = np.zeros(12*P)
@@ -372,22 +445,26 @@ def optimize_approximated_quadratic(P, H, row_mats, deformed_vs, x0):
 			
 			f = normalization * (np.dot(np.dot(pt.T,Q), pt) - 2*np.dot(pt.T,L) + C)
 			pt_new = np.linalg.solve(Q,L)
-			xmat[j] = pt_new
-			xmat[:j] = B.T[:j] + pt_new
-			xmat[j+1:] = B.T[j:] + pt_new
+			f_new = normalization * (np.dot(np.dot(pt_new.T,Q), pt_new) - 2*np.dot(pt_new.T,L) + C)
 			
-			print( "Sub-iteration", j, "finished. New function value:", f )
+			x = pack_shifted( pt_new, B, j )
+			
+			print( "Sub-iteration", j, "finished. Old function value:", f )
+			print( "Sub-iteration", j, "finished. New function value:", f_new )
 #			print( "New x value:", xmat.reshape(-1) )
-		res_x = x.copy()
-		res_x[:12*P] = xmat[-1]
-		res_x[12*P:] = xmat[:-1].reshape(-1)
+		#res_x = x.copy()
+		#res_x[:12*P] = xmat[-1]
+		#res_x[12*P:] = xmat[:-1].reshape(-1)
 		
 		print( "Finished iteration." )
-		return f, res_x
+		return f, x
 	
-	f_eps = 1e-10
-	x_eps = 1e-10
-	max_iter = 9999
+	if f_eps is None:
+		f_eps = 1e-10
+	if x_eps is None:
+		x_eps = 1e-10
+	if max_iter is None:
+		max_iter = 9999
 	
 	f_prev = None
 	x_prev = x0.copy()
@@ -439,6 +516,7 @@ if __name__ == '__main__':
 	parser.add_argument('--handles', '--H', type=int, help='Number of handles.')
 	parser.add_argument('--ground-truth', '--GT', type=str, help='Ground truth data path.')
 	parser.add_argument('--recovery', '--R', type=float, help='Recovery test epsilon (default no recovery test).')
+	parser.add_argument('--strategy', '--S', type=str, help='Strategy: function, gradient (default), hessian, mixed.')
 	
 	args = parser.parse_args()
 	H = args.handles
@@ -535,7 +613,7 @@ if __name__ == '__main__':
 			x0 = pack( pt, B )
 		
 		# converged, x = optimize(P, H, all_R_mats, deformed_vs, x0)
-		converged, x = optimize_nullspace_directly(P, H, all_R_mats, deformed_vs, x0)
+		converged, x = optimize_nullspace_directly(P, H, all_R_mats, deformed_vs, x0, strategy = args.strategy)
 		if ground_truth_path is None and converged:
 			print("Converged at handle #", H)
 			break
