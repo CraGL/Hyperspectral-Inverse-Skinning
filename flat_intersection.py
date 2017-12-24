@@ -319,6 +319,21 @@ def optimize_nullspace_directly(P, H, row_mats, deformed_vs, x0, strategy = None
 		return f * normalization, pack( grad_p * normalization, grad_B * normalization )
 	
 	def f_hess(x):
+		import flat_intersection_hessians
+		
+		print( "Computing hessian begins." )
+		
+		hess = np.zeros( ( len(x), len(x) ) )
+		for j, vs in enumerate(deformed_vs):
+			vprime = vs.ravel()
+			vbar = row_mats[j]
+			hess += flat_intersection_hessians.hess( x, vbar, vprime, P )
+		
+		print( "Computing hessian finished." )
+		
+		return hess
+	
+	def f_hess_onlyp(x):
 		pt, B = unpack(x,P)
 		pt = pt.squeeze()
 		
@@ -358,6 +373,7 @@ def optimize_nullspace_directly(P, H, row_mats, deformed_vs, x0, strategy = None
 		solution = scipy.optimize.minimize( f_point_distance_sum_and_gradient, x0, jac = True, callback = show_progress, options={'disp':True} )
 	elif strategy == 'hessian':
 		## Use the Hessian:
+		# solution = scipy.optimize.minimize( f_point_distance_sum_and_gradient, x0, jac = True, hess = f_hess, method = 'Newton-CG', callback = show_progress, options={'disp':True} )
 		solution = scipy.optimize.minimize( f_point_distance_sum_and_gradient, x0, jac = True, hess = f_hess, method = 'Newton-CG', callback = show_progress, options={'disp':True} )
 	elif strategy == 'mixed':
 		## Mixed with quadratic for p:
