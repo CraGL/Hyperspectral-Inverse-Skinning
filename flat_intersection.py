@@ -423,7 +423,7 @@ def optimize_nullspace_cayley(P, H, row_mats, deformed_vs, x0, strategy = None):
 		for j, vs in enumerate(deformed_vs):
 			vprime = vs.ravel()
 			vbar = row_mats[j]
-			fj, gradj_p, gradj_A = cayley.f_and_dfdp_and_dfdA( pt, A, vbar, vprime, P, H )
+			fj, gradj_p, gradj_A = cayley.f_and_dfdp_and_dfdA( pt, A, vbar, vprime, H )
 			
 			f += fj
 			grad_p += gradj_p
@@ -452,7 +452,9 @@ def optimize_nullspace_cayley(P, H, row_mats, deformed_vs, x0, strategy = None):
 	else:
 		raise RuntimeError( "Unknown strategy: " + str(strategy) )
 	
-	converged = abs( f_point_distance_sum_and_gradient( solution.x )[0] ) < 1e-2
+	f = f_point_distance_sum_and_gradient( solution.x )[0]
+	print( "f_point_distance_sum_and_gradient value at solution:", f )
+	converged = abs( f ) < 1e-2
 	
 	pt, A = cayley.unpack( solution.x, P, H )
 	B = cayley.B_from_Cayley_A( A, H )

@@ -21,7 +21,7 @@ d/dA norm2((v*p-w)-v*(inv(I-A)*(I+A)*B)*inv((inv(I-A)*(I+A)*B)'*v'*v*(inv(I-A)*(
 where
 
 p is a vector
-I is a matrix
+I is a matrix (symmetric matrix generates more not less code)
 w is a vector
 A is a matrix
 B is a matrix
@@ -145,7 +145,7 @@ def A_from_non_Cayley_B_broken( B ):
     assert is_skew_symmetric( A )
     return A
 
-def f_and_dfdA(p, A, v, w, handles):
+def f_and_dfdp_and_dfdA_matrixcalculus(p, A, v, w, handles):
     I = np.eye(len(p))
     ## B is the matrix which takes the top (handles-1) rows.
     ## It's a truncated identity matrix.
@@ -205,15 +205,19 @@ def f_and_dfdA(p, A, v, w, handles):
     t_11 = np.dot(np.dot(t_10, T_1.T), T_0.T)
     t_12 = np.dot(T_0.T, np.dot(v.T, t_6))
     t_13 = np.dot(np.dot(np.dot(np.dot(np.dot(np.dot((t_3 - np.dot(t_11, v.T)), v), T_0), T_1), B), T_4), B.T)
-    t_14 = np.dot(T_0.T, np.dot(v.T, np.dot(v, np.dot(T_0, np.dot(T_1, np.dot(B, np.dot(T_9, np.dot(B.T, np.dot(T_1.T, t_8)))))))))
+    extra = np.dot(v.T, np.dot(v, np.dot(T_0, np.dot(T_1, np.dot(B, np.dot(T_9, np.dot(B.T, np.dot(T_1.T, t_8))))))))
+    t_14 = np.dot(T_0.T, extra)
     t_15 = np.dot(np.dot(t_13, T_2.T), T_0.T)
     functionValue = (np.linalg.norm(t_7) ** 2)
-    gradient = -(((((2 * np.multiply.outer(t_8, t_11)) + (2 * np.multiply.outer(t_8, t_10))) - ((((2 * np.multiply.outer(t_12, t_13)) + (2 * np.multiply.outer(t_12, t_15))) + (2 * np.multiply.outer(t_14, t_11))) + (2 * np.multiply.outer(t_14, t_10)))) + (2 * np.multiply.outer(t_5, t_13))) + (2 * np.multiply.outer(t_5, t_15)))
+    gradientA = -(((((2 * np.multiply.outer(t_8, t_11)) + (2 * np.multiply.outer(t_8, t_10))) - ((((2 * np.multiply.outer(t_12, t_13)) + (2 * np.multiply.outer(t_12, t_15))) + (2 * np.multiply.outer(t_14, t_11))) + (2 * np.multiply.outer(t_14, t_10)))) + (2 * np.multiply.outer(t_5, t_13))) + (2 * np.multiply.outer(t_5, t_15)))
 
     # print( 'inner B:', B.shape )
     # print( np.dot(np.dot(T_0, T_1), B) )
+    
+    t_5 = np.dot(v.T, t_7)
+    gradientp = ((2 * t_5) - (2 * extra))
 
-    return functionValue, gradient
+    return functionValue, gradientp, gradientA
 
 def f_and_dfdp_and_Hfp(p, A, v, w, handles):
     B = B_from_Cayley_A( A, handles )
@@ -260,14 +264,20 @@ def f_and_dfdp_and_Hfp(p, A, v, w, handles):
 def f_and_gradf( x, v, w, poses, handles ):
     p, A = unpack( x, poses )
     
-    f, gradA = f_and_dfdA( p, A, v, w, handles )
-    f, gradp, hessp = f_and_dfdp_and_Hfp( p, A, v, w, handles )
+    f, gradp, gradA = f_and_dfdp_and_dfdA_matrixcalculus( p, A, v, w, handles )
+    # f, gradp2, hessp = f_and_dfdp_and_Hfp( p, A, v, w, handles )
+    
+    # print( "Gradient p check. Should be zero:", abs( gradp - gradp2 ).max() )
     
     return f, pack( gradp, gradA )
 
-def f_and_dfdp_and_dfdA( p, A, v, w, poses, handles ):
-    f, gradA = f_and_dfdA( p, A, v, w, handles )
-    f, gradp, hessp = f_and_dfdp_and_Hfp( p, A, v, w, handles )
+def f_and_dfdp_and_dfdA( p, A, v, w, handles ):
+    f, gradp, gradA = f_and_dfdp_and_dfdA_matrixcalculus( p, A, v, w, handles )
+    
+    ## gradient p check (computed another way):
+    ## This test passes.
+    # f, gradp2, hessp = f_and_dfdp_and_Hfp( p, A, v, w, handles )
+    # print( '|gradient p difference| max:', abs( gradp - gradp2 ).max() )
     
     return f, gradp, gradA
 
@@ -290,13 +300,15 @@ def generateRandomData():
 if __name__ == '__main__':
     p, A, v, w, poses, handles = generateRandomData()
     
-    f, gradA = f_and_dfdA( p, A, v, w, handles )
-    f2, gradp, hessp = f_and_dfdp_and_Hfp( p, A, v, w, handles )
+    f, gradp, gradA = f_and_dfdp_and_dfdA( p, A, v, w, handles )
+    f2, gradp2, hessp = f_and_dfdp_and_Hfp( p, A, v, w, handles )
     
     print( 'function value:', f )
     print( 'other function value:', f2 )
     print( '|function difference|:', abs( f - f2 ) )
     print( 'gradient p:', gradp )
+    print( 'other gradient p:', gradp )
+    print( '|gradient p difference| max:', abs( gradp - gradp2 ).max() )
     print( 'gradient A:', gradA )
     
     x = pack( p, A, poses )
