@@ -314,7 +314,7 @@ def optimize_nullspace_directly(P, H, row_mats, deformed_vs, x0, strategy = None
 			grad_p += gradj_p
 			grad_B += gradj_B
 		
-		# print( "f:", f )
+		print( "f:", f )
 		
 		return f * normalization, pack( grad_p * normalization, grad_B * normalization )
 	

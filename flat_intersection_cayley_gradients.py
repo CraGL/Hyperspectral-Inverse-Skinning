@@ -97,15 +97,23 @@ def B_from_Cayley_A( A, B_rows ):
     return Q
 
 def A_from_non_Cayley_B( B ):
-    raise RuntimeError( "This function is broken." )
+    # raise RuntimeError( "This function is broken." )
+    
+    handles = B.shape[1]
     
     ## Complete B. Get an orthonormal basis for the whole space.
     _, S, V = np.linalg.svd( B.T )
     assert is_orthogonal( V )
-    ## We want the Cayley transform for V.
-    I = np.eye(B.shape[0])
+    ## The first handles rows of V are the ones that span the columns of B.
+    ## We want the Cayley transform for V.T
+    I = np.eye( B.shape[0] )
     # A = np.linalg.solve( I+V, I-V )
-    A = np.dot( np.linalg.inv( I+V ), I-V )
+    ## Why does (I+V) or (I+V.T) have a zero eigenvalue/singular value?
+    A = np.dot( np.linalg.inv( I+V.T ), I-V.T )
+    B_recovered = B_from_Cayley_A( A, B.shape[0] ) # handles )
+    ## This would be non-zero, since B_recovered should be orthogonal:
+    # print( 'A_from_non_Cayley_B() recovery difference:', abs( B - B_recovered ).max() )
+    print( 'A_from_non_Cayley_B() recovery difference:', abs( B_recovered[:handles].dot( B ) ).max() )
     ## A should be skew-symmetric
     assert is_skew_symmetric( A )
     return A
