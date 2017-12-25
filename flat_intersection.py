@@ -236,14 +236,22 @@ def zero_energy_test(base_dir):
 #	gt_bones = gt_bones.reshape( len(gt_bones), -1 )
 #	
 #	return gt_bones
-	
+
+def normalization_factor_from_row_mats( row_mats ):
+	## To make function values comparable, we need to normalize.
+	xyzs = np.asarray([ row_mat[0,:3] for row_mat in row_mats ])
+	return normalization_factor_from_xyzs( xyzs )
+def normalization_factor_from_xyzs( xyzs ):
+	## To make function values comparable, we need to normalize.
+	diag = xyzs.max( axis = 0 ) - xyzs.min( axis = 0 )
+	diag = np.linalg.norm(diag)
+	normalization = 1./( len(xyzs) * diag )
+	return normalization
+
 def optimize_nullspace_directly(P, H, row_mats, deformed_vs, x0, strategy = None):
 
 	## To make function values comparable, we need to normalize.
-	xyzs = np.asarray([ row_mat[0,:3] for row_mat in row_mats ])
-	diag = xyzs.max( axis = 0 ) - xyzs.min( axis = 0 )
-	diag = np.linalg.norm(diag)
-	normalization = 1./( len(row_mats) * diag )
+	normalization = normalization_factor_from_row_mats( row_mats )
 	
 	def f_point_distance_sum(x):
 		dist = 0
@@ -366,7 +374,7 @@ def optimize_nullspace_directly(P, H, row_mats, deformed_vs, x0, strategy = None
 		solution = scipy.optimize.minimize( f_point_distance_sum, x0, constraints = constraints, method = 'L-BFGS-B', callback = show_progress, options={'maxiter':10, 'disp':True} )
 	elif strategy == 'gradient':
 		## With gradients:
-		## check_grad() is too slow.
+		## check_grad() is too slow to always run.
 		# grad_err = scipy.optimize.check_grad( lambda x: f_point_distance_sum_and_gradient(x)[0], lambda x: f_point_distance_sum_and_gradient(x)[1], x0 )
 		# print( "scipy.optimize.check_grad() error:", grad_err )
 		# solution = scipy.optimize.minimize( f_point_distance_sum_and_gradient, x0, jac = True, method = 'L-BFGS-B', callback = show_progress, options={'disp':True} )
@@ -385,10 +393,72 @@ def optimize_nullspace_directly(P, H, row_mats, deformed_vs, x0, strategy = None
 			solution = scipy.optimize.minimize( f_point_distance_sum_and_gradient, x, jac = True, method = 'L-BFGS-B', callback = show_progress, options={'disp':True, 'maxiter': MAX_NONLINEAR_ITER} )
 			x = solution.x
 			if solution.success: break
+	else:
+		raise RuntimeError( "Unknown strategy: " + str(strategy) )
 	
 	converged = abs( f_point_distance_sum( solution.x ) ) < 1e-2
 	
 	return converged, solution.x
+
+def optimize_nullspace_cayley(P, H, row_mats, deformed_vs, x0, strategy = None):
+
+	## To make function values comparable, we need to normalize.
+	normalization = normalization_factor_from_row_mats( row_mats )
+	
+	
+	import flat_intersection_cayley_gradients as cayley
+	
+	p, B = unpack( x0, P )
+	A = cayley.A_from_non_Cayley_B( B )
+	x0 = cayley.pack( p, A, P )
+	
+	def f_point_distance_sum_and_gradient(x):
+		pt, A = cayley.unpack( x, P, H )
+		pt = pt.squeeze()
+		
+		f = 0
+		grad_p = np.zeros(pt.shape)
+		grad_A = np.zeros(A.shape)
+		
+		for j, vs in enumerate(deformed_vs):
+			vprime = vs.ravel()
+			vbar = row_mats[j]
+			fj, gradj_p, gradj_A = cayley.f_and_dfdp_and_dfdA( pt, A, vbar, vprime, P, H )
+			
+			f += fj
+			grad_p += gradj_p
+			grad_A += gradj_A
+		
+		print( "f:", f )
+		
+		return f * normalization, cayley.pack( grad_p * normalization, grad_A * normalization, P )
+	
+	## Print the initial function.
+	print( "f_point_distance_sum_and_gradient value at x0:", f_point_distance_sum_and_gradient( x0 )[0] )
+	
+	reset_progress()
+	## strategies: 'function', 'gradient', 'hessian', 'mixed'
+	if strategy is None: strategy = 'gradient'
+	if strategy == 'function':
+		## Without gradients:
+		solution = scipy.optimize.minimize( lambda x: f_point_distance_sum_and_gradient( x )[0], x0, constraints = constraints, method = 'L-BFGS-B', callback = show_progress, options={'maxiter':10, 'disp':True} )
+	elif strategy == 'gradient':
+		## With gradients:
+		## check_grad() is too slow to always run.
+		# grad_err = scipy.optimize.check_grad( lambda x: f_point_distance_sum_and_gradient(x)[0], lambda x: f_point_distance_sum_and_gradient(x)[1], x0 )
+		# print( "scipy.optimize.check_grad() error:", grad_err )
+		solution = scipy.optimize.minimize( f_point_distance_sum_and_gradient, x0, jac = True, method = 'L-BFGS-B', callback = show_progress, options={'disp':True} )
+		# solution = scipy.optimize.minimize( f_point_distance_sum_and_gradient, x0, jac = True, callback = show_progress, options={'disp':True} )
+	else:
+		raise RuntimeError( "Unknown strategy: " + str(strategy) )
+	
+	converged = abs( f_point_distance_sum_and_gradient( solution.x )[0] ) < 1e-2
+	
+	pt, A = cayley.unpack( solution.x, P, H )
+	B = cayley.B_from_Cayley_A( A, H )
+	x_pb = pack( pt, B )
+	
+	return converged, x_pb
 
 def optimize_approximated_quadratic(P, H, row_mats, deformed_vs, x0, f_eps = None, x_eps = None, max_iter = None):
 
@@ -533,7 +603,8 @@ if __name__ == '__main__':
 	parser.add_argument('--handles', '--H', type=int, help='Number of handles.')
 	parser.add_argument('--ground-truth', '--GT', type=str, help='Ground truth data path.')
 	parser.add_argument('--recovery', '--R', type=float, help='Recovery test epsilon (default no recovery test).')
-	parser.add_argument('--strategy', '--S', type=str, help='Strategy: function, gradient (default), hessian, mixed.')
+	parser.add_argument('--strategy', '--S', type=str, choices = ['function', 'gradient', 'hessian', 'mixed'], help='Strategy: function, gradient (default), hessian, mixed.')
+	parser.add_argument('--energy', '--E', type=str, default='B', choices = ['B', 'cayley'], help='Energy: B, cayley (default: B).')
 	
 	args = parser.parse_args()
 	H = args.handles
@@ -629,8 +700,14 @@ if __name__ == '__main__':
 				B[:,i] /= np.linalg.norm(B[:,i])
 			x0 = pack( pt, B )
 		
-		# converged, x = optimize(P, H, all_R_mats, deformed_vs, x0)
-		converged, x = optimize_nullspace_directly(P, H, all_R_mats, deformed_vs, x0, strategy = args.strategy)
+		if args.energy == 'B':
+			# converged, x = optimize(P, H, all_R_mats, deformed_vs, x0)
+			converged, x = optimize_nullspace_directly(P, H, all_R_mats, deformed_vs, x0, strategy = args.strategy)
+		elif args.energy == 'cayley':
+			converged, x = optimize_nullspace_cayley( P, H, all_R_mats, deformed_vs, x0, strategy = args.strategy )
+		else:
+			raise RuntimeError( "Unknown energy parameter: " + str(parser.energy) )
+		
 		if ground_truth_path is None and converged:
 			print("Converged at handle #", H)
 			break

@@ -34,12 +34,18 @@ from __future__ import division, print_function, absolute_import
 
 import numpy as np
 
+SKIP_CHECKS = True
+
 def is_skew_symmetric( A, threshold = 1e-10 ):
+    if SKIP_CHECKS: return True
+    
     # return abs( A + A.T ).max() < threshold
     print( "A is skew symmetric if this is 0:", abs( A + A.T ).max() )
     return True
 
 def is_orthogonal( Q, threshold = 1e-10 ):
+    if SKIP_CHECKS: return True
+    
     # return abs( np.dot( Q, Q.T ) - I ).max() < threshold
     print( "Q is orthogonal if this is 0:", abs( np.dot( Q.T, Q ) - np.eye(Q.shape[1]) ).max() )
     return True
@@ -52,7 +58,7 @@ def unpack( x, poses, handles ):
     xa = x[12*poses:]
     
     off = 0
-    A = zeros( ( 12*poses, 12*poses ) )
+    A = np.zeros( ( 12*poses, 12*poses ) )
     for row in range( 12*poses - 1 ):
         A[ row, row+1: ] = xa[ off : off + 12*poses-1-row ]
         off += 12*poses-1-row
@@ -66,7 +72,7 @@ def unpack( x, poses, handles ):
     
     return p, A
 
-def pack( p, A ):
+def pack( p, A, poses ):
     ## A should be skew-symmetric
     assert is_skew_symmetric( A )
     
@@ -74,7 +80,7 @@ def pack( p, A ):
     poses = len(p)//12
     # x[:12*poses] = p
     
-    xa = zeros( (6*poses)*(12*poses-1) )
+    xa = np.zeros( (6*poses)*(12*poses-1) )
     
     off = 0
     for row in range( 12*poses - 1 ):
@@ -83,18 +89,18 @@ def pack( p, A ):
     
     assert off == len( xa )
     
-    x = concatenate( ( p.squeeze(), xa ) )
+    x = np.concatenate( ( p.squeeze(), xa ) )
     
     return x
 
-def B_from_Cayley_A( A, B_rows ):
+def B_from_Cayley_A( A, handles ):
     ## A should be skew-symmetric
     assert is_skew_symmetric( A )
     
     I = np.eye(A.shape[0])
     ## Return: Q = (I-A)^(-1) * (I+A)
     # Q = np.linalg.solve( I-A, I+A )[:B_rows]
-    Q = np.dot( np.linalg.inv( I-A ), I+A )[:,:B_rows]
+    Q = np.dot( np.linalg.inv( I-A ), I+A )[:,:handles]
     assert is_orthogonal( Q )
     return Q
 
@@ -204,15 +210,15 @@ def f_and_dfdA(p, A, v, w, handles):
     functionValue = (np.linalg.norm(t_7) ** 2)
     gradient = -(((((2 * np.multiply.outer(t_8, t_11)) + (2 * np.multiply.outer(t_8, t_10))) - ((((2 * np.multiply.outer(t_12, t_13)) + (2 * np.multiply.outer(t_12, t_15))) + (2 * np.multiply.outer(t_14, t_11))) + (2 * np.multiply.outer(t_14, t_10)))) + (2 * np.multiply.outer(t_5, t_13))) + (2 * np.multiply.outer(t_5, t_15)))
 
-    print( 'inner B:', B.shape )
-    print( np.dot(np.dot(T_0, T_1), B) )
+    # print( 'inner B:', B.shape )
+    # print( np.dot(np.dot(T_0, T_1), B) )
 
     return functionValue, gradient
 
 def f_and_dfdp_and_Hfp(p, A, v, w, handles):
     B = B_from_Cayley_A( A, handles )
-    print( 'B_from_Cayley_A:', B.shape )
-    print( B )
+    # print( 'B_from_Cayley_A:', B.shape )
+    # print( B )
     
     assert(type(B) == np.ndarray)
     dim = B.shape
@@ -251,13 +257,19 @@ def f_and_dfdp_and_Hfp(p, A, v, w, handles):
     
     return functionValue, gradient, hessian
 
-def f_and_gradf( x, v, w, poses ):
+def f_and_gradf( x, v, w, poses, handles ):
     p, A = unpack( x, poses )
     
-    f, gradA = f_and_dfdA( p, A, v, w )
-    f, gradp, hessp = f_and_dfdp_and_Hfp( p, A, v, w )
+    f, gradA = f_and_dfdA( p, A, v, w, handles )
+    f, gradp, hessp = f_and_dfdp_and_Hfp( p, A, v, w, handles )
     
     return f, pack( gradp, gradA )
+
+def f_and_dfdp_and_dfdA( p, A, v, w, poses, handles ):
+    f, gradA = f_and_dfdA( p, A, v, w, handles )
+    f, gradp, hessp = f_and_dfdp_and_Hfp( p, A, v, w, handles )
+    
+    return f, gradp, gradA
 
 def random_skew_symmetric_matrix( n ):
     A = np.random.randn(n,n)
@@ -273,10 +285,10 @@ def generateRandomData():
     p = np.random.randn(12*P)
     v = np.random.randn(3*P, 12*P)
     w = np.random.randn(3*P)
-    return p, A, v, w, handles
+    return p, A, v, w, P, handles
 
 if __name__ == '__main__':
-    p, A, v, w, handles = generateRandomData()
+    p, A, v, w, poses, handles = generateRandomData()
     
     f, gradA = f_and_dfdA( p, A, v, w, handles )
     f2, gradp, hessp = f_and_dfdp_and_Hfp( p, A, v, w, handles )
@@ -286,3 +298,11 @@ if __name__ == '__main__':
     print( '|function difference|:', abs( f - f2 ) )
     print( 'gradient p:', gradp )
     print( 'gradient A:', gradA )
+    
+    x = pack( p, A, poses )
+    p2, A2 = unpack( x, poses, handles )
+    x2 = pack( p2, A2, poses )
+    print( "If pack/unpack work, these should be zeros:" )
+    print( abs( p - p2 ).max() )
+    print( abs( A - A2 ).max() )
+    print( abs( x - x2 ).max() )
