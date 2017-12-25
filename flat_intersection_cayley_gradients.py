@@ -44,6 +44,8 @@ def is_orthogonal( Q, threshold = 1e-10 ):
     print( "Q is orthogonal if this is 0:", abs( np.dot( Q.T, Q ) - np.eye(Q.shape[1]) ).max() )
     return True
 
+## TODO: pack() and unpack() and A_from_non_Cayley_B() should use the Grassmann manifold parameters only
+##       and zero the rest (or rotate appropriately).
 def unpack( x, poses, handles ):
     p = x[:12*poses]
     
@@ -96,7 +98,26 @@ def B_from_Cayley_A( A, B_rows ):
     assert is_orthogonal( Q )
     return Q
 
-def A_from_non_Cayley_B( B ):
+def A_from_non_Cayley_B( Q ):
+    ## This function follows the paper mentioned below. Its input is Q and output is X.
+    handles = Q.shape[1]
+    
+    ## The Representation and Parametrization of Orthogonal Matrices (Ron Shepard, Scott R. Brozell, Gergely Gidofalvi 2015 Journal of Physical Chemistry)
+    ## Equations 101-103:
+    Q1 = Q[:handles,:handles]
+    ## TODO: For Grassmann parameters, use SVD of Q1 to get a right-matrix to modify B.
+    Q2 = Q[handles:,:handles]
+    I = np.eye(handles)
+    F = np.dot( (I-Q1), np.linalg.inv( I+Q1 ) )
+    B = 0.5*( F.T - F )
+    A = 0.5*np.dot( Q2, ( I + F ) )
+    X = np.zeros( ( Q.shape[0], Q.shape[0] ) )
+    X[:handles,:handles] = B
+    X[handles:,:handles] = A
+    X[:handles,handles:] = -A.T
+    return X
+
+def A_from_non_Cayley_B_broken( B ):
     # raise RuntimeError( "This function is broken." )
     
     handles = B.shape[1]
