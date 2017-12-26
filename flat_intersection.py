@@ -393,6 +393,21 @@ def optimize_nullspace_directly(P, H, row_mats, deformed_vs, x0, strategy = None
 			solution = scipy.optimize.minimize( f_point_distance_sum_and_gradient, x, jac = True, method = 'L-BFGS-B', callback = show_progress, options={'disp':True, 'maxiter': MAX_NONLINEAR_ITER} )
 			x = solution.x
 			if solution.success: break
+	elif strategy == 'grassmann':
+		## Mixed with grassmann projections
+		import flat_intersection_cayley_grassmann_gradients as grassmann
+		x = x0.copy()
+		MAX_NONLINEAR_ITER = 10
+		while True:
+			
+			p, B = unpack( x, P )
+			A = grassmann.A_from_non_Cayley_B( B )
+			B = grassmann.B_from_Cayley_A( A, H )
+			x = pack( p, B )
+			
+			solution = scipy.optimize.minimize( f_point_distance_sum_and_gradient, x, jac = True, method = 'BFGS', callback = show_progress, options={'disp':True, 'maxiter': MAX_NONLINEAR_ITER} )
+			x = solution.x
+			if solution.success: break
 	else:
 		raise RuntimeError( "Unknown strategy: " + str(strategy) )
 	
@@ -619,8 +634,8 @@ if __name__ == '__main__':
 	parser.add_argument('--handles', '--H', type=int, help='Number of handles.')
 	parser.add_argument('--ground-truth', '--GT', type=str, help='Ground truth data path.')
 	parser.add_argument('--recovery', '--R', type=float, help='Recovery test epsilon (default no recovery test).')
-	parser.add_argument('--strategy', '--S', type=str, choices = ['function', 'gradient', 'hessian', 'mixed'], help='Strategy: function, gradient (default), hessian, mixed.')
-	parser.add_argument('--energy', '--E', type=str, default='B', choices = ['B', 'cayley', 'B+cayley', 'B+B', 'cayley+cayley'], help='Energy: B, cayley (default: B).')
+	parser.add_argument('--strategy', '--S', type=str, choices = ['function', 'gradient', 'hessian', 'mixed', 'grassmann'], help='Strategy: function, gradient (default), hessian, mixed, grassmann (for energy B only).')
+	parser.add_argument('--energy', '--E', type=str, default='B', choices = ['B', 'cayley', 'B+cayley', 'B+B', 'cayley+cayley'], help='Energy: B (default), cayley, B+cayley, B+B, cayley+cayley.')
 	
 	args = parser.parse_args()
 	H = args.handles
@@ -731,7 +746,14 @@ if __name__ == '__main__':
 			converged, x = optimize_nullspace_cayley( P, H, all_R_mats, deformed_vs, x, strategy = args.strategy )
 		elif args.energy == 'B+B':
 			converged, x = optimize_nullspace_directly(P, H, all_R_mats, deformed_vs, x0, strategy = args.strategy)
-			## This doesn't do anything. It terminates immediately.
+			## Without the following projection in and out of Grassmann space,
+			## the next optimize_nullspace_directly() doesn't do anything.
+			## (It terminates immediately.)
+			p, B = unpack( x, P )
+			import flat_intersection_cayley_grassmann_gradients as grassmann
+			A = grassmann.A_from_non_Cayley_B( B )
+			B = grassmann.B_from_Cayley_A( A, H )
+			x = pack( p, B )
 			converged, x = optimize_nullspace_directly(P, H, all_R_mats, deformed_vs, x, strategy = args.strategy)
 		else:
 			raise RuntimeError( "Unknown energy parameter: " + str(parser.energy) )
