@@ -98,10 +98,20 @@ def B_from_Cayley_A( A, handles ):
     ## A should be skew-symmetric
     assert is_skew_symmetric( A )
     
-    I = np.eye(A.shape[0])
     ## Return: Q = (I-A)^(-1) * (I+A)
+    # I = np.eye(A.shape[0])
     # Q = np.linalg.solve( I-A, I+A )[:,:handles]
-    Q = np.dot( np.linalg.inv( I-A ), I+A )[:,:handles]
+    # Q = np.dot( np.linalg.inv( I-A ), I+A )[:,:handles]
+    
+    ## The Representation and Parametrization of Orthogonal Matrices (Ron Shepard, Scott R. Brozell, Gergely Gidofalvi 2015 Journal of Physical Chemistry)
+    ## Equation 100:
+    littleA = A[handles:,:handles]
+    F = np.dot( littleA.T, littleA )
+    Q2 = np.dot( np.vstack( ( np.eye( handles ) - F, 2*littleA ) ), np.linalg.inv( np.eye(handles) + F ) )
+    
+    # assert abs( Q - Q2 ).max() < 1e-10
+    Q = Q2
+    
     assert is_orthogonal( Q )
     return Q
 
@@ -276,7 +286,7 @@ def random_skew_symmetric_matrix( n ):
 def generateRandomData():
     # np.random.seed(0)
     P = 1
-    handles = 3
+    handles = 2
     B = np.random.randn(12*P, handles)
     A = A_from_non_Cayley_B( B )
     # A = random_skew_symmetric_matrix( 12*P )
