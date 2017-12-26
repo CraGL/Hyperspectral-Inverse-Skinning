@@ -397,7 +397,7 @@ def optimize_nullspace_directly(P, H, row_mats, deformed_vs, x0, strategy = None
 		## Mixed with grassmann projections
 		import flat_intersection_cayley_grassmann_gradients as grassmann
 		x = x0.copy()
-		MAX_NONLINEAR_ITER = 10
+		MAX_NONLINEAR_ITER = 100
 		while True:
 			
 			p, B = unpack( x, P )
