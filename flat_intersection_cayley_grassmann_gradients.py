@@ -57,20 +57,18 @@ def unpack( x, poses, handles ):
     
     xa = x[12*poses:]
     
-    off = 0
-    A = np.zeros( ( 12*poses, 12*poses ) )
-    for row in range( 12*poses - 1 ):
-        A[ row, row+1: ] = xa[ off : off + 12*poses-1-row ]
-        off += 12*poses-1-row
+    X = np.zeros( ( 12*poses, 12*poses ) )
+    ## Following equation 97 from:
+    ## The Representation and Parametrization of Orthogonal Matrices (Ron Shepard, Scott R. Brozell, Gergely Gidofalvi 2015 Journal of Physical Chemistry)
+    ## and equation 97.
+    X[handles:,:handles] = xa.reshape( 12*poses - handles, handles )
     
-    assert off == len( xa )
-    
-    A -= A.T
+    X -= X.T
     
     ## A should be skew-symmetric
-    assert is_skew_symmetric( A )
+    assert is_skew_symmetric( X )
     
-    return p, A
+    return p, X
 
 def pack( p, A, poses, handles ):
     ## A should be skew-symmetric
@@ -78,16 +76,8 @@ def pack( p, A, poses, handles ):
     
     assert len(p) % 12 == 0
     assert poses == len(p)//12
-    # x[:12*poses] = p
     
-    xa = np.zeros( (6*poses)*(12*poses-1) )
-    
-    off = 0
-    for row in range( 12*poses - 1 ):
-        xa[ off : off + 12*poses-1-row ] = A[ row, row+1: ]
-        off += 12*poses-1-row
-    
-    assert off == len( xa )
+    xa = A[handles:,:handles].ravel()
     
     x = np.concatenate( ( p.squeeze(), xa ) )
     
@@ -104,15 +94,23 @@ def B_from_Cayley_A( A, handles ):
     assert is_orthogonal( Q )
     return Q
 
-def A_from_non_Cayley_B( Q ):
+def A_from_non_Cayley_B_Grassmann( Q ):
     ## This function follows the paper mentioned below. Its input is Q and output is X.
     handles = Q.shape[1]
     
     ## The Representation and Parametrization of Orthogonal Matrices (Ron Shepard, Scott R. Brozell, Gergely Gidofalvi 2015 Journal of Physical Chemistry)
     ## Equations 101-103:
     Q1 = Q[:handles,:handles]
-    ## TODO: For Grassmann parameters, use SVD of Q1 to get a right-matrix to modify B.
     Q2 = Q[handles:,:handles]
+    
+    ## For Grassmann parameters, use SVD of Q1 to get a right-matrix to rotate Q1 and Q2
+    ## so that Q1 ends up symmetric and B ends up zero.
+    Q1_U, Q1_S, Q1_V = np.linalg.svd( Q1 )
+    Z = np.dot( Q1_U, Q1_V )
+    
+    Q1 = np.dot( Q1, Z.T )
+    Q2 = np.dot( Q2, Z.T )
+    
     I = np.eye(handles)
     F = np.dot( (I-Q1), np.linalg.inv( I+Q1 ) )
     B = 0.5*( F.T - F )
@@ -121,105 +119,15 @@ def A_from_non_Cayley_B( Q ):
     X[:handles,:handles] = B
     X[handles:,:handles] = A
     X[:handles,handles:] = -A.T
+    
+    ## For Grassmann parameters, B should be zeros
+    assert abs( B ).max() < 1e-10
+    
     return X
 
-def A_from_non_Cayley_B_broken( B ):
-    # raise RuntimeError( "This function is broken." )
-    
-    handles = B.shape[1]
-    
-    ## Complete B. Get an orthonormal basis for the whole space.
-    _, S, V = np.linalg.svd( B.T )
-    assert is_orthogonal( V )
-    ## The first handles rows of V are the ones that span the columns of B.
-    ## We want the Cayley transform for V.T
-    I = np.eye( B.shape[0] )
-    # A = np.linalg.solve( I+V, I-V )
-    ## Why does (I+V) or (I+V.T) have a zero eigenvalue/singular value?
-    A = np.dot( np.linalg.inv( I+V.T ), I-V.T )
-    B_recovered = B_from_Cayley_A( A, B.shape[0] ) # handles )
-    ## This would be non-zero, since B_recovered should be orthogonal:
-    # print( 'A_from_non_Cayley_B() recovery difference:', abs( B - B_recovered ).max() )
-    print( 'A_from_non_Cayley_B() recovery difference:', abs( B_recovered[:handles].dot( B ) ).max() )
-    ## A should be skew-symmetric
-    assert is_skew_symmetric( A )
-    return A
+A_from_non_Cayley_B = A_from_non_Cayley_B_Grassmann
 
 def f_and_dfdp_and_dfdA_matrixcalculus(p, A, v, w, handles):
-    I = np.eye(len(p))
-    ## B is the matrix which takes the top (handles-1) rows.
-    ## It's a truncated identity matrix.
-    B = I.copy()[:,:handles]
-    
-    assert(type(A) == np.ndarray)
-    dim = A.shape
-    assert(len(dim) == 2)
-    A_rows = dim[0]
-    A_cols = dim[1]
-    
-    ## A should be skew-symmetric
-    assert is_skew_symmetric( A )
-    
-    assert(type(B) == np.ndarray)
-    dim = B.shape
-    assert(len(dim) == 2)
-    B_rows = dim[0]
-    B_cols = dim[1]
-    assert(type(I) == np.ndarray)
-    dim = I.shape
-    assert(len(dim) == 2)
-    I_rows = dim[0]
-    I_cols = dim[1]
-    assert(type(p) == np.ndarray)
-    dim = p.shape
-    assert(len(dim) == 1)
-    p_rows = dim[0]
-    assert(type(v) == np.ndarray)
-    dim = v.shape
-    assert(len(dim) == 2)
-    v_rows = dim[0]
-    v_cols = dim[1]
-    assert(type(w) == np.ndarray)
-    dim = w.shape
-    assert(len(dim) == 1)
-    w_rows = dim[0]
-    assert(A_cols == v_cols == p_rows == I_cols)
-    assert(I_rows == A_rows)
-    assert(A_cols == v_cols == B_rows == I_cols)
-    assert(I_cols == A_cols == B_rows == p_rows == v_cols)
-    assert(B_cols)
-    assert(v_rows == w_rows)
-
-    T_0 = np.linalg.inv((I - A))
-    T_1 = (A + I)
-    # T_2 = (I + A)
-    T_2 = T_1
-    t_3 = (np.dot(v, p) - w)
-    T_4 = np.linalg.inv(np.dot(np.dot(np.dot(np.dot(np.dot(v, np.dot(T_0, np.dot(T_2, B))).T, v), T_0), T_1), B))
-    t_5 = np.dot(T_0.T, np.dot(v.T, t_3))
-    t_6 = np.dot(v, np.dot(T_0, np.dot(T_1, np.dot(B, np.dot(T_4, np.dot(B.T, np.dot(T_2.T, t_5)))))))
-    t_7 = (t_3 - t_6)
-    t_8 = np.dot(T_0.T, np.dot(v.T, t_7))
-    T_9 = np.linalg.inv(np.dot(np.dot(np.dot(np.dot(np.dot(v, np.dot(T_0, np.dot(T_1, B))).T, v), T_0), T_1), B))
-    t_10 = np.dot(np.dot(np.dot(np.dot(np.dot(np.dot(t_3, v), T_0), T_1), B), T_9), B.T)
-    t_11 = np.dot(np.dot(t_10, T_1.T), T_0.T)
-    t_12 = np.dot(T_0.T, np.dot(v.T, t_6))
-    t_13 = np.dot(np.dot(np.dot(np.dot(np.dot(np.dot((t_3 - np.dot(t_11, v.T)), v), T_0), T_1), B), T_4), B.T)
-    extra = np.dot(v.T, np.dot(v, np.dot(T_0, np.dot(T_1, np.dot(B, np.dot(T_9, np.dot(B.T, np.dot(T_1.T, t_8))))))))
-    t_14 = np.dot(T_0.T, extra)
-    t_15 = np.dot(np.dot(t_13, T_2.T), T_0.T)
-    functionValue = (np.linalg.norm(t_7) ** 2)
-    gradientA = -(((((2 * np.multiply.outer(t_8, t_11)) + (2 * np.multiply.outer(t_8, t_10))) - ((((2 * np.multiply.outer(t_12, t_13)) + (2 * np.multiply.outer(t_12, t_15))) + (2 * np.multiply.outer(t_14, t_11))) + (2 * np.multiply.outer(t_14, t_10)))) + (2 * np.multiply.outer(t_5, t_13))) + (2 * np.multiply.outer(t_5, t_15)))
-
-    # print( 'inner B:', B.shape )
-    # print( np.dot(np.dot(T_0, T_1), B) )
-    
-    t_5 = np.dot(v.T, t_7)
-    gradientp = ((2 * t_5) - (2 * extra))
-
-    return functionValue, gradientp, gradientA
-
-def f_and_dfdp_and_dfdA_matrixcalculus2(p, A, v, w, handles):
     I = np.eye(len(p))
     ## B is the matrix which takes the top (handles-1) rows.
     ## It's a truncated identity matrix.
@@ -298,8 +206,6 @@ def f_and_dfdp_and_dfdA_matrixcalculus2(p, A, v, w, handles):
 
     return functionValue, gradientp, gradientA
 
-f_and_dfdp_and_dfdA_matrixcalculus = f_and_dfdp_and_dfdA_matrixcalculus2
-
 def f_and_dfdp_and_Hfp(p, A, v, w, handles):
     B = B_from_Cayley_A( A, handles )
     # print( 'B_from_Cayley_A:', B.shape )
@@ -344,12 +250,6 @@ def f_and_dfdp_and_Hfp(p, A, v, w, handles):
 
 def f_and_dfdp_and_dfdA( p, A, v, w, handles ):
     f, gradp, gradA = f_and_dfdp_and_dfdA_matrixcalculus( p, A, v, w, handles )
-    
-    # f2, gradp2, gradA2 = f_and_dfdp_and_dfdA_matrixcalculus2( p, A, v, w, handles )
-    # print( "Faster? zero?" )
-    # print( abs( f - f2 ) )
-    # print( abs( gradp - gradp2 ).max() )
-    # print( abs( gradA - gradA2 ).max() )
     
     ## gradient p check (computed another way):
     ## This test passes.
