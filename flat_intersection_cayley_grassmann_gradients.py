@@ -57,6 +57,7 @@ def unpack( x, poses, handles ):
     
     xa = x[12*poses:]
     
+    
     X = np.zeros( ( 12*poses, 12*poses ) )
     ## Following equation 97 from:
     ## The Representation and Parametrization of Orthogonal Matrices (Ron Shepard, Scott R. Brozell, Gergely Gidofalvi 2015 Journal of Physical Chemistry)
@@ -64,6 +65,16 @@ def unpack( x, poses, handles ):
     X[handles:,:handles] = xa.reshape( 12*poses - handles, handles )
     
     X -= X.T
+    
+    
+    assert 12*poses - handles > 0
+    
+    '''
+    X = np.block( [
+        [ np.zeros((handles,handles)), -xa.reshape( 12*poses - handles, handles ).T ],
+        [ xa.reshape( 12*poses - handles, handles ), np.zeros((12*poses - handles, 12*poses - handles)) ]
+        ] )
+    '''
     
     ## A should be skew-symmetric
     assert is_skew_symmetric( X )
@@ -89,7 +100,7 @@ def B_from_Cayley_A( A, handles ):
     
     I = np.eye(A.shape[0])
     ## Return: Q = (I-A)^(-1) * (I+A)
-    # Q = np.linalg.solve( I-A, I+A )[:B_rows]
+    # Q = np.linalg.solve( I-A, I+A )[:,:handles]
     Q = np.dot( np.linalg.inv( I-A ), I+A )[:,:handles]
     assert is_orthogonal( Q )
     return Q
@@ -116,12 +127,12 @@ def A_from_non_Cayley_B_Grassmann( Q ):
     B = 0.5*( F.T - F )
     A = 0.5*np.dot( Q2, ( I + F ) )
     X = np.zeros( ( Q.shape[0], Q.shape[0] ) )
-    X[:handles,:handles] = B
     X[handles:,:handles] = A
     X[:handles,handles:] = -A.T
     
     ## For Grassmann parameters, B should be zeros
     assert abs( B ).max() < 1e-10
+    # X[:handles,:handles] = B
     
     return X
 
@@ -263,12 +274,12 @@ def random_skew_symmetric_matrix( n ):
     return 0.5 * ( A - A.T )
 
 def generateRandomData():
-    #np.random.seed(0)
+    # np.random.seed(0)
     P = 1
-    handles = 2
-    # B = np.random.randn(12*P, handles)
-    # A = A_from_non_Cayley_B( B )
-    A = random_skew_symmetric_matrix( 12*P )
+    handles = 3
+    B = np.random.randn(12*P, handles)
+    A = A_from_non_Cayley_B( B )
+    # A = random_skew_symmetric_matrix( 12*P )
     p = np.random.randn(12*P)
     v = np.random.randn(3*P, 12*P)
     w = np.random.randn(3*P)
@@ -295,3 +306,22 @@ if __name__ == '__main__':
     print( abs( p - p2 ).max() )
     print( abs( A - A2 ).max() )
     print( abs( x - x2 ).max() )
+    
+    def f_gradf_packed( x ):
+        xp, xA = unpack( x, poses, handles )
+        val, gradp, gradA = f_and_dfdp_and_dfdA( xp, xA, v, w, handles )
+        grad = pack( gradp, gradA, poses, handles )
+        return val, grad
+    import scipy.optimize
+    grad_err = scipy.optimize.check_grad( lambda x: f_gradf_packed(x)[0], lambda x: f_gradf_packed(x)[1], pack( p, A, poses, handles ) )
+    print( "scipy.optimize.check_grad() error:", grad_err )
+    
+    '''
+    def f_packed( x ):
+        xp, xA = unpack( x, poses, handles )
+        val, gradp, hessP = f_and_dfdp_and_Hfp( xp, xA, v, w, handles )
+        return val
+    f_packed_autograd = autograd.grad( f_packed )
+    grad_err = scipy.optimize.check_grad( lambda x: f_gradf_packed(x)[0], f_packed_autograd, pack( p, A, poses, handles ) )
+    print( "scipy.optimize.check_grad() error (autograd):", grad_err )
+    '''

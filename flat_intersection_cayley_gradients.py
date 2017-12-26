@@ -34,7 +34,7 @@ from __future__ import division, print_function, absolute_import
 
 import numpy as np
 
-SKIP_CHECKS = True
+SKIP_CHECKS = False
 
 def is_skew_symmetric( A, threshold = 1e-10 ):
     if SKIP_CHECKS: return True
@@ -363,12 +363,13 @@ def random_skew_symmetric_matrix( n ):
     return 0.5 * ( A - A.T )
 
 def generateRandomData():
-    #np.random.seed(0)
+    # np.random.seed(0)
     P = 1
     handles = 2
     # B = np.random.randn(12*P, handles)
     # A = A_from_non_Cayley_B( B )
     A = random_skew_symmetric_matrix( 12*P )
+    assert is_skew_symmetric( A )
     p = np.random.randn(12*P)
     v = np.random.randn(3*P, 12*P)
     w = np.random.randn(3*P)
@@ -395,3 +396,12 @@ if __name__ == '__main__':
     print( abs( p - p2 ).max() )
     print( abs( A - A2 ).max() )
     print( abs( x - x2 ).max() )
+    
+    def f_gradf_packed( x ):
+        xp, xA = unpack( x, poses, handles )
+        val, gradp, gradA = f_and_dfdp_and_dfdA( xp, xA, v, w, handles )
+        grad = pack( gradp, gradA, poses, handles )
+        return val, grad
+    import scipy.optimize
+    grad_err = scipy.optimize.check_grad( lambda x: f_gradf_packed(x)[0], lambda x: f_gradf_packed(x)[1], pack( p, A, poses, handles ) )
+    print( "scipy.optimize.check_grad() error:", grad_err )
