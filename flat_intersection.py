@@ -398,6 +398,7 @@ def optimize_nullspace_directly(P, H, row_mats, deformed_vs, x0, strategy = None
 		import flat_intersection_cayley_grassmann_gradients as grassmann
 		x = x0.copy()
 		MAX_NONLINEAR_ITER = 100
+		MIN_NONLINEAR_ITER = 10
 		while True:
 			
 			p, B = unpack( x, P )
@@ -407,7 +408,8 @@ def optimize_nullspace_directly(P, H, row_mats, deformed_vs, x0, strategy = None
 			
 			solution = scipy.optimize.minimize( f_point_distance_sum_and_gradient, x, jac = True, method = 'BFGS', callback = show_progress, options={'disp':True, 'maxiter': MAX_NONLINEAR_ITER} )
 			x = solution.x
-			if solution.success: break
+			## Only break if we converge and ran just a few iterations.
+			if solution.success and solution.nit < MIN_NONLINEAR_ITER: break
 	else:
 		raise RuntimeError( "Unknown strategy: " + str(strategy) )
 	
