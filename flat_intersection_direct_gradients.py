@@ -73,7 +73,30 @@ def f_and_dfdp_and_dfdB(p, B, vbar, vprime):
 	gradientp = 2 * (t_2 - np.dot(v.T, np.dot(vB, np.dot(T_0, np.dot(B.T, t_2)))))
 	
 	return functionValue, gradientp, gradientB 
+
+def f_and_dfdp_and_dfdB_hand(p, B, vbar, vprime):
+	v = vbar
+	w = vprime
 	
+	vB = np.dot( v, B )
+	S = np.dot( vB.T, vB )
+	u = np.dot( v,p ) - w
+	R = np.dot( vB, np.linalg.inv(S) )
+	Q = np.dot( R, vB.T )
+	M = u - np.dot( Q, u )
+	MuR = np.dot( np.dot( M, u.T ), R )
+	uMR = np.dot( np.dot( u, M.T ), R )
+	
+	E = ( M * M ).sum()
+	
+	# dE/dp = 2*(v - Q*v)'*M
+	gradp = 2 * np.dot( ( v - np.dot( Q, v ) ).T, M )
+	
+	# dE/dB = -2*v'*(M*u'*R + Q'*u*M'*R + Q'*M*u'*R + u*M'*R)
+	gradB = -2 * ( np.dot( v.T, MuR ) + np.dot( np.dot( v.T, Q.T ), uMR ) + np.dot( np.dot( v.T, Q.T ), MuR ) + np.dot( v.T, uMR ) )
+	
+	return E, gradp, gradB
+
 def fAndGB(p, B, vbar, vprime):
 	v = vbar
 	w = vprime
@@ -284,7 +307,7 @@ if __name__ == '__main__':
 	print('gradient p dumb = ', gradientp_dumb)
 	print('gradient B dumb = ', gradientB_dumb)
 	
-	print( "Function value matches if zero:", abs( functionValue - functionValue ) )
+	print( "Function value matches if zero:", abs( functionValue - functionValue_dumb ) )
 	print( "gradient p matches if zero:", abs( gradientp - gradientp_dumb ).max() )
 	print( "gradient B matches if zero:", abs( gradientB - gradientB_dumb ).max() )
 	
@@ -299,6 +322,14 @@ if __name__ == '__main__':
 	print( "Function value matches if zero:", abs( functionValue - f_fast ) )
 	print( "gradient p matches if zero:", abs( gradientp - gp_fast ).max() )
 	print( "hess p matches if zero:", abs( hp_dumb - hp_fast ).max() )
+	
+	f_hand, gradp_hand, gradB_hand = f_and_dfdp_and_dfdB_hand(p, B, v, w)
+	print( 'f hand = ', f_hand )
+	print( 'gradient p hand = ', gradp_hand )
+	print( 'gradient B hand = ', gradB_hand )
+	print( "Function value matches if zero:", abs( functionValue - f_hand ) )
+	print( "gradient p matches if zero:", abs( gradientp - gradp_hand ).max() )
+	print( "gradient B matches if zero:", abs( gradientB - gradB_hand ).max() )
 	
 	def f_gradf_packed( x ):
 		xp, xB = unpack( x, poses )
