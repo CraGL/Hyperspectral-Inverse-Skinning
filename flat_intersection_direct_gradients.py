@@ -93,7 +93,7 @@ def f_and_dfdp_and_dfdB_hand(p, B, vbar, vprime):
 	gradp = 2 * np.dot( ( v - np.dot( Q, v ) ).T, M )
 	
 	# dE/dB = -2*v'*(M*u'*R + Q'*u*M'*R + Q'*M*u'*R + u*M'*R)
-	gradB = -2 * ( np.dot( v.T, MuR ) + np.dot( np.dot( v.T, Q.T ), uMR ) + np.dot( np.dot( v.T, Q.T ), MuR ) + np.dot( v.T, uMR ) )
+	gradB = -2 * ( np.dot( v.T, MuR ) - np.dot( np.dot( v.T, Q ), uMR ) - np.dot( np.dot( v.T, Q ), MuR ) + np.dot( v.T, uMR ) )
 	
 	return E, gradp, gradB
 

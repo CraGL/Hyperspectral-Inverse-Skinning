@@ -29,6 +29,7 @@
     d(X*Y) = (dX)*Y + X*(dY)
     d(X') = (dX)'
     dZ/dX = dZ/dY * dY/dX
+    d(inv(X)) = -inv(X)*dX*inv(X)
 
 E = norm2(v*(p+B*-inv(B'*v'*v*B)*B'*v'*(v*p-w))-w)^2
   = norm2((v*p-w)-v*B*inv(B'*v'*v*B)*B'*v'*(v*p-w))^2
@@ -38,31 +39,31 @@ S = B'*v'*v*B
     inv(S) = inv(S)'
 u = v*p-w
 R = v*B*inv(S)
-Q = R*B'*v'
+Q = R*B'*v' = v*B*inv(S)*B'*v'
 M = (I-Q)*u = u - Q*u
-Z = R'*u
 
 E  = M : M
 dE = 2*M : dM
-   = 2*M : (v*dp - Q*v*dp) + 2*M : (-v*dB*Z) + 2*M : (-v*B*[d inv(S)]*B'*v'*u) + 2*M : (-R*dB'*v'*u)
-   = 2*M : (v*dp - Q*v*dp) + 2*M : (-v*dB*Z) + 2*M : (-R*[dS]*Z) + 2*M : (-R*dB'*v'*u)
+   = 2*M : d[ (v*p-w) - v*B*inv(S)*B'*v'*(v*p-w) ]
+   = 2*M : (v*dp - Q*v*dp) + 2*M : (-v*dB*R'*u) + 2*M : (-v*B*[d inv(S)]*B'*v'*u) + 2*M : (-R*dB'*v'*u)
+   = 2*M : (v*dp - Q*v*dp) + 2*M : (-v*dB*R'*u) + 2*M : (R*[dS]*R'*u) + 2*M : (-R*dB'*v'*u)
 
 dS = d( B'*v'*v*B ) = dB'*v'*v*B + B'*v'*v*dB
 
-dE = 2*M : (v*dp - Q*v*dp) + 2*M : (-v*dB*Z) + 2*M : (-R*[dB'*v'*v*B + B'*v'*v*dB]*Z) + 2*M : (-R*dB'*v'*u)
-   = 2*M : (v - Q*v)*dp    + 2*M : (-v*dB*Z) + 2*M : (-R*[dB'*v'*v*B + B'*v'*v*dB]*Z) + 2*M : (-R*dB'*v'*u)
-   = 2*(v - Q*v)'*M : dp   + 2*M : (-v*dB*Z) + 2*M : (-R*[dB'*v'*v*B + B'*v'*v*dB]*Z) + 2*M : (-R*dB'*v'*u)
-   = 2*(v - Q*v)'*M : dp   - 2*M : ( v*dB*Z) - 2*M : ( R*[dB'*v'*v*B + B'*v'*v*dB]*Z) - 2*M : ( R*dB'*v'*u)
-   = 2*(v - Q*v)'*M : dp   - 2*v'*M*Z' :dB   - 2*R'*M*Z' : (dB'*v'*v*B+B'*v'*v*dB)    - 2*R'*M*(v'*u)' : dB'
-   = 2*(v - Q*v)'*M : dp   - 2*v'*M*Z' :dB   - 2*R'*M*Z' : (dB'*v'*v*B+B'*v'*v*dB)    - 2*(v'*u)*M'*R : dB
-   = 2*(v - Q*v)'*M : dp   - 2*v'*M*Z' :dB   - 2*R'*M*Z' : dB'*v'*v*B - 2*R'*M*Z' : B'*v'*v*dB - 2*(v'*u)*M'*R : dB
-   = 2*(v - Q*v)'*M : dp   - 2*v'*M*Z' :dB   - 2*R'*M*Z'*(v'*v*B)' : dB' - 2*(v'*v*B)*R'*M*Z' : dB - 2*(v'*u)*M'*R : dB
-   = 2*(v - Q*v)'*M : dp   - 2*v'*M*Z' :dB   - 2*(v'*v*B)*Z*M'*R : dB - 2*(v'*v*B)*R'*M*Z' : dB - 2*(v'*u)*M'*R : dB
+dE = 2*M : (v*dp - Q*v*dp) + 2*M : (-v*dB*R'*u) + 2*M : (R*[dB'*v'*v*B + B'*v'*v*dB]*R'*u) + 2*M : (-R*dB'*v'*u)
+   = 2*M : (v - Q*v)*dp    + 2*M : (-v*dB*R'*u) + 2*M : (R*[dB'*v'*v*B + B'*v'*v*dB]*R'*u) + 2*M : (-R*dB'*v'*u)
+   = 2*(v - Q*v)'*M : dp   + 2*M : (-v*dB*R'*u) + 2*M : (R*[dB'*v'*v*B + B'*v'*v*dB]*R'*u) + 2*M : (-R*dB'*v'*u)
+   = 2*(v - Q*v)'*M : dp   - 2*M : ( v*dB*R'*u) + 2*M : (R*[dB'*v'*v*B + B'*v'*v*dB]*R'*u) - 2*M : ( R*dB'*v'*u)
+   = 2*(v - Q*v)'*M : dp   - 2*v'*M*(R'*u)' :dB + 2*R'*M*(R'*u)' : (dB'*v'*v*B+B'*v'*v*dB)  - 2*R'*M*(v'*u)' : dB'
+   = 2*(v - Q*v)'*M : dp   - 2*v'*M*(R'*u)' :dB + 2*R'*M*(R'*u)' : (dB'*v'*v*B+B'*v'*v*dB)  - 2*(v'*u)*M'*R : dB
+   = 2*(v - Q*v)'*M : dp   - 2*v'*M*(R'*u)' :dB + 2*R'*M*(R'*u)' : dB'*v'*v*B + 2*R'*M*(R'*u)' : B'*v'*v*dB - 2*(v'*u)*M'*R : dB
+   = 2*(v - Q*v)'*M : dp   - 2*v'*M*(R'*u)' :dB + 2*R'*M*(R'*u)'*(v'*v*B)' : dB' + 2*(v'*v*B)*R'*M*(R'*u)' : dB - 2*(v'*u)*M'*R : dB
+   = 2*(v - Q*v)'*M : dp   - 2*v'*M*(R'*u)' :dB + 2*(v'*v*B)*R'*u*M'*R : dB + 2*(v'*v*B)*R'*M*(R'*u)' : dB - 2*(v'*u)*M'*R : dB
 
 dE/dp = 2*(v - Q*v)'*M
 
-dE/dB = - 2*v'*M*Z'   - 2*(v'*v*B)*Z*M'*R - 2*(v'*v*B)*R'*M*Z' - 2*(v'*u)*M'*R
-      = -2*( v'*M*Z' + (v'*v*B)*Z*M'*R + (v'*v*B)*R'*M*Z' + (v'*u)*M'*R )
-      = -2*v'*(M*Z' + v*B*Z*M'*R + v*B*R'*M*Z' + u*M'*R)
-      = -2*v'*(M*Z' + v*B*Z*M'*R + Q'*M*Z' + u*M'*R)
-      = -2*v'*(M*u'*R + Q'*u*M'*R + Q'*M*u'*R + u*M'*R)
+dE/dB = - 2*v'*M*(R'*u)'   + 2*(v'*v*B)*R'*u*M'*R + 2*(v'*v*B)*R'*M*(R'*u)' - 2*(v'*u)*M'*R
+      = -2*( v'*M*(R'*u)' - (v'*v*B)*R'*u*M'*R - (v'*v*B)*R'*M*(R'*u)' + (v'*u)*M'*R )
+      = -2*v'*( M*(R'*u)' - v*B*R'*u*M'*R - v*B*R'*M*(R'*u)' + u*M'*R )
+      = -2*v'*( M*(R'*u)' - v*B*R'*u*M'*R - Q*M*(R'*u)' + u*M'*R )
+      = -2*v'*( M*u'*R - Q*u*M'*R - Q*M*u'*R + u*M'*R )
