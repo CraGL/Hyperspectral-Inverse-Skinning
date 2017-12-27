@@ -9,12 +9,18 @@ E = norm2((v*p-w)-v*(inv(I-A)*(I+A)*B)*inv((inv(I-A)*(I+A)*B)'*v'*v*(inv(I-A)*(I
 
 where
 
-v is vbar (3p-by-(handles-1))
+v is vbar (3p-by-12p)
 w is vprime (3p-vector)
 p is a 12p-vector
 I is the 12p identity matrix
-B is the left (handles-1) rows of a 12p identity matrix (12p-by-(handles-1))
+B is the left (handles-1) columns of a 12p identity matrix (12p-by-(handles-1))
 
+For the big inverse in the energy to work, we need:
+    max(12p, handles, 3p) = max( 3p, handles ) >= handles
+which is equivalent to:
+    3p >= handles
+(This wouldn't be a problem if we switched the big inverse to a pseudoinverse,
+but that would make the gradient harder to calculate.)
 
 d/dA norm2((v*p-w)-v*(inv(I-A)*(I+A)*B)*inv((inv(I-A)*(I+A)*B)'*v'*v*(inv(I-A)*(I+A)*B))*(inv(I-A)*(I+A)*B)'*v'*(v*p-w))^2 = -(2*inv(I-A)'*v'*(v*p-w-v*inv(I-A)*(A+I)*B*inv((v*inv(I-A)*(I+A)*B)'*v*inv(I-A)*(A+I)*B)*B'*(I+A)'*inv(I-A)'*v'*(v*p-w))*((v*p-w)'*v*inv(I-A)*(A+I)*B*inv((v*inv(I-A)*(A+I)*B)'*v*inv(I-A)*(A+I)*B)*B'*(A+I)'*inv(I-A)')+2*inv(I-A)'*v'*(v*p-w-v*inv(I-A)*(A+I)*B*inv((v*inv(I-A)*(I+A)*B)'*v*inv(I-A)*(A+I)*B)*B'*(I+A)'*inv(I-A)'*v'*(v*p-w))*((v*p-w)'*v*inv(I-A)*(A+I)*B*inv((v*inv(I-A)*(A+I)*B)'*v*inv(I-A)*(A+I)*B)*B')-(2*inv(I-A)'*v'*v*inv(I-A)*(A+I)*B*inv((v*inv(I-A)*(I+A)*B)'*v*inv(I-A)*(A+I)*B)*B'*(I+A)'*inv(I-A)'*v'*(v*p-w)*(((v*p-w)'-(v*p-w)'*v*inv(I-A)*(A+I)*B*inv((v*inv(I-A)*(A+I)*B)'*v*inv(I-A)*(A+I)*B)*B'*(A+I)'*inv(I-A)'*v')*v*inv(I-A)*(A+I)*B*inv((v*inv(I-A)*(I+A)*B)'*v*inv(I-A)*(A+I)*B)*B')+2*inv(I-A)'*v'*v*inv(I-A)*(A+I)*B*inv((v*inv(I-A)*(I+A)*B)'*v*inv(I-A)*(A+I)*B)*B'*(I+A)'*inv(I-A)'*v'*(v*p-w)*(((v*p-w)'-(v*p-w)'*v*inv(I-A)*(A+I)*B*inv((v*inv(I-A)*(A+I)*B)'*v*inv(I-A)*(A+I)*B)*B'*(A+I)'*inv(I-A)'*v')*v*inv(I-A)*(A+I)*B*inv((v*inv(I-A)*(I+A)*B)'*v*inv(I-A)*(A+I)*B)*B'*(I+A)'*inv(I-A)')+2*inv(I-A)'*v'*v*inv(I-A)*(A+I)*B*inv((v*inv(I-A)*(A+I)*B)'*v*inv(I-A)*(A+I)*B)*B'*(A+I)'*inv(I-A)'*v'*(v*p-w-v*inv(I-A)*(A+I)*B*inv((v*inv(I-A)*(I+A)*B)'*v*inv(I-A)*(A+I)*B)*B'*(I+A)'*inv(I-A)'*v'*(v*p-w))*((v*p-w)'*v*inv(I-A)*(A+I)*B*inv((v*inv(I-A)*(A+I)*B)'*v*inv(I-A)*(A+I)*B)*B'*(A+I)'*inv(I-A)')+2*inv(I-A)'*v'*v*inv(I-A)*(A+I)*B*inv((v*inv(I-A)*(A+I)*B)'*v*inv(I-A)*(A+I)*B)*B'*(A+I)'*inv(I-A)'*v'*(v*p-w-v*inv(I-A)*(A+I)*B*inv((v*inv(I-A)*(I+A)*B)'*v*inv(I-A)*(A+I)*B)*B'*(I+A)'*inv(I-A)'*v'*(v*p-w))*((v*p-w)'*v*inv(I-A)*(A+I)*B*inv((v*inv(I-A)*(A+I)*B)'*v*inv(I-A)*(A+I)*B)*B'))+2*inv(I-A)'*v'*(v*p-w)*(((v*p-w)'-(v*p-w)'*v*inv(I-A)*(A+I)*B*inv((v*inv(I-A)*(A+I)*B)'*v*inv(I-A)*(A+I)*B)*B'*(A+I)'*inv(I-A)'*v')*v*inv(I-A)*(A+I)*B*inv((v*inv(I-A)*(I+A)*B)'*v*inv(I-A)*(A+I)*B)*B')+2*inv(I-A)'*v'*(v*p-w)*(((v*p-w)'-(v*p-w)'*v*inv(I-A)*(A+I)*B*inv((v*inv(I-A)*(A+I)*B)'*v*inv(I-A)*(A+I)*B)*B'*(A+I)'*inv(I-A)'*v')*v*inv(I-A)*(A+I)*B*inv((v*inv(I-A)*(I+A)*B)'*v*inv(I-A)*(A+I)*B)*B'*(I+A)'*inv(I-A)'))
 
@@ -285,8 +291,12 @@ def random_skew_symmetric_matrix( n ):
 
 def generateRandomData():
     # np.random.seed(0)
-    P = 1
-    handles = 2
+    P = 2
+    handles = 5
+    
+    ## If this isn't true, the inv() in the energy will fail.
+    assert 3*P >= handles
+    
     B = np.random.randn(12*P, handles)
     A = A_from_non_Cayley_B( B )
     # A = random_skew_symmetric_matrix( 12*P )
@@ -305,7 +315,7 @@ if __name__ == '__main__':
     print( 'other function value:', f2 )
     print( '|function difference|:', abs( f - f2 ) )
     print( 'gradient p:', gradp )
-    print( 'other gradient p:', gradp )
+    print( 'other gradient p:', gradp2 )
     print( '|gradient p difference| max:', abs( gradp - gradp2 ).max() )
     print( 'gradient A:', gradA )
     

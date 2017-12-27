@@ -234,16 +234,45 @@ def fAndGpAndHp_fast(p, B, vbar, vprime):
 
 def generateRandomData():
 	#np.random.seed(0)
-	P = 1
-	handles = 2
+	P = 2
+	handles = 3
+	## If this isn't true, the inv() in the energy will fail.
+	assert 3*P >= handles
 	B = np.random.randn(12*P, handles)
 	p = np.random.randn(12*P)
 	v = np.random.randn(3*P, 12*P)
 	w = np.random.randn(3*P)
-	return B, p, v, w
+	return B, p, v, w, P, handles
+
+def pack( point, B ):
+	'''
+	`point` is a 12P-by-1 column matrix.
+	`B` is a 12P-by-#(handles-1) matrix.
+	Returns them packed so that unpack( pack( point, B ) ) == point, B.
+	'''
+	p12 = B.shape[0]
+	handles = B.shape[1]
+	X = np.zeros( p12*(handles+1) )
+	X[:p12] = point.ravel()
+	X[p12:] = B.T.ravel()
+	return X
+
+def unpack( X, poses ):
+	'''
+	X is a flattened array with #handle*12P entries.
+	The first 12*P entries are `point` as a 12*P-by-1 matrix.
+	The remaining entries are the 12P-by-#(handles-1) matrix B.
+	
+	where P = poses.
+	'''
+	P = poses
+	point = X[:12*P].reshape(12*P, 1)
+	B = X[12*P:].reshape(-1,12*P).T
+
+	return point, B
 
 if __name__ == '__main__':
-	B, p, v, w = generateRandomData()
+	B, p, v, w, poses, handles = generateRandomData()
 	functionValue, gradientp, gradientB = f_and_dfdp_and_dfdB(p, B, v, w)
 	functionValue_dumb, gradientp_dumb, gradientB_dumb = f_and_dfdp_and_dfdB_dumb(p, B, v, w)
 	
@@ -270,3 +299,13 @@ if __name__ == '__main__':
 	print( "Function value matches if zero:", abs( functionValue - f_fast ) )
 	print( "gradient p matches if zero:", abs( gradientp - gp_fast ).max() )
 	print( "hess p matches if zero:", abs( hp_dumb - hp_fast ).max() )
+	
+	def f_gradf_packed( x ):
+		xp, xB = unpack( x, poses )
+		xp = xp.squeeze()
+		val, gradp, gradB = f_and_dfdp_and_dfdB( xp, xB, v, w )
+		grad = pack( gradp, gradB )
+		return val, grad
+	import scipy.optimize
+	grad_err = scipy.optimize.check_grad( lambda x: f_gradf_packed(x)[0], lambda x: f_gradf_packed(x)[1], pack( p, B ) )
+	print( "scipy.optimize.check_grad() error:", grad_err )

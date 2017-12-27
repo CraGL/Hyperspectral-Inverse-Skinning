@@ -734,6 +734,9 @@ if __name__ == '__main__':
 				B[:,i] /= np.linalg.norm(B[:,i])
 			x0 = pack( pt, B )
 		
+		if 3*P < B.shape[1]:
+		    print( "Warning: Not enough poses for the handles without pseudoinverse in the energy." )
+		
 		if args.energy == 'B':
 			# converged, x = optimize(P, H, all_R_mats, deformed_vs, x0)
 			converged, x = optimize_nullspace_directly(P, H, all_R_mats, deformed_vs, x0, strategy = args.strategy)
