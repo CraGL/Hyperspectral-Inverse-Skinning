@@ -634,7 +634,7 @@ def optimize_biquadratic( P, H, row_mats, deformed_vs, x0, solve_for_rest_pose =
 	normalization = 1./( len(row_mats) * diag )
 	
 	use_pseudoinverse = False
-	if strategy is 'pinv':
+	if strategy == 'pinv':
 		use_pseudoinverse = True
 	
 	def unpack_W( x, P ):
