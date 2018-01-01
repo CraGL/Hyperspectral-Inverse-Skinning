@@ -621,6 +621,107 @@ def optimize_approximated_quadratic(P, H, row_mats, deformed_vs, x0, f_eps = Non
 	
 	return converged, x
 
+def optimize_biquadratic(P, H, row_mats, deformed_vs, x0, f_eps = None, x_eps = None, max_iter = None):
+
+	## To make function values comparable, we need to normalize.
+	xyzs = np.asarray([ row_mat[0,:3] for row_mat in row_mats ])
+	diag = xyzs.max( axis = 0 ) - xyzs.min( axis = 0 )
+	diag = np.linalg.norm(diag)
+	normalization = 1./( len(row_mats) * diag )
+	
+	def unpack_W( x, P ):
+		pt, B = unpack( x, P )
+		## Make sure pt is a column matrix.
+		pt = pt.squeeze()[...,np.newaxis]
+		assert len( pt.shape ) == 2
+		assert pt.shape[1] == 1
+		
+		## Switch pt with the j-th column of [p;B].
+		## 1 Convert [pt;B] from an origin and basis to a set of points.
+		W = np.hstack((pt,pt+B))
+		
+		return W
+	
+	def pack_W( W ):
+		pt = W[:,0:1]
+		B = W[:,1:] - pt
+		return pack( pt, B )
+	
+	## Verify that we can unpack and re-pack shifted without changing anything.
+	assert abs( pack_W( unpack_W( np.arange(36), 1 ) ) - np.arange(36) ).max() < 1e-10
+	
+	if f_eps is None:
+		f_eps = 1e-10
+	if x_eps is None:
+		x_eps = 1e-10
+	if max_iter is None:
+		max_iter = 9999
+	
+	import flat_intersection_biquadratic_gradients as biquadratic
+	
+	f_prev = None
+	W_prev = unpack_W( x0.copy(), P )
+	iterations = 0
+	converged = False
+	while( True ):
+		iterations += 1
+		if iterations > max_iter:
+			print( "Terminating due to too many iterations." )
+			break
+		
+		print( "Starting iteration", iterations )
+		
+		## 1 Find the optimal z.
+		## 2 Accumulate the linear matrix equation for W.
+		## 3 Solve for the new W.
+		
+		f = 0
+		As = []
+		Bs = []
+		Ys = []
+		
+		for i, vs in enumerate(deformed_vs):
+			vprime = vs.reshape((3*P,1))
+			vbar = row_mats[i]
+			
+			## 1
+			z, fi = biquadratic.solve_for_z( W_prev, vbar, vprime, return_energy = True )
+			
+			## 2
+			A, B, Y = linear_matrix_equation_for_W( vbar, vprime, z )
+			As.append( A )
+			Bs.append( B )
+			Ys.append( Y )
+			
+			f += fi
+		
+		## 3
+		W = biquadratic.solve_for_W( As, Bs, Ys )
+		f *= normalization
+		
+		## If this is the first iteration, pretend that the old function value was
+		## out of termination range.
+		if f_prev is None: f_prev = f + 100*f_eps
+		
+		if f - f_prev > 0:
+			print( "WARNING: Function value increased." )
+		if abs( f_prev - f ) < f_eps:
+			print( "Function change too small, terminating:", f_prev - f )
+			converged = True
+			break
+		x_change = abs( W_prev - W ).max()
+		if W_change < x_eps:
+			print( "Variables change too small, terminating:", x_change )
+			converged = True
+			break
+		
+		f_prev = f
+		W_prev = W.copy()
+	
+	print( "Terminated after", iterations, "iterations." )
+	
+	return converged, pack_W( W )
+
 def optimize(P, H, all_R_mats, deformed_vs, x0):
 	converged, x = optimize_approximated_quadratic(P, H, all_R_mats, deformed_vs, x0 )
 	converged, x = optimize_nullspace_directly(P, H, all_R_mats, deformed_vs, x )
@@ -637,7 +738,7 @@ if __name__ == '__main__':
 	parser.add_argument('--ground-truth', '--GT', type=str, help='Ground truth data path.')
 	parser.add_argument('--recovery', '--R', type=float, help='Recovery test epsilon (default no recovery test).')
 	parser.add_argument('--strategy', '--S', type=str, choices = ['function', 'gradient', 'hessian', 'mixed', 'grassmann'], help='Strategy: function, gradient (default), hessian, mixed, grassmann (for energy B only).')
-	parser.add_argument('--energy', '--E', type=str, default='B', choices = ['B', 'cayley', 'B+cayley', 'B+B', 'cayley+cayley'], help='Energy: B (default), cayley, B+cayley, B+B, cayley+cayley.')
+	parser.add_argument('--energy', '--E', type=str, default='B', choices = ['B', 'cayley', 'B+cayley', 'B+B', 'cayley+cayley', 'biquadratic'], help='Energy: B (default), cayley, B+cayley, B+B, cayley+cayley.')
 	
 	args = parser.parse_args()
 	H = args.handles
@@ -735,7 +836,7 @@ if __name__ == '__main__':
 			x0 = pack( pt, B )
 		
 		if 3*P < B.shape[1]:
-		    print( "Warning: Not enough poses for the handles without pseudoinverse in the energy." )
+			print( "Warning: Not enough poses for the handles without pseudoinverse in the energy." )
 		
 		if args.energy == 'B':
 			# converged, x = optimize(P, H, all_R_mats, deformed_vs, x0)
@@ -760,6 +861,8 @@ if __name__ == '__main__':
 			B = grassmann.B_from_Cayley_A( A, H )
 			x = pack( p, B )
 			converged, x = optimize_nullspace_directly(P, H, all_R_mats, deformed_vs, x, strategy = args.strategy)
+		elif args.energy == 'biquadratic':
+			converged, x = optimize_biquadratic( P, H, all_R_mats, deformed_vs, x0 )
 		else:
 			raise RuntimeError( "Unknown energy parameter: " + str(parser.energy) )
 		

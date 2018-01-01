@@ -67,3 +67,17 @@ dE/dB = - 2*v'*M*(R'*u)'   + 2*(v'*v*B)*R'*u*M'*R + 2*(v'*v*B)*R'*M*(R'*u)' - 2*
       = -2*v'*( M*(R'*u)' - v*B*R'*u*M'*R - v*B*R'*M*(R'*u)' + u*M'*R )
       = -2*v'*( M*(R'*u)' - v*B*R'*u*M'*R - Q*M*(R'*u)' + u*M'*R )
       = -2*v'*( M*u'*R - Q*u*M'*R - Q*M*u'*R + u*M'*R )
+
+or (worked out on paper)
+dE = [ 2*V'*( M - R*(V*B)'*M ] dp
+     -2*V'*[ u*M'*R - R*(V*B)'*M*u'*R - R*(V*B)'*u*M'*R + M*R*u ] dB
+
+---
+
+Test to see if my understanding is correct:
+
+E = | A inv(B) C |^2
+M = A inv(B) C
+E = M : M
+dE = 2*M : dM
+   = 

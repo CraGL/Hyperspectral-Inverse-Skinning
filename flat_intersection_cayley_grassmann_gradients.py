@@ -47,6 +47,8 @@ def is_skew_symmetric( A, threshold = 1e-10 ):
     
     # return abs( A + A.T ).max() < threshold
     print( "A is skew symmetric if this is 0:", abs( A + A.T ).max() )
+    if( abs( A + A.T ).max() > 1 ):
+        print( "whoa" )
     return True
 
 def is_orthogonal( Q, threshold = 1e-10 ):
@@ -306,6 +308,7 @@ def generateRandomData():
     return p, A, v, w, P, handles
 
 if __name__ == '__main__':
+    SKIP_CHECKS = False
     p, A, v, w, poses, handles = generateRandomData()
     
     f, gradp, gradA = f_and_dfdp_and_dfdA( p, A, v, w, handles )
