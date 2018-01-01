@@ -621,7 +621,11 @@ def optimize_approximated_quadratic(P, H, row_mats, deformed_vs, x0, f_eps = Non
 	
 	return converged, x
 
-def optimize_biquadratic( P, H, row_mats, deformed_vs, x0, f_eps = None, x_eps = None, max_iter = None, f_zero_threshold = None, strategy = None ):
+def optimize_biquadratic( P, H, row_mats, deformed_vs, x0, solve_for_rest_pose = False, f_eps = None, x_eps = None, max_iter = None, f_zero_threshold = None, strategy = None ):
+	'''
+	If solve_for_rest_pose is False (the default), returns ( converged, final x ).
+	If solve_for_rest_pose is True, returns ( converged, final x, and updated row_mats ).
+	'''
 	
 	## To make function values comparable, we need to normalize.
 	xyzs = np.asarray([ row_mat[0,:3] for row_mat in row_mats ])
@@ -661,7 +665,7 @@ def optimize_biquadratic( P, H, row_mats, deformed_vs, x0, f_eps = None, x_eps =
 	if max_iter is None:
 		max_iter = 9999
 	if f_zero_threshold is None:
-	    f_zero_threshold = 0.0
+		f_zero_threshold = 0.0
 	
 	import flat_intersection_biquadratic_gradients as biquadratic
 	
@@ -678,8 +682,9 @@ def optimize_biquadratic( P, H, row_mats, deformed_vs, x0, f_eps = None, x_eps =
 		print( "Starting iteration", iterations )
 		
 		## 1 Find the optimal z.
-		## 2 Accumulate the linear matrix equation for W.
-		## 3 Solve for the new W.
+		## (optional) 2 Solve for the new V.
+		## 3 Accumulate the linear matrix equation for W.
+		## 4 Solve for the new W.
 		
 		f = 0
 		
@@ -687,6 +692,11 @@ def optimize_biquadratic( P, H, row_mats, deformed_vs, x0, f_eps = None, x_eps =
 		As = []
 		Bs = []
 		Ys = []
+		
+		## If we are solving for the rest pose, make a copy of row_mats, because
+		## we will modify it.
+		if solve_for_rest_pose:
+			row_mats = row_mats.copy()
 		
 		for i, vs in enumerate(deformed_vs):
 			vprime = vs.reshape((3*P,1))
@@ -697,6 +707,17 @@ def optimize_biquadratic( P, H, row_mats, deformed_vs, x0, f_eps = None, x_eps =
 			fis[i] = fi
 			
 			## 2
+			if solve_for_rest_pose:
+				Q,L,C = biquadratic.quadratic_for_V( W_prev, z, vprime )
+				v = vbar[:3,0]
+				old_fi = np.dot( np.dot( v, Q ), v ) + np.dot( L, v ) + C
+				
+				vbar, fi = biquadratic.solve_for_V( W_prev, z, vprime, return_energy = True, use_pseudoinverse = use_pseudoinverse )
+				## Store the new vbar.
+				row_mats[i] = vbar
+				fis[i] = fi
+			
+			## 3
 			A, B, Y = biquadratic.linear_matrix_equation_for_W( vbar, vprime, z )
 			As.append( A )
 			Bs.append( B )
@@ -704,7 +725,7 @@ def optimize_biquadratic( P, H, row_mats, deformed_vs, x0, f_eps = None, x_eps =
 			
 			f += fi
 		
-		## 3
+		## 4
 		W = biquadratic.solve_for_W( As, Bs, Ys, use_pseudoinverse = use_pseudoinverse )
 		f *= normalization
 		print( "Function value:", f )
@@ -729,16 +750,19 @@ def optimize_biquadratic( P, H, row_mats, deformed_vs, x0, f_eps = None, x_eps =
 			converged = True
 			break
 		if f < f_zero_threshold:
-		    print( "Function below zero threshold, terminating." )
-		    converged = True
-		    break
+			print( "Function below zero threshold, terminating." )
+			converged = True
+			break
 		
 		f_prev = f
 		W_prev = W.copy()
 	
 	print( "Terminated after", iterations, "iterations." )
 	
-	return converged, pack_W( W )
+	if solve_for_rest_pose:
+		return converged, pack_W( W ), row_mats
+	else:
+		return converged, pack_W( W )
 
 def optimize(P, H, all_R_mats, deformed_vs, x0):
 	converged, x = optimize_approximated_quadratic(P, H, all_R_mats, deformed_vs, x0 )
@@ -757,6 +781,7 @@ if __name__ == '__main__':
 	parser.add_argument('--recovery', '--R', type=float, help='Recovery test epsilon (default no recovery test).')
 	parser.add_argument('--strategy', '--S', type=str, choices = ['function', 'gradient', 'hessian', 'mixed', 'grassmann', 'pinv'], help='Strategy: function, gradient (default), hessian, mixed, grassmann (for energy B only), pinv (for energy biquadratic only).')
 	parser.add_argument('--energy', '--E', type=str, default='B', choices = ['B', 'cayley', 'B+cayley', 'B+B', 'cayley+cayley', 'biquadratic'], help='Energy: B (default), cayley, B+cayley, B+B, cayley+cayley.')
+	parser.add_argument('--solve-for-rest-pose', type=bool, default=False, help='Whether to solve for the rest pose (only affects "biquadratic" energy (default: False).')
 	
 	args = parser.parse_args()
 	H = args.handles
@@ -880,7 +905,10 @@ if __name__ == '__main__':
 			x = pack( p, B )
 			converged, x = optimize_nullspace_directly(P, H, all_R_mats, deformed_vs, x, strategy = args.strategy)
 		elif args.energy == 'biquadratic':
-			converged, x = optimize_biquadratic( P, H, all_R_mats, deformed_vs, x0, strategy = args.strategy )
+			if args.solve_for_rest_pose:
+				converged, x, new_all_R_mats = optimize_biquadratic( P, H, all_R_mats, deformed_vs, x0, strategy = args.strategy, solve_for_rest_pose = args.solve_for_rest_pose )
+			else:
+				converged, x = optimize_biquadratic( P, H, all_R_mats, deformed_vs, x0, strategy = args.strategy )
 		else:
 			raise RuntimeError( "Unknown energy parameter: " + str(parser.energy) )
 		

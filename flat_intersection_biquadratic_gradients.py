@@ -21,6 +21,17 @@ which is equivalent to:
     3p >= handles
 (Just in case, we can use the pseudoinverse.)
 
+For the formulation finding a V which minimizes the expression,
+we de-vectorize W*z into a stack of T 3x3 matrices and t translations and substitute
+b=t-vprime:
+
+d/dv norm2(T*v+b)^2 = 2*T'*(b+T*v)
+
+where
+
+T is a 3px3 matrix
+b is a 3p-vector
+v id a 3p-vector
 
 The generated code is provided"as is" without warranty of any kind.
 """
@@ -44,7 +55,7 @@ def pack( W, poses, handles ):
 def quadratic_for_z( W, V, vprime ):
     '''
     Returns a quadratic expression ( Q, L, C ) for the energy in terms of `z`:
-        energy = np.dot( np.dot( z, Q ), z ) + np.dot( L, Z ) + C
+        energy = np.dot( np.dot( z, Q ), z ) + np.dot( L, z ) + C
     '''
     
     vprime = vprime.squeeze()
@@ -94,6 +105,60 @@ def solve_for_z( W, V, vprime, return_energy = False, use_pseudoinverse = True )
         return z, E
     else:
         return z
+
+def quadratic_for_V( W, z, vprime ):
+    '''
+    Returns a quadratic expression ( Q, L, C ) for the energy in terms of the 3-vector
+    `v`, the rest pose position which are converted to V via:
+        kron( identity(poses), kron( identity(3), append( v, [1] ) ) )
+    
+    The quadratic expression returned is:
+        energy = np.dot( np.dot( v, Q ), v ) + np.dot( L, v ) + C
+    '''
+    
+    z = z.squeeze()
+    vprime = vprime.squeeze()
+    
+    assert len( W.shape ) == 2
+    assert len( z.shape ) == 1
+    assert len( vprime.shape ) == 1
+    assert W.shape[1] == z.shape[0]
+    
+    Taffine = np.dot( W, z ).reshape( -1,4 )
+    ## It should be a horizontal stack of poses 3-by-4 matrices.
+    assert Taffine.shape[0] % 3 == 0
+    ## Separate the left 3x3 from the translation
+    T = Taffine[:,:3]
+    t = Taffine[:,3]
+    
+    b = t - vprime
+    assert len( b.shape ) == 1
+    
+    Q = np.dot( T.T, T )
+    L = 2.0*np.dot( T.T, b )
+    C = np.dot( b, b )
+    
+    return Q, L, C
+
+def solve_for_V( W, z, vprime, return_energy = False, use_pseudoinverse = False ):
+    Q, L, C = quadratic_for_V( W, z, vprime )
+    
+    if use_pseudoinverse:
+        v = np.dot( np.linalg.pinv(Q), -0.5*L )
+    else:
+        v = np.linalg.solve( Q, -0.5*L )
+    
+    ## Restore V to a matrix.
+    assert len(vprime) % 3 == 0
+    poses = len(vprime)//3
+    V = np.kron( np.identity(poses), np.kron( np.identity(3), np.append( v, [1] ) ) )
+    
+    if return_energy:
+        E = np.dot( np.dot( v, Q ), v ) + np.dot( L, v ) + C
+        # print( "New function value after solve_for_z():", E )
+        return V, E
+    else:
+        return V
 
 def linear_matrix_equation_for_W( V, vprime, z ):
     '''
