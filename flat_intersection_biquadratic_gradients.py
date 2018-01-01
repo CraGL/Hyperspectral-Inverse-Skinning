@@ -29,8 +29,6 @@ from __future__ import division, print_function, absolute_import
 
 import numpy as np
 
-USE_PSEUDOINVERSE = True
-
 ## TODO: pack() and unpack() and A_from_non_Cayley_B() should use the Grassmann manifold parameters only
 ##       and zero the rest (or rotate appropriately).
 def unpack( x, poses, handles ):
@@ -49,6 +47,8 @@ def quadratic_for_z( W, V, vprime ):
         energy = np.dot( np.dot( z, Q ), z ) + np.dot( L, Z ) + C
     '''
     
+    vprime = vprime.squeeze()
+    
     assert len( W.shape ) == 2
     assert len( V.shape ) == 2
     assert len( vprime.shape ) == 1
@@ -63,23 +63,34 @@ def quadratic_for_z( W, V, vprime ):
     
     return Q, L, C
 
-def solve_for_z( W, V, vprime, return_energy = False ):
+def solve_for_z( W, V, vprime, return_energy = False, use_pseudoinverse = True ):
     Q, L, C = quadratic_for_z( W, V, vprime )
     
     ## We also need the constraint that z.sum() == 1
     handles = len(L)
-    Qbig = np.block( [ [ Q, np.ones((handles,1)) ], [np.ones((1,handles)), np.zeros((1,1)) ] ] )
+    
+    ## numpy.block() is extremely slow:
+    # Qbig = np.block( [ [ Q, np.ones((handles,1)) ], [np.ones((1,handles)), np.zeros((1,1)) ] ] )
+    ## This is the same but much faster:
+    Qbig = np.zeros( (Q.shape[0]+1, Q.shape[1]+1) )
+    Qbig[:-1,:-1] = Q
+    Qbig[-1,:-1] = 1
+    Qbig[:-1,-1] = 1
+    
     rhs = np.zeros( ( len(L) + 1 ) )
     rhs[:-1] = -0.5*L
     rhs[-1] = 1
-    if USE_PSEUDOINVERSE:
+    if use_pseudoinverse:
         z = np.dot( np.linalg.pinv(Qbig), rhs )[:-1]
     else:
         z = np.linalg.solve( Qbig, rhs )[:-1]
     
-    E = np.dot( np.dot( z, Q ), z ) + np.dot( L, z ) + C
-    print( "New function value after solve_for_z():", E )
+    ## This always passes:
+    # assert abs( z.sum() - 1.0 ) < 1e-10
+    
     if return_energy:
+        E = np.dot( np.dot( z, Q ), z ) + np.dot( L, z ) + C
+        # print( "New function value after solve_for_z():", E )
         return z, E
     else:
         return z
@@ -90,6 +101,9 @@ def linear_matrix_equation_for_W( V, vprime, z ):
     in the following linear matrix equation:
         0.5 * dE/dW = np.dot( A, np.dot( W, B ) ) + Y
     '''
+    
+    vprime = vprime.squeeze()
+    z = z.squeeze()
     
     assert len( V.shape ) == 2
     assert len( vprime.shape ) == 1
@@ -106,7 +120,7 @@ def linear_matrix_equation_for_W( V, vprime, z ):
     
     return A, B, Y
 
-def solve_for_W( As, Bs, Ys ):
+def solve_for_W( As, Bs, Ys, use_pseudoinverse = True ):
     assert len( As ) == len( Bs )
     assert len( As ) == len( Ys )
     assert len( As ) > 0
@@ -119,15 +133,16 @@ def solve_for_W( As, Bs, Ys ):
         system += np.kron( A, B.T )
         rhs -= Y.ravel()
     
-    if USE_PSEUDOINVERSE:
+    if use_pseudoinverse:
         W = np.dot( np.linalg.pinv(system), rhs ).reshape( A.shape[0], B.shape[1] )
     else:
         W = np.linalg.solve( system, rhs ).reshape( A.shape[0], B.shape[1] )
     
     ## Normalize the columns of W.
-    columns_norm2 = ( W*W ).sum( axis = 0 )
-    assert columns_norm2.min() > 1e-10
-    W /= np.sqrt( columns_norm2 ).reshape( 1, -1 )
+    ## UPDATE: No, this is wrong. W's columns are points, not vectors.
+    # columns_norm2 = ( W*W ).sum( axis = 0 )
+    # assert columns_norm2.min() > 1e-10
+    # W /= np.sqrt( columns_norm2 ).reshape( 1, -1 )
     
     return W
 
@@ -135,7 +150,8 @@ def generateRandomData( poses = None, handles = None ):
     # np.random.seed(0)
     
     ## If this isn't true, the inv() in the energy will fail.
-    assert 3*poses >= handles or USE_PSEUDOINVERSE
+    if 3*poses < handles:
+        print( "You'd better use the pseudoinverse or you'll get unpredictable results." )
     
     W = np.random.randn(12*poses, handles)
     V = np.random.randn(3*poses, 12*poses)
@@ -143,11 +159,11 @@ def generateRandomData( poses = None, handles = None ):
     return W, V, vprime, poses, handles
 
 if __name__ == '__main__':
-    USE_PSEUDOINVERSE = False
+    use_pseudoinverse = False
     
-    W, V, vprime, poses, handles = generateRandomData( poses = 2, handles = 5 )
+    W, V, vprime, poses, handles = generateRandomData( poses = 1, handles = 5 )
     
-    z, f = solve_for_z( W, V, vprime, return_energy = True )
+    z, f = solve_for_z( W, V, vprime, return_energy = True, use_pseudoinverse = use_pseudoinverse )
     
     import flat_intersection_direct_gradients
     f2, _, _ = flat_intersection_direct_gradients.fAndGpAndHp_fast( W[:,0], W[:,1:] - W[:,:1], V, vprime )
@@ -157,10 +173,10 @@ if __name__ == '__main__':
     print( '|function difference|:', abs( f - f2 ) )
     
     A, B, Y = linear_matrix_equation_for_W( V, vprime, z )
-    W_next = solve_for_W( [A], [B], [Y] )
+    W_next = solve_for_W( [A], [B], [Y], use_pseudoinverse = use_pseudoinverse )
     print( 'W:', W )
     print( 'W from solve_for_W():', W_next )
-    print( 'W from solve_for_W() column norms:', ( W_next*W_next ).sum(0) )
+    # print( 'W from solve_for_W() column norms:', ( W_next*W_next ).sum(0) )
     print( '|W difference|:', abs( W - W_next ).max() )
     
     x = pack( W, poses, handles )
