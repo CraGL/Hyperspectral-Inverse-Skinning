@@ -1,3 +1,45 @@
+derivatives
+
+# A good primer on basic matrix calculus: https://atmos.washington.edu/~dennis/MatrixCalculus.pdf
+# The Matrix Reference Manual: http://www.ee.ic.ac.uk/hp/staff/dmb/matrix/intro.html#Intro
+# Trying to understand the derivative of the inverse: https://math.stackexchange.com/questions/1471825/derivative-of-the-inverse-of-a-matrix
+# Derivative of the pseudoinverse:
+    https://math.stackexchange.com/questions/2179160/derivative-of-pseudoinverse-with-respect-to-original-matrix
+    https://mathoverflow.net/questions/25778/analytical-formula-for-numerical-derivative-of-the-matrix-pseudo-inverse
+    https://mathoverflow.net/questions/264130/derivative-of-pseudoinverse-with-respect-to-original-matrix/264426
+    https://math.stackexchange.com/questions/1689434/derivative-of-the-frobenius-norm-of-a-pseudoinverse-matrix
+# Math Overflow user john316 does derivatives with Frobenius norms ( https://math.stackexchange.com/users/262158/john316 ):
+    https://math.stackexchange.com/questions/1689434/derivative-of-the-frobenius-norm-of-a-pseudoinverse-matrix
+    https://math.stackexchange.com/questions/1405922/what-is-the-gradient-of-f-s-abat-2/1406290#1406290
+    https://math.stackexchange.com/questions/946911/minimize-the-frobenius-norm-of-the-difference-of-two-matrices-with-respect-to-ma/1474048#1474048
+# Math Overflow user greg also does derivatives with Frobenius norms ( https://math.stackexchange.com/users/357854/greg ):
+    https://math.stackexchange.com/questions/2444284/matrix-derivative-of-frobenius-norm-with-hadamard-product-inside
+    https://math.stackexchange.com/questions/1890313/derivative-wrt-to-kronecker-product/1890653#1890653
+    https://math.stackexchange.com/questions/2125499/second-derivative-of-det-sqrtftf-with-respect-to-f/2125849#2125849
+# Some matrix calculus:
+    Practical Guide to Matrix Calculus for Deep Learning (Andrew Delong)
+    http://www.psi.toronto.edu/~andrew/papers/matrix_calculus_for_learning.pdf
+
+# Properties (: is Frobenius inner product, ∘ and ⊙ are element-wise Hadamard product, * is matrix multiplication, ' is transpose):
+    d(X:X)=dX:X+X:dX=2X:dX
+    A:B=B:A
+    A:(B+C)=A:B + A:C
+    A:B=A':B'
+    A∘B=B∘A
+    A:B∘C=A∘B:C
+    A:(B*C) = (B'*A):C = (A*C'):B
+    d(X:Y) = (dX):Y + X:(dY)
+    d(X⊙Y) = (dX)⊙Y + X⊙(dY)
+    d(X*Y) = (dX)*Y + X*(dY)
+    d(X') = (dX)'
+    dZ/dX = dZ/dY * dY/dX
+    d(inv(X)) = -inv(X)*dX*inv(X)
+    
+    vec_column( A*B*C ) = ( C' kronecker A ) * vec_column( B )
+    vec_row( A*B*C ) = ( A kronecker C' ) * vec_row( B )
+
+## Our energy:
+
 E = norm2(v*(p+B*-inv(B'*v'*v*B)*B'*v'*(v*p-w))-w)^2
   = norm2((v*p-w)-v*B*inv(B'*v'*v*B)*B'*v'*(v*p-w))^2
 
