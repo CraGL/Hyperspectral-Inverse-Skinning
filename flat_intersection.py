@@ -661,7 +661,8 @@ def optimize_biquadratic( P, H, row_mats, deformed_vs, x0, solve_for_rest_pose =
 	if f_eps is None:
 		f_eps = 1e-10
 	if x_eps is None:
-		x_eps = 1e-10
+	    ## To make xtol approximately match scipy's default gradient tolerance (gtol) for BFGS.
+		x_eps = 1e-5
 	if max_iter is None:
 		max_iter = 9999
 	if f_zero_threshold is None:
@@ -744,7 +745,10 @@ def optimize_biquadratic( P, H, row_mats, deformed_vs, x0, solve_for_rest_pose =
 			print( "Function change too small, terminating:", f_prev - f )
 			converged = True
 			break
-		x_change = abs( W_prev - W ).max()
+		# x_change = abs( W_prev - W ).max()
+		## To make xtol approximately match scipy's default gradient tolerance (gtol) for BFGS,
+		## use norm() instead of the max change.
+		x_change = np.linalg.norm( W_prev - W )
 		if x_change < x_eps:
 			print( "Variables change too small, terminating:", x_change )
 			converged = True
