@@ -80,23 +80,25 @@ def f_and_dfdp_and_dfdB_hand(p, B, vbar, vprime):
 	
 	vB = np.dot( v, B )
 	S = np.dot( vB.T, vB )
-	u = np.dot( v,p ) - w
+	u = ( np.dot( v,p ) - w ).reshape(-1,1)
 	R = np.dot( vB, np.linalg.inv(S) )
 	Q = np.dot( R, vB.T )
 	M = u - np.dot( Q, u )
-	MuR = np.dot( np.dot( M, u.T ), R )
-	uMR = np.dot( np.dot( u, M.T ), R )
+	# MuR = np.dot( np.dot( M, u.T ), R )
+	## Actually, M'*R is identically zero.
+	# uMR = np.dot( np.dot( u, M.T ), R )
+	assert len( u.shape ) == 2
+	assert len( M.shape ) == 2
 	
 	E = ( M * M ).sum()
 	
 	# dE/dp = 2*(v - Q*v)'*M
 	gradp = 2 * np.dot( ( v - np.dot( Q, v ) ).T, M )
 	
-	# dE/dB = -2*v'*(M*u'*R + Q'*u*M'*R + Q'*M*u'*R + u*M'*R)
-	# gradB = -2 * ( np.dot( v.T, MuR ) - np.dot( np.dot( v.T, Q ), uMR ) - np.dot( np.dot( v.T, Q ), MuR ) + np.dot( v.T, uMR ) )
-	gradB = -2 * ( np.dot( v.T - np.dot( v.T, Q ), MuR + uMR ) )
+	# dE/dB = - dE/dp * (u'*R)
+	gradB = np.dot( -gradp, np.dot( u.T, R ) )
 	
-	return E, gradp, gradB
+	return E, gradp.squeeze(), gradB
 
 def fAndGB(p, B, vbar, vprime):
 	v = vbar
@@ -341,3 +343,6 @@ if __name__ == '__main__':
 	import scipy.optimize
 	grad_err = scipy.optimize.check_grad( lambda x: f_gradf_packed(x)[0], lambda x: f_gradf_packed(x)[1], pack( p, B ) )
 	print( "scipy.optimize.check_grad() error:", grad_err )
+
+## f_and_dfdp_and_dfdB_hand() wins
+f_and_dfdp_and_dfdB = f_and_dfdp_and_dfdB_hand
