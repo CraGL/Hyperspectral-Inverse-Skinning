@@ -365,6 +365,7 @@ def generateRandomData():
     
     B = np.random.randn(12*P, handles-1)
     A = A_from_non_Cayley_B( B )
+    print( "This should have", handles-1, "non-zeros:", np.linalg.svd( np.hstack([ B_from_Cayley_A( A, handles ), B ]).T )[1] )
     p = np.random.randn(12*P)
     v = np.random.randn(3*P, 12*P)
     w = np.random.randn(3*P)
