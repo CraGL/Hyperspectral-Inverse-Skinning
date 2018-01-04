@@ -186,7 +186,7 @@ def linear_matrix_equation_for_W( V, vprime, z ):
     # B' = B = z*z' = z kron z' = z kron z'
     # A kron B' = ( I_3poses kron ( [v 1]'*[v 1] ) ) kron ( z kron z' ) = I_3poses kron( ( [v 1]'*[v 1] ) kron ( z*z' ) )
     v = V[0,:4].reshape(1,-1)
-    A = np.outer( v.T, v ), np.dot( V.T, V )
+    A = np.outer( v.T, v ) #, np.dot( V.T, V )
     B = np.dot( z, z.T )
     Y = np.dot( np.dot( V.T, -vprime ), z.T )
     
@@ -199,7 +199,7 @@ def solve_for_W( As, Bs, Ys, use_pseudoinverse = True ):
     
     assert Ys[0].shape[0] % 12 == 0
     poses = Ys[0].shape[0]//12
-    system = np.zeros( ( Bs[0].shape[1]*As[0][0].shape[0], Bs[0].shape[0]*As[0][0].shape[1] ) )
+    system = np.zeros( ( Bs[0].shape[1]*As[0].shape[0], Bs[0].shape[0]*As[0].shape[1] ) )
     ## Our kronecker product formula assumes column-major vectorization.
     ## In that case, the identity is: vec( A*X*B ) = kron( A, B.T ) * vec(X)
     ## Since the system matrix is a repeated block diagonal, we can just store
@@ -211,7 +211,7 @@ def solve_for_W( As, Bs, Ys, use_pseudoinverse = True ):
         ## There is no point to doing this, since the inverse of a block diagonal matrix
         ## is the inverse of each block (and these blocks are repeated).
         # system += np.kron( np.eye( 3*poses ), np.kron( A[0], B.T ) )
-        system += np.kron( A[0], B.T )
+        system += np.kron( A, B.T )
         # system += np.kron( A[1], B.T )
         rhs -= Y
     
