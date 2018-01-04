@@ -80,14 +80,13 @@ def pack( p, A, poses, handles ):
     
     return x
 
-def Q_from_Cayley_A( A, handles ):
+def Q_from_Cayley_A( A, _ = None ):
     ## The Representation and Parametrization of Orthogonal Matrices (Ron Shepard, Scott R. Brozell, Gergely Gidofalvi 2015 Journal of Physical Chemistry)
     ## Equations 98-100.
     
+    handles = A.shape[1]
     ## Actually, there is one more handle than columns of A.
-    handles = handles-1
-    
-    assert handles == A.shape[1]
+    assert _ is None or handles+1 == _
     poses12 = A.shape[0] + handles
     assert poses12 % 12 == 0
     # assert poses*12 == poses12
@@ -118,8 +117,12 @@ B_from_Cayley_A = Q_from_Cayley_A
 
 ## This function should be called A_from_non_Cayley_Q(), but we won't change it for
 ## consistency with `flat_intersection_cayley_gradients.py`.
-def A_from_non_Cayley_B( Q ):
+def A_from_non_Cayley_B( B ):
     ## This function follows the paper mentioned below. Its input is Q and output is A.
+    
+    ## This function expect B to be orthonormal, even if it's not necessarily in the Grassmann space.
+    Q = np.linalg.svd( B )[0][:,:B.shape[1]]
+    
     handles = Q.shape[1]
     
     ## The Representation and Parametrization of Orthogonal Matrices (Ron Shepard, Scott R. Brozell, Gergely Gidofalvi 2015 Journal of Physical Chemistry)
@@ -172,6 +175,8 @@ def A_from_X( X, handles ):
     return A
 
 def f_and_dfdp_and_dfdA_matrixcalculus(p, A, v, w, handles):
+    print( "WARNING: This function computes dfdA incorrectly." )
+    
     ## The A this function expects is X from:
     ## The Representation and Parametrization of Orthogonal Matrices (Ron Shepard, Scott R. Brozell, Gergely Gidofalvi 2015 Journal of Physical Chemistry)
     ## Equation 97
@@ -365,7 +370,7 @@ def generateRandomData():
     
     B = np.random.randn(12*P, handles-1)
     A = A_from_non_Cayley_B( B )
-    print( "This should have", handles-1, "non-zeros:", np.linalg.svd( np.hstack([ B_from_Cayley_A( A, handles ), B ]).T )[1] )
+    print( "This should have", handles-1, "non-zeros:", np.linalg.svd( np.hstack([ B_from_Cayley_A( A ), B ]), compute_uv=False ) )
     p = np.random.randn(12*P)
     v = np.random.randn(3*P, 12*P)
     w = np.random.randn(3*P)
