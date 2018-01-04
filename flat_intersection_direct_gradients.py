@@ -92,8 +92,8 @@ def f_and_dfdp_and_dfdB_hand(p, B, vbar, vprime):
 	
 	E = ( M * M ).sum()
 	
-	# dE/dp = 2*(v - Q*v)'*M
-	gradp = 2 * np.dot( ( v - np.dot( Q, v ) ).T, M )
+	# dE/dp = 2*v'*M
+	gradp = 2 * np.dot( v.T, M )
 	
 	# dE/dB = - dE/dp * (u'*R)
 	gradB = np.dot( -gradp, np.dot( u.T, R ) )
