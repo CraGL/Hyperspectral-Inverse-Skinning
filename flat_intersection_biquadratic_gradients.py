@@ -209,6 +209,9 @@ def solve_for_W( As, Bs, Ys, use_pseudoinverse = True ):
     # assert columns_norm2.min() > 1e-10
     # W /= np.sqrt( columns_norm2 ).reshape( 1, -1 )
     
+    ## We could normalize the difference from the average, but it's always large:
+    # print( "W column norm:", ( ( W - np.average( W, axis = 1 ).reshape(-1,1) )**2 ).sum(axis=0) )
+    
     return W
 
 def generateRandomData( poses = None, handles = None ):
