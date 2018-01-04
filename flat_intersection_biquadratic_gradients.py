@@ -110,7 +110,9 @@ def quadratic_for_V( W, z, vprime ):
     '''
     Returns a quadratic expression ( Q, L, C ) for the energy in terms of the 3-vector
     `v`, the rest pose position which are converted to V via:
-        kron( identity(poses), kron( identity(3), append( v, [1] ) ) )
+        kron( identity(poses), kron( identity(3), append( v, [1] ).reshape(1,-1) ) )
+        =
+        kron( identity(poses*3), append( v, [1] ).reshape(1,-1) )
     
     The quadratic expression returned is:
         energy = np.dot( np.dot( v, Q ), v ) + np.dot( L, v ) + C
@@ -151,7 +153,8 @@ def solve_for_V( W, z, vprime, return_energy = False, use_pseudoinverse = False 
     ## Restore V to a matrix.
     assert len(vprime) % 3 == 0
     poses = len(vprime)//3
-    V = np.kron( np.identity(poses), np.kron( np.identity(3), np.append( v, [1] ) ) )
+    # V = np.kron( np.identity(poses), np.kron( np.identity(3), np.append( v, [1] ).reshape(1,-1) ) )
+    V = np.kron( np.identity(poses*3), np.append( v, [1] ).reshape(1,-1) )
     
     if return_energy:
         E = np.dot( np.dot( v, Q ), v ) + np.dot( L, v ) + C
@@ -179,7 +182,11 @@ def linear_matrix_equation_for_W( V, vprime, z ):
     vprime = vprime.reshape(-1,1)
     z = z.reshape(-1,1)
     
-    A = np.dot( V.T, V )
+    # A = V'*V = ( I_3poses kron [v 1] )'*( I_3poses kron [v 1] ) = ( I_3poses kron [v 1]' )*( I_3poses kron [v 1] ) = I_3poses kron ( [v 1]'*[v 1] )
+    # B' = B = z*z' = z kron z' = z kron z'
+    # A kron B' = ( I_3poses kron ( [v 1]'*[v 1] ) ) kron ( z kron z' ) = I_3poses kron( ( [v 1]'*[v 1] ) kron ( z*z' ) )
+    v = V[0,:4].reshape(1,-1)
+    A = np.outer( v.T, v ) #, np.dot( V.T, V )
     B = np.dot( z, z.T )
     Y = np.dot( np.dot( V.T, -vprime ), z.T )
     
@@ -190,24 +197,44 @@ def solve_for_W( As, Bs, Ys, use_pseudoinverse = True ):
     assert len( As ) == len( Ys )
     assert len( As ) > 0
     
+    assert Ys[0].shape[0] % 12 == 0
+    poses = Ys[0].shape[0]//12
     system = np.zeros( ( Bs[0].shape[1]*As[0].shape[0], Bs[0].shape[0]*As[0].shape[1] ) )
     ## Our kronecker product formula assumes column-major vectorization.
     ## In that case, the identity is: vec( A*X*B ) = kron( A, B.T ) * vec(X)
-    rhs = np.zeros( Ys[0].ravel().shape )
+    ## Since the system matrix is a repeated block diagonal, we can just store
+    ## the block and solve against the right-hand-side reshaped with each N entries as
+    ## a column.
+    ## Vectorize (ravel) the right-hand side at the end.
+    rhs = np.zeros( Ys[0].shape )
     for A, B, Y in zip( As, Bs, Ys ):
+        ## There is no point to doing this, since the inverse of a block diagonal matrix
+        ## is the inverse of each block (and these blocks are repeated).
+        # system += np.kron( np.eye( 3*poses ), np.kron( A[0], B.T ) )
         system += np.kron( A, B.T )
-        rhs -= Y.ravel()
+        # system += np.kron( A[1], B.T )
+        rhs -= Y
+    
+    # import scipy.linalg
+    # system_big = scipy.linalg.block_diag( *( [system]*(3*poses) ) )
     
     if use_pseudoinverse:
-        W = np.dot( np.linalg.pinv(system), rhs ).reshape( A.shape[0], B.shape[1] )
+        # W1 = np.dot( np.linalg.pinv(system_big), rhs.ravel() ).reshape( 12*poses, B.shape[1] )
+        W = np.dot( np.linalg.pinv(system), rhs.reshape( -1, system.shape[0] ).T ).T.reshape( 12*poses, B.shape[1] )
+        # print( "pinv block difference:", abs( W - W1 ).max() )
     else:
-        W = np.linalg.solve( system, rhs ).reshape( A.shape[0], B.shape[1] )
+        # W1 = np.linalg.solve( system_big, rhs.ravel() ).reshape( 12*poses, B.shape[1] )
+        W = np.linalg.solve( system, rhs.reshape( -1, system.shape[0] ).T ).T.reshape( 12*poses, B.shape[1] )
+        # print( "solve block difference:", abs( W - W1 ).max() )
     
     ## Normalize the columns of W.
     ## UPDATE: No, this is wrong. W's columns are points, not vectors.
     # columns_norm2 = ( W*W ).sum( axis = 0 )
     # assert columns_norm2.min() > 1e-10
     # W /= np.sqrt( columns_norm2 ).reshape( 1, -1 )
+    
+    ## We could normalize the difference from the average, but it's always large:
+    # print( "W column norm:", ( ( W - np.average( W, axis = 1 ).reshape(-1,1) )**2 ).sum(axis=0) )
     
     return W
 

@@ -660,7 +660,7 @@ def optimize_biquadratic( P, H, row_mats, deformed_vs, x0, solve_for_rest_pose =
 	assert abs( pack_W( unpack_W( np.arange(36), 1 ) ) - np.arange(36) ).max() < 1e-10
 	
 	if f_eps is None:
-		f_eps = 1e-5
+		f_eps = 1e-6
 	if x_eps is None:
 		## To make xtol approximately match scipy's default gradient tolerance (gtol) for BFGS.
 		x_eps = 1e-4
@@ -814,6 +814,7 @@ if __name__ == '__main__':
 	parser.add_argument('--solve-for-rest-pose', type=bool, default=False, help='Whether to solve for the rest pose (only affects "biquadratic" energy (default: False).')
 	parser.add_argument('--error', type=bool, default=False, help='Whether to compute transformation error and vertex error compared with ground truth.')
 	parser.add_argument('--zero', type=bool, default=False, help='Given ground truth, zero test.')
+	parser.add_argument('--fancy-init', type=str, help='valid points generated from local subspace intersection.')
 	
 	args = parser.parse_args()
 	H = args.handles
@@ -823,6 +824,8 @@ if __name__ == '__main__':
 	zero_test = args.zero
 	if error_test:	assert( ground_truth_path is not None and "Error test needs ground truth path." )
 	if zero_test:	assert( ground_truth_path is not None and "Zero energy test or zero test need ground truth path." )
+	
+	fancy_init_path = args.fancy_init
 	
 	rest_mesh = TriMesh.FromOBJ_FileName( args.rest_pose )
 	deformed_vs = format_loader.load_poses( args.deformed_vs )
@@ -902,8 +905,9 @@ if __name__ == '__main__':
 			for i in range(B.shape[1]):
 				B[:,i] /= np.linalg.norm(B[:,i])
 			
-			if fancy_init: 		
-				qs_data = np.loadtxt("./PerVertex/datas/cube4_copy/qs.txt")
+			if fancy_init_path is not None: 		
+				qs_data = np.loadtxt(fancy_init_path)
+				print( "# of good valid vertices: ", qs_data.shape[0] )
 				from space_mapper import SpaceMapper
 				pca = SpaceMapper.Uncorrellated_Space( qs_data, dimension = H )
 				pt = pca.Xavg_
@@ -956,5 +960,5 @@ if __name__ == '__main__':
 	rev_vertex_trans, vertex_dists = per_vertex_transformation(x, P, all_R_mats, deformed_vs)	
 	if error_test:
 		transformation_error = abs( rev_vertex_trans - gt_vertices )
-		print( "Largest and accumulated transformation errors are: ", transformation_error.max(), transformation_error.sum() )
-		print( "Largest and accumulated vertex errors are: ", vertex_dists.max(), vertex_dists.sum() )
+		print( "Largest, average and median transformation errors are: ", transformation_error.max(), transformation_error.mean(), np.median(transformation_error.ravel()) )
+		print( "Largest, average and meidan vertex errors are: ", vertex_dists.max(), vertex_dists.mean(), np.median(vertex_dists) )

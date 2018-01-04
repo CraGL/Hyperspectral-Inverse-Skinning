@@ -42,12 +42,12 @@ import numpy as np
 
 SKIP_CHECKS = True
 
-def is_skew_symmetric( A, threshold = 1e-10 ):
+def is_skew_symmetric( X, threshold = 1e-10 ):
     if SKIP_CHECKS: return True
     
-    # return abs( A + A.T ).max() < threshold
-    print( "A is skew symmetric if this is 0:", abs( A + A.T ).max() )
-    if( abs( A + A.T ).max() > 1 ):
+    # return abs( X + X.T ).max() < threshold
+    print( "X is skew symmetric if this is 0:", abs( X + X.T ).max() )
+    if( abs( X + X.T ).max() > 1 ):
         print( "whoa" )
     return True
 
@@ -63,59 +63,46 @@ def is_orthogonal( Q, threshold = 1e-10 ):
 def unpack( x, poses, handles ):
     p = x[:12*poses]
     
-    xa = x[12*poses:]
-    
-    
-    X = np.zeros( ( 12*poses, 12*poses ) )
     ## Following equation 97 from:
     ## The Representation and Parametrization of Orthogonal Matrices (Ron Shepard, Scott R. Brozell, Gergely Gidofalvi 2015 Journal of Physical Chemistry)
     ## and equation 97.
-    X[handles:,:handles] = xa.reshape( 12*poses - handles, handles )
+    A = x[12*poses:].reshape( 12*poses - (handles-1), handles-1 )
     
-    X -= X.T
+    assert 12*poses - (handles-1) > 0
     
-    
-    assert 12*poses - handles > 0
-    
-    '''
-    X = np.block( [
-        [ np.zeros((handles,handles)), -xa.reshape( 12*poses - handles, handles ).T ],
-        [ xa.reshape( 12*poses - handles, handles ), np.zeros((12*poses - handles, 12*poses - handles)) ]
-        ] )
-    '''
-    
-    ## A should be skew-symmetric
-    assert is_skew_symmetric( X )
-    
-    return p, X
+    return p, A
 
 def pack( p, A, poses, handles ):
-    ## A should be skew-symmetric
-    assert is_skew_symmetric( A )
-    
     assert len(p) % 12 == 0
     assert poses == len(p)//12
     
-    xa = A[handles:,:handles].ravel()
-    
-    x = np.concatenate( ( p.squeeze(), xa ) )
+    x = np.concatenate( ( p.squeeze(), A.ravel() ) )
     
     return x
 
-def B_from_Cayley_A( A, handles ):
-    ## A should be skew-symmetric
-    assert is_skew_symmetric( A )
+def Q_from_Cayley_A( A, _ = None ):
+    ## The Representation and Parametrization of Orthogonal Matrices (Ron Shepard, Scott R. Brozell, Gergely Gidofalvi 2015 Journal of Physical Chemistry)
+    ## Equations 98-100.
     
-    ## Return: Q = (I-A)^(-1) * (I+A)
-    # I = np.eye(A.shape[0])
-    # Q = np.linalg.solve( I-A, I+A )[:,:handles]
-    # Q = np.dot( np.linalg.inv( I-A ), I+A )[:,:handles]
+    handles = A.shape[1]
+    ## Actually, there is one more handle than columns of A.
+    assert _ is None or handles+1 == _
+    poses12 = A.shape[0] + handles
+    assert poses12 % 12 == 0
+    # assert poses*12 == poses12
+    poses = poses12//12
+    
+    ## Return: Q = (I+X) * (I-X)^(-1)
+    # X = np.zeros( ( 12*poses, 12*poses ) )
+    # X[handles:,:handles] = A
+    # X -= X.T
+    # I = np.eye(X.shape[0])
+    # Q = np.dot( I+X, np.linalg.inv( I-X ) )[:,:handles]
     
     ## The Representation and Parametrization of Orthogonal Matrices (Ron Shepard, Scott R. Brozell, Gergely Gidofalvi 2015 Journal of Physical Chemistry)
     ## Equation 100:
-    littleA = A[handles:,:handles]
-    F = np.dot( littleA.T, littleA )
-    Q2 = np.dot( np.vstack( ( np.eye( handles ) - F, 2*littleA ) ), np.linalg.inv( np.eye(handles) + F ) )
+    F = np.dot( A.T, A )
+    Q2 = np.dot( np.vstack( ( np.eye( handles ) - F, 2*A ) ), np.linalg.inv( np.eye(handles) + F ) )
     
     # assert abs( Q - Q2 ).max() < 1e-10
     Q = Q2
@@ -123,8 +110,19 @@ def B_from_Cayley_A( A, handles ):
     assert is_orthogonal( Q )
     return Q
 
-def A_from_non_Cayley_B_Grassmann( Q ):
-    ## This function follows the paper mentioned below. Its input is Q and output is X.
+## For compatibility with my math notation
+## and `flat_intersection_cayley_gradients.py`'s interface,
+## alias the function.
+B_from_Cayley_A = Q_from_Cayley_A
+
+## This function should be called A_from_non_Cayley_Q(), but we won't change it for
+## consistency with `flat_intersection_cayley_gradients.py`.
+def A_from_non_Cayley_B( B ):
+    ## This function follows the paper mentioned below. Its input is Q and output is A.
+    
+    ## This function expect B to be orthonormal, even if it's not necessarily in the Grassmann space.
+    Q = np.linalg.svd( B )[0][:,:B.shape[1]]
+    
     handles = Q.shape[1]
     
     ## The Representation and Parametrization of Orthogonal Matrices (Ron Shepard, Scott R. Brozell, Gergely Gidofalvi 2015 Journal of Physical Chemistry)
@@ -142,21 +140,57 @@ def A_from_non_Cayley_B_Grassmann( Q ):
     
     I = np.eye(handles)
     F = np.dot( (I-Q1), np.linalg.inv( I+Q1 ) )
-    B = 0.5*( F.T - F )
     A = 0.5*np.dot( Q2, ( I + F ) )
-    X = np.zeros( ( Q.shape[0], Q.shape[0] ) )
-    X[handles:,:handles] = A
-    X[:handles,handles:] = -A.T
     
     ## For Grassmann parameters, B should be zeros
+    B = 0.5*( F.T - F )
     assert abs( B ).max() < 1e-10
+    
+    # X = np.zeros( ( Q.shape[0], Q.shape[0] ) )
+    # X[handles:,:handles] = A
+    # X[:handles,handles:] = -A.T
     # X[:handles,:handles] = B
     
-    return X
+    return A
 
-A_from_non_Cayley_B = A_from_non_Cayley_B_Grassmann
+def X_from_A( A ):
+    ## The Representation and Parametrization of Orthogonal Matrices (Ron Shepard, Scott R. Brozell, Gergely Gidofalvi 2015 Journal of Physical Chemistry)
+    ## Equation 97
+    
+    handles = A.shape[1]
+    poses12 = A.shape[0] + handles
+    assert poses12 % 12 == 0
+    # assert poses*12 == poses12
+    poses = poses12//12
+    
+    X = np.zeros( ( 12*poses, 12*poses ) )
+    X[handles:,:handles] = A
+    X -= X.T
+    return X
+def A_from_X( X, handles ):
+    ## The Representation and Parametrization of Orthogonal Matrices (Ron Shepard, Scott R. Brozell, Gergely Gidofalvi 2015 Journal of Physical Chemistry)
+    ## Equation 97
+    
+    A = X[handles:,:handles]
+    return A
 
 def f_and_dfdp_and_dfdA_matrixcalculus(p, A, v, w, handles):
+    print( "WARNING: This function computes dfdA incorrectly." )
+    
+    ## The A this function expects is X from:
+    ## The Representation and Parametrization of Orthogonal Matrices (Ron Shepard, Scott R. Brozell, Gergely Gidofalvi 2015 Journal of Physical Chemistry)
+    ## Equation 97
+    ## We can turn our A into that X (and call it A for the remainder of the function).
+    
+    ## Actually, there is one more handle than columns of A.
+    handles = handles-1
+    
+    assert A.shape[1] == handles
+    assert ( A.shape[0] + handles ) == p.shape[0]
+    assert p.shape[0] % 12 == 0
+    poses = p.shape[0] // 12
+    A = X_from_A( A )
+    
     I = np.eye(len(p))
     ## B is the matrix which takes the top (handles-1) rows.
     ## It's a truncated identity matrix.
@@ -167,9 +201,6 @@ def f_and_dfdp_and_dfdA_matrixcalculus(p, A, v, w, handles):
     assert(len(dim) == 2)
     A_rows = dim[0]
     A_cols = dim[1]
-    
-    ## A should be skew-symmetric
-    assert is_skew_symmetric( A )
     
     assert(type(B) == np.ndarray)
     dim = B.shape
@@ -201,9 +232,6 @@ def f_and_dfdp_and_dfdA_matrixcalculus(p, A, v, w, handles):
     assert(B_cols)
     assert(v_rows == w_rows)
     
-    assert len(p)%12 == 0
-    poses = len(p)//12
-    
     T_0 = np.linalg.inv((I - A))
     T_1 = (A + I)
     T_01 = np.dot(T_0, T_1)
@@ -233,7 +261,52 @@ def f_and_dfdp_and_dfdA_matrixcalculus(p, A, v, w, handles):
     t_5 = np.dot(v.T, t_7)
     gradientp = ((2 * t_5) - (2 * extra))
 
-    return functionValue, gradientp, gradientA
+    return functionValue, gradientp, A_from_X( gradientA, handles )
+
+def f_and_dfdp_and_dfdA_hand(p, A, vbar, vprime):
+	V = vbar
+	w = vprime
+	
+	## Matrices computing the Cayley transform to obtain B in our energy expression.
+	F = np.dot( A.T, A )
+	I_F = np.eye(F.shape[0])
+	G = np.linalg.inv( I_F + F )
+	AG = np.dot( A, G )
+	B = np.zeros( ( F.shape[0] + A.shape[0], A.shape[1] ) )
+	ImFG = np.dot( I_F - F, G )
+	B[:F.shape[0]] = ImFG
+	B[F.shape[0]:] = 2*AG
+	
+	u = ( np.dot( V,p ) - w ).reshape(-1,1)
+	VB = np.dot( V, B )
+	S = np.dot( VB.T, VB )
+	R = np.dot( VB, np.linalg.inv(S) )
+	Q = np.dot( R, VB.T )
+	M = u - np.dot( Q, u )
+	# MuR = np.dot( np.dot( M, u.T ), R )
+	## Actually, M'*R is identically zero.
+	# uMR = np.dot( np.dot( u, M.T ), R )
+	assert len( u.shape ) == 2
+	assert len( M.shape ) == 2
+	
+	E = ( M * M ).sum()
+	
+	# dE/dp = 2*(v - Q*v)'*M
+	gradp = 2 * np.dot( ( V - np.dot( Q, V ) ).T, M )
+	
+	BBox = np.dot( gradp, np.dot( u.T, R ) )
+	K1 = B.copy()
+	K1[:F.shape[0]] = I_F + ImFG
+	K2 = np.zeros( ( F.shape[0] + A.shape[0], A.shape[0] ) )
+	K2[:F.shape[0]] = np.dot( K1[:F.shape[0]], A.T )
+	K2[F.shape[0]:] = 2*( np.dot( AG, A.T ) - np.eye(A.shape[0]) )
+	
+	# dE/dA = A*G*BBox.T*K1 + K2.T*BBox*G.T
+	gradAleft = np.dot( AG, np.dot( BBox.T, K1 ) )
+	gradAright = np.dot( K2.T, np.dot( BBox, G.T ) )
+	gradA = gradAleft + gradAright
+	
+	return E, gradp.squeeze(), gradA
 
 def f_and_dfdp_and_Hfp(p, A, v, w, handles):
     B = B_from_Cayley_A( A, handles )
@@ -278,7 +351,7 @@ def f_and_dfdp_and_Hfp(p, A, v, w, handles):
     return functionValue, gradient, hessian
 
 def f_and_dfdp_and_dfdA( p, A, v, w, handles ):
-    f, gradp, gradA = f_and_dfdp_and_dfdA_matrixcalculus( p, A, v, w, handles )
+    f, gradp, gradA = f_and_dfdp_and_dfdA_hand( p, A, v, w )
     
     ## gradient p check (computed another way):
     ## This test passes.
@@ -286,10 +359,6 @@ def f_and_dfdp_and_dfdA( p, A, v, w, handles ):
     # print( '|gradient p difference| max:', abs( gradp - gradp2 ).max() )
     
     return f, gradp, gradA
-
-def random_skew_symmetric_matrix( n ):
-    A = np.random.randn(n,n)
-    return 0.5 * ( A - A.T )
 
 def generateRandomData():
     # np.random.seed(0)
@@ -299,28 +368,38 @@ def generateRandomData():
     ## If this isn't true, the inv() in the energy will fail.
     assert 3*P >= handles
     
-    B = np.random.randn(12*P, handles)
+    B = np.random.randn(12*P, handles-1)
     A = A_from_non_Cayley_B( B )
-    # A = random_skew_symmetric_matrix( 12*P )
+    print( "This should have", handles-1, "non-zeros:", np.linalg.svd( np.hstack([ B_from_Cayley_A( A ), B ]), compute_uv=False ) )
     p = np.random.randn(12*P)
     v = np.random.randn(3*P, 12*P)
     w = np.random.randn(3*P)
     return p, A, v, w, P, handles
 
-if __name__ == '__main__':
+def main():
+    global SKIP_CHECKS
+    
     SKIP_CHECKS = False
     p, A, v, w, poses, handles = generateRandomData()
     
-    f, gradp, gradA = f_and_dfdp_and_dfdA( p, A, v, w, handles )
+    f, gradp, gradA = f_and_dfdp_and_dfdA_matrixcalculus( p, A, v, w, handles )
     f2, gradp2, hessp = f_and_dfdp_and_Hfp( p, A, v, w, handles )
+    
+    f_hand, gradp_hand, gradA_hand = f_and_dfdp_and_dfdA_hand( p, A, v, w )
     
     print( 'function value:', f )
     print( 'other function value:', f2 )
     print( '|function difference|:', abs( f - f2 ) )
+    print( 'hand function value:', f_hand )
+    print( '|hand function difference|:', abs( f - f_hand ) )
     print( 'gradient p:', gradp )
     print( 'other gradient p:', gradp2 )
     print( '|gradient p difference| max:', abs( gradp - gradp2 ).max() )
+    print( 'hand gradient p:', gradp_hand )
+    print( '|hand gradient p difference| max:', abs( gradp - gradp_hand ).max() )
     print( 'gradient A:', gradA )
+    print( 'hand gradient A:', gradA_hand )
+    print( '|hand gradient A difference| max:', abs( gradA - gradA_hand ).max() )
     
     x = pack( p, A, poses, handles )
     p2, A2 = unpack( x, poses, handles )
@@ -332,7 +411,7 @@ if __name__ == '__main__':
     
     def f_gradf_packed( x ):
         xp, xA = unpack( x, poses, handles )
-        val, gradp, gradA = f_and_dfdp_and_dfdA( xp, xA, v, w, handles )
+        val, gradp, gradA = f_and_dfdp_and_dfdA_hand( xp, xA, v, w )
         grad = pack( gradp, gradA, poses, handles )
         return val, grad
     import scipy.optimize
@@ -348,3 +427,6 @@ if __name__ == '__main__':
     grad_err = scipy.optimize.check_grad( lambda x: f_gradf_packed(x)[0], f_packed_autograd, pack( p, A, poses, handles ) )
     print( "scipy.optimize.check_grad() error (autograd):", grad_err )
     '''
+
+if __name__ == '__main__':
+    main()

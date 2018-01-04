@@ -50,6 +50,7 @@ u = v*p-w
 R = v*B*inv(S)
 Q = R*B'*v' = v*B*inv(S)*B'*v'
     Q = Q'
+    Q*Q = Q'*Q = v*B*inv(S)*B'*v'*v*B*inv(S)*B'*v' = v*B*inv(B'*v'*v*B)*B'*v'*v*B*inv(S)*B'*v' = v*B*inv(S)*B'*v' = Q
 M = (I-Q)*u = u - Q*u
 
 Note: u and M are column matrices. Make sure they are column matrices or else numpy.dot() will confuse the inner and outer product.
@@ -77,6 +78,12 @@ M'*R = (u'-u'*R*(v*B)')*R = u'*R-u'*v*B*inv(S)*S*inv(S) = u'*R-u'*v*B*inv(S) = u
 dE = 2*(v - Q*v)'*M : dp   - 2*v'*M*(R'*u)' :dB + 2*(v'*v*B)*R'*M*(R'*u)' : dB
 
 dE/dp = 2*(v - Q*v)'*M
+      = 2*v'*(I-Q)'*(I-Q)*u
+
+(I-Q)'*(I-Q) = (I-Q)*(I-Q) = I - 2*Q + Q*Q = I - 2*Q + Q = I-Q
+
+dE/dp = 2*v'*(I-Q)*u
+      = 2*v'*M
 
 dE/dB = - 2*v'*M*(R'*u)'   + 2*(v'*v*B)*R'*M*(R'*u)'
       = -2*( v'*M*(R'*u)' - (v'*v*B)*R'*M*(R'*u)' )
