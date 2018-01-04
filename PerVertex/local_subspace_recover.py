@@ -9,7 +9,7 @@ from trimesh import TriMesh
 
 '''
 Command:
-python local_subspace_recover.py ./datas/cube4_copy/cube.obj ./datas/cube4_copy/poses-1/cube-*.obj -s 1e-15 -t 1e-4  -o ./datas/cube4_copy/qs.txt
+python local_subspace_recover.py ./datas/cube4_copy/cube.obj ./datas/cube4_copy/poses-1/cube-*.obj -s 1e-15 -t 1e-4 -v 1  -o ./datas/cube4_copy/qs.txt
 '''
 
 def null_space_matrix(A):
@@ -72,12 +72,13 @@ def solve(q0, V0, V1):
     return q, cost
 
 
-def solve_directly(V0, V1, method):
+def solve_directly(V0, V1, method, version=0):
     pose_num=V0.shape[1]//4
     left=np.zeros((12*pose_num, 12*pose_num))
     right=np.zeros((12*pose_num))
     constant=0.0
-    
+    v_expand_center=None
+    v1_center=None
     for i in range(len(V0)):
         v0=V0[i]
         v1=V1[i]
@@ -85,7 +86,10 @@ def solve_directly(V0, V1, method):
         for j in range(pose_num):
             for k in range(3):
                 v0_expand[j*3+k, (j*3+k)*4:(j*3+k)*4+4]=v0[4*j:4*j+4]
-    
+        if i==0:
+            v_expand_center=v0_expand.copy()
+            v1_center=v1.copy()
+
         if method == "nullspace":
             #### version 1
             Identity=np.identity(12*pose_num)
@@ -112,7 +116,16 @@ def solve_directly(V0, V1, method):
         else:
             raise RuntimeError
     
-    x=scipy.linalg.solve(left,right)
+    if version==0:
+        x=scipy.linalg.solve(left,right)
+    elif version==1:
+        new_left=np.hstack((left, v_expand_center.T))
+        temp=np.hstack((v_expand_center, np.zeros((3*pose_num, 3*pose_num))))
+        new_left=np.vstack((new_left, temp))
+        new_right=np.concatenate((right, v1_center))
+        x_full=scipy.linalg.solve(new_left,new_right)
+        x=x_full[:12*pose_num]
+
     return x, (x.T.dot(left).dot(x)-2*right.T.dot(x)+constant).squeeze()
     
 
@@ -131,6 +144,7 @@ def find_subspace_intersections( *args, **kwargs ):
     other_poses_name=args[1]
     svd_threshold=args[2]
     transformation_threshold=args[3]
+    version=args[4]
     
     mesh0=TriMesh.FromOBJ_FileName(rest_pose_name[0])
     mesh1_list=[]
@@ -167,17 +181,15 @@ def find_subspace_intersections( *args, **kwargs ):
             if s[-1] < svd_threshold:
                 continue
 
-    #### solve using optimization
-                
+            #### solve using optimization 
             # q0=np.random.random((12*pose_num,))
             # q,cost=solve(q0, V0, V1)
             # q_space.append(q)
             # errors.append(cost)
-            
 
+            #### solve directly
+            q,cost=solve_directly(V0, V1, "vertex", version)
 
-    #### solve directly
-            q,cost=solve_directly(V0, V1, "vertex")
             if q is not None:
                 q_space.append(q)
                 errors.append(np.sqrt(max(cost/(pose_num*scale*scale), 1e-30)))
@@ -201,12 +213,13 @@ if __name__ == '__main__':
     parser.add_argument( 'other_poses', type=str, nargs='+', help='Paths to other poses (OBJ)')
     parser.add_argument( '--svd_threshold', '-s', type=float, help='Threshold for determining a singular vertex neighborhood (flat).' )
     parser.add_argument( '--transformation_threshold', '-t', type=float, help='Threshold for determining whether the subspaces intersect.' )
+    parser.add_argument( '--version', '-v', type=int, help='0 means basic least square linear solver. 1 means constrained least square' )
     parser.add_argument( '--out', '-o', type=str, help='Path to store the result (prints to stdout if not specified).' )
 
     args = parser.parse_args()
 
     print( "Generating transformations..." )
-    qs = find_subspace_intersections( args.rest_pose, args.other_poses, args.svd_threshold, args.transformation_threshold )
+    qs = find_subspace_intersections( args.rest_pose, args.other_poses, args.svd_threshold, args.transformation_threshold, args.version )
     print( "... Finished generating transformations." )
 
     if args.out is None:
