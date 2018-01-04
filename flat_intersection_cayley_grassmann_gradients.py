@@ -94,18 +94,18 @@ def Q_from_Cayley_A( A, handles ):
     poses = poses12//12
     
     ## Return: Q = (I+X) * (I-X)^(-1)
-    X = np.zeros( ( 12*poses, 12*poses ) )
-    X[handles:,:handles] = A
-    X -= X.T
-    I = np.eye(X.shape[0])
-    Q = np.dot( I+X, np.linalg.inv( I-X ) )[:,:handles]
+    # X = np.zeros( ( 12*poses, 12*poses ) )
+    # X[handles:,:handles] = A
+    # X -= X.T
+    # I = np.eye(X.shape[0])
+    # Q = np.dot( I+X, np.linalg.inv( I-X ) )[:,:handles]
     
     ## The Representation and Parametrization of Orthogonal Matrices (Ron Shepard, Scott R. Brozell, Gergely Gidofalvi 2015 Journal of Physical Chemistry)
     ## Equation 100:
     F = np.dot( A.T, A )
     Q2 = np.dot( np.vstack( ( np.eye( handles ) - F, 2*A ) ), np.linalg.inv( np.eye(handles) + F ) )
     
-    assert abs( Q - Q2 ).max() < 1e-10
+    # assert abs( Q - Q2 ).max() < 1e-10
     Q = Q2
     
     assert is_orthogonal( Q )
