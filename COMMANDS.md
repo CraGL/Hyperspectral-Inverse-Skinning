@@ -34,40 +34,42 @@ SSD input includes a rest pose OBJ file and a TXT file containing pose informati
 	python -m pdb flat_intersection.py models/cheburashka/cheburashka.obj models/cheburashka/poses-2/cheb-2.txt --H 11 --recovery 0 --GT models/cheburashka/poses-2
 	
 	#### Zero energy tests
-    python flat_intersection.py models/cube4/cube.obj models/cube4/poses-1/cube4-1.txt --H 4 --recovery 0 --GT models/cube4/poses-1 --energy biquadratic --solve-for-rest-pose True
-    python flat_intersection.py models/cube4/cube.obj models/cube4/poses-1/cube4-1.txt --H 4 --recovery 0 --strategy gradient --GT models/cube4/poses-1 --energy cayley
-    python flat_intersection.py models/cube4/cube.obj models/cube4/poses-1/cube4-1.txt --H 4 --recovery 0 --GT models/cube4/poses-1 --energy biquadratic
-    python flat_intersection.py models/cube4/cube.obj models/cube4/poses-1/cube4-1.txt --H 20 --GT models/cube4/poses-1 --energy biquadratic
-    
-    #### Recovery tests
-    python flat_intersection.py models/cube4/cube.obj models/cube4/poses-1/cube4-1.txt --H 4 --recovery 0.01 --strategy grassmann --GT models/cube4/poses-1 --energy B
-    python flat_intersection.py models/cube4/cube.obj models/cube4/poses-1/cube4-1.txt --H 4 --recovery 0.01 --strategy gradient --GT models/cube4/poses-1 --energy B
-    python flat_intersection.py models/cube4/cube.obj models/cube4/poses-1/cube4-1.txt --H 4 --recovery 0.01 --strategy gradient --GT models/cube4/poses-1 --energy cayley
-    python flat_intersection.py models/cube4/cube.obj models/cube4/poses-1/cube4-1.txt --H 4 --recovery 0.001 --strategy gradient --GT models/cube4/poses-1 --energy cayley
-    python flat_intersection.py models/cube4/cube.obj models/cube4/poses-1/cube4-1.txt --H 4 --recovery 0.1 --strategy grassmann --GT models/cube4/poses-1 --energy B
-    python flat_intersection.py models/cube4/cube.obj models/cube4/poses-1/cube4-1.txt --H 4 --recovery 0.1 --strategy gradient --GT models/cube4/poses-1 --energy B
-    python flat_intersection.py models/cube4/cube.obj models/cube4/poses-1/cube4-1.txt --H 4 --recovery 0.1 --strategy gradient --GT models/cube4/poses-1 --energy cayley
-    python flat_intersection.py models/cube4/cube.obj models/cube4/poses-1/cube4-1.txt --H 4 --recovery 0.1 --strategy gradient --GT models/cube4/poses-1 --energy cayley+cayley
-    python flat_intersection.py models/cube4/cube.obj models/cube4/poses-1/cube4-1.txt --H 4 --recovery 0.1 --strategy gradient --GT models/cube4/poses-1 --energy B+cayley
-    python flat_intersection.py models/cube4/cube.obj models/cube4/poses-1/cube4-1.txt --H 4 --recovery 0.1 --strategy gradient --GT models/cube4/poses-1 --energy B+B
-    python flat_intersection.py models/cube4/cube.obj models/cube4/poses-1/cube4-1.txt --H 4 --recovery 0.1 --GT models/cube4/poses-1 --energy biquadratic --strategy pinv
-    python flat_intersection.py models/cube4/cube.obj models/cube4/poses-1/cube4-1.txt --H 4 --recovery 0.1 --GT models/cube4/poses-1 --energy biquadratic --solve-for-rest-pose True
-    python flat_intersection.py models/cube4/cube.obj models/cube4/poses-1/cube4-1.txt --H 4 --recovery 0.1 --GT models/cube4/poses-1 --energy biquadratic
-    python flat_intersection.py models/cube4/cube.obj models/cube4/poses-1/cube4-1.txt --H 4 --recovery 1 --GT models/cube4/poses-1 --energy biquadratic
-    python flat_intersection.py models/cube4/cube.obj models/cube4/poses-1/cube4-1.txt --H 4 --recovery 1 --GT models/cube4/poses-1 --energy biquadratic --strategy pinv
-    python flat_intersection.py models/cube4/cube.obj models/cube4/poses-1/cube4-1.txt --H 4 --recovery 1 --strategy gradient --GT models/cube4/poses-1 --energy cayley
-    python flat_intersection.py models/cube4/cube.obj models/cube4/poses-1/cube4-1.txt --H 4 --recovery 1 --strategy gradient --GT models/cube4/poses-1 --energy B
-    python flat_intersection.py models/cube4/cube.obj models/cube4/poses-1/cube4-1.txt --H 4 --recovery 1 --strategy grassmann --GT models/cube4/poses-1 --energy B
-    python flat_intersection.py models/cube4/cube.obj models/cube4/poses-1/cube4-1.txt --H 4 --recovery 100 --GT models/cube4/poses-1 --energy biquadratic
-    
-    #### Tests from random
-    python flat_intersection.py models/cube4/cube.obj models/cube4/poses-1/cube4-1.txt --H 4 --energy biquadratic
-    python flat_intersection.py models/cube4/cube.obj models/cube4/poses-1/cube4-1.txt --H 4 --strategy grassmann --energy B
-    python flat_intersection.py models/cube4/cube.obj models/cube4/poses-1/cube4-1.txt --H 4 --strategy gradient --energy B
-    python flat_intersection.py models/cube4/cube.obj models/cube4/poses-1/cube4-1.txt --H 2 --energy biquadratic
-    python flat_intersection.py models/cube4/cube.obj models/cube4/poses-1/cube4-1.txt --H 1 --energy biquadratic
-    
-    #### Zero energy tests onto fewer handles than possible
-    python flat_intersection.py models/cube4/cube.obj models/cube4/poses-1/cube4-1.txt --H 3 --recovery 0 --GT models/cube4/poses-1 --energy biquadratic
-    python flat_intersection.py models/cube4/cube.obj models/cube4/poses-1/cube4-1.txt --H 2 --recovery 0 --GT models/cube4/poses-1 --energy biquadratic
-    python flat_intersection.py models/cube4/cube.obj models/cube4/poses-1/cube4-1.txt --H 1 --recovery 0 --GT models/cube4/poses-1 --energy biquadratic
+	python flat_intersection.py models/cube4/cube.obj models/cube4/poses-1/cube4-1.txt --H 4 --recovery 0 --strategy gradient --GT models/cube4/poses-1 --energy B
+	python flat_intersection.py models/cube4/cube.obj models/cube4/poses-1/cube4-1.txt --H 4 --recovery 0 --strategy grassmann --GT models/cube4/poses-1 --energy B
+	python flat_intersection.py models/cube4/cube.obj models/cube4/poses-1/cube4-1.txt --H 4 --recovery 0 --strategy gradient --GT models/cube4/poses-1 --energy cayley
+	python flat_intersection.py models/cube4/cube.obj models/cube4/poses-1/cube4-1.txt --H 4 --recovery 0 --GT models/cube4/poses-1 --energy biquadratic
+	python flat_intersection.py models/cube4/cube.obj models/cube4/poses-1/cube4-1.txt --H 4 --recovery 0 --GT models/cube4/poses-1 --energy biquadratic --solve-for-rest-pose True
+	python flat_intersection.py models/cube4/cube.obj models/cube4/poses-1/cube4-1.txt --H 20 --GT models/cube4/poses-1 --energy biquadratic
+	
+	#### Recovery tests
+	python flat_intersection.py models/cube4/cube.obj models/cube4/poses-1/cube4-1.txt --H 4 --recovery 0.01 --strategy grassmann --GT models/cube4/poses-1 --energy B
+	python flat_intersection.py models/cube4/cube.obj models/cube4/poses-1/cube4-1.txt --H 4 --recovery 0.01 --strategy gradient --GT models/cube4/poses-1 --energy B
+	python flat_intersection.py models/cube4/cube.obj models/cube4/poses-1/cube4-1.txt --H 4 --recovery 0.01 --strategy gradient --GT models/cube4/poses-1 --energy cayley
+	python flat_intersection.py models/cube4/cube.obj models/cube4/poses-1/cube4-1.txt --H 4 --recovery 0.001 --strategy gradient --GT models/cube4/poses-1 --energy cayley
+	python flat_intersection.py models/cube4/cube.obj models/cube4/poses-1/cube4-1.txt --H 4 --recovery 0.1 --strategy grassmann --GT models/cube4/poses-1 --energy B
+	python flat_intersection.py models/cube4/cube.obj models/cube4/poses-1/cube4-1.txt --H 4 --recovery 0.1 --strategy gradient --GT models/cube4/poses-1 --energy B
+	python flat_intersection.py models/cube4/cube.obj models/cube4/poses-1/cube4-1.txt --H 4 --recovery 0.1 --strategy gradient --GT models/cube4/poses-1 --energy cayley
+	python flat_intersection.py models/cube4/cube.obj models/cube4/poses-1/cube4-1.txt --H 4 --recovery 0.1 --strategy gradient --GT models/cube4/poses-1 --energy cayley+cayley
+	python flat_intersection.py models/cube4/cube.obj models/cube4/poses-1/cube4-1.txt --H 4 --recovery 0.1 --strategy gradient --GT models/cube4/poses-1 --energy B+cayley
+	python flat_intersection.py models/cube4/cube.obj models/cube4/poses-1/cube4-1.txt --H 4 --recovery 0.1 --strategy gradient --GT models/cube4/poses-1 --energy B+B
+	python flat_intersection.py models/cube4/cube.obj models/cube4/poses-1/cube4-1.txt --H 4 --recovery 0.1 --GT models/cube4/poses-1 --energy biquadratic --strategy pinv
+	python flat_intersection.py models/cube4/cube.obj models/cube4/poses-1/cube4-1.txt --H 4 --recovery 0.1 --GT models/cube4/poses-1 --energy biquadratic --solve-for-rest-pose True
+	python flat_intersection.py models/cube4/cube.obj models/cube4/poses-1/cube4-1.txt --H 4 --recovery 0.1 --GT models/cube4/poses-1 --energy biquadratic
+	python flat_intersection.py models/cube4/cube.obj models/cube4/poses-1/cube4-1.txt --H 4 --recovery 1 --GT models/cube4/poses-1 --energy biquadratic
+	python flat_intersection.py models/cube4/cube.obj models/cube4/poses-1/cube4-1.txt --H 4 --recovery 1 --GT models/cube4/poses-1 --energy biquadratic --strategy pinv
+	python flat_intersection.py models/cube4/cube.obj models/cube4/poses-1/cube4-1.txt --H 4 --recovery 1 --strategy gradient --GT models/cube4/poses-1 --energy cayley
+	python flat_intersection.py models/cube4/cube.obj models/cube4/poses-1/cube4-1.txt --H 4 --recovery 1 --strategy gradient --GT models/cube4/poses-1 --energy B
+	python flat_intersection.py models/cube4/cube.obj models/cube4/poses-1/cube4-1.txt --H 4 --recovery 1 --strategy grassmann --GT models/cube4/poses-1 --energy B
+	python flat_intersection.py models/cube4/cube.obj models/cube4/poses-1/cube4-1.txt --H 4 --recovery 100 --GT models/cube4/poses-1 --energy biquadratic
+	
+	#### Tests from random
+	python flat_intersection.py models/cube4/cube.obj models/cube4/poses-1/cube4-1.txt --H 4 --energy biquadratic
+	python flat_intersection.py models/cube4/cube.obj models/cube4/poses-1/cube4-1.txt --H 4 --strategy grassmann --energy B
+	python flat_intersection.py models/cube4/cube.obj models/cube4/poses-1/cube4-1.txt --H 4 --strategy gradient --energy B
+	python flat_intersection.py models/cube4/cube.obj models/cube4/poses-1/cube4-1.txt --H 2 --energy biquadratic
+	python flat_intersection.py models/cube4/cube.obj models/cube4/poses-1/cube4-1.txt --H 1 --energy biquadratic
+	
+	#### Zero energy tests onto fewer handles than possible
+	python flat_intersection.py models/cube4/cube.obj models/cube4/poses-1/cube4-1.txt --H 3 --recovery 0 --GT models/cube4/poses-1 --energy biquadratic
+	python flat_intersection.py models/cube4/cube.obj models/cube4/poses-1/cube4-1.txt --H 2 --recovery 0 --GT models/cube4/poses-1 --energy biquadratic
+	python flat_intersection.py models/cube4/cube.obj models/cube4/poses-1/cube4-1.txt --H 1 --recovery 0 --GT models/cube4/poses-1 --energy biquadratic
