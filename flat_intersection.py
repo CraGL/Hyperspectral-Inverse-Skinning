@@ -23,6 +23,7 @@ import format_loader
 from trimesh import TriMesh
 
 MAX_H = 20
+fancy_init = False
 
 ## http://scipy-cookbook.readthedocs.io/items/RankNullspace.html
 def nullspace(A, atol=1e-13, rtol=0):
@@ -223,10 +224,10 @@ def zero_energy_test(base_dir):
 	gt_vertices = np.swapaxes(gt_vertices, 0, 1)
 	gt_vertices = gt_vertices.reshape( len(gt_vertices), -1 )
 	
-	gt_W_path = "models/cheburashka/cheburashka.DMAT"
-	gt_W = np.array( format_loader.load_DMAT(gt_W_path) ).T
+# 	gt_W_path = "models/cheburashka/cheburashka.DMAT"
+# 	gt_W = np.array( format_loader.load_DMAT(gt_W_path) ).T
 	
-	return gt_bones, gt_vertices, gt_W
+	return gt_bones, gt_vertices
 	
 # def zero_energy_test(base_dir):
 #	gt_bone_paths = glob.glob(base_dir + "*.DMAT")
@@ -593,7 +594,7 @@ def optimize_approximated_quadratic(P, H, row_mats, deformed_vs, x0, f_eps = Non
 	while( True ):
 		iterations += 1
 		if iterations > max_iter:
-			print( "Terminating due to too many iterations." )
+			print( "Terminating due to too many iterations:", max_iter )
 			break
 		
 		print( "Starting iteration", iterations )
@@ -659,10 +660,10 @@ def optimize_biquadratic( P, H, row_mats, deformed_vs, x0, solve_for_rest_pose =
 	assert abs( pack_W( unpack_W( np.arange(36), 1 ) ) - np.arange(36) ).max() < 1e-10
 	
 	if f_eps is None:
-		f_eps = 1e-10
+		f_eps = 1e-6
 	if x_eps is None:
 		## To make xtol approximately match scipy's default gradient tolerance (gtol) for BFGS.
-		x_eps = 1e-5
+		x_eps = 1e-4
 	if max_iter is None:
 		max_iter = 9999
 	if f_zero_threshold is None:
@@ -677,7 +678,7 @@ def optimize_biquadratic( P, H, row_mats, deformed_vs, x0, solve_for_rest_pose =
 	while( True ):
 		iterations += 1
 		if iterations > max_iter:
-			print( "Terminating due to too many iterations." )
+			print( "Terminating due to too many iterations: ", max_iter )
 			break
 		
 		print( "Starting iteration", iterations )
@@ -775,6 +776,30 @@ def optimize(P, H, all_R_mats, deformed_vs, x0):
 	return converged, x
 	
 
+def per_vertex_transformation(x, P, row_mats, deformed_vs):
+	
+	rev_vertex_transformations = []
+	vertex_dists = []
+
+	pt, B = unpack(x,P)
+	num_underconstrained = 0
+	for j, vs in enumerate(deformed_vs):
+		vprime = vs.reshape((3*P,1))	
+		vbar = row_mats[j]
+		vB = np.dot( vbar, B )
+		lh = np.dot( vB.T, vB )
+		rh = -np.dot( vB.T, np.dot(vbar, pt) - vprime )
+		## lh should be well-behaved. Its smallest singular value should not be zero.
+		z = np.dot( np.linalg.pinv( lh ), rh )
+		z = z.reshape(-1,1)
+		
+		transformation = pt + np.dot(B,z)
+		rev_vertex_transformations.append( transformation )
+		vertex_dists.append( np.linalg.norm( np.dot( vbar, transformation ) - vprime ) )
+	
+	return np.array( rev_vertex_transformations ).squeeze(), np.array( vertex_dists )
+	
+
 if __name__ == '__main__':
 	import argparse
 	
@@ -787,11 +812,20 @@ if __name__ == '__main__':
 	parser.add_argument('--strategy', '--S', type=str, choices = ['function', 'gradient', 'hessian', 'mixed', 'grassmann', 'pinv'], help='Strategy: function, gradient (default), hessian, mixed, grassmann (for energy B only), pinv (for energy biquadratic only).')
 	parser.add_argument('--energy', '--E', type=str, default='B', choices = ['B', 'cayley', 'B+cayley', 'B+B', 'cayley+cayley', 'biquadratic'], help='Energy: B (default), cayley, B+cayley, B+B, cayley+cayley.')
 	parser.add_argument('--solve-for-rest-pose', type=bool, default=False, help='Whether to solve for the rest pose (only affects "biquadratic" energy (default: False).')
+	parser.add_argument('--error', type=bool, default=False, help='Whether to compute transformation error and vertex error compared with ground truth.')
+	parser.add_argument('--zero', type=bool, default=False, help='Given ground truth, zero test.')
+	parser.add_argument('--fancy-init', type=str, help='valid points generated from local subspace intersection.')
 	
 	args = parser.parse_args()
 	H = args.handles
 	ground_truth_path = args.ground_truth
 	recovery_test = args.recovery
+	error_test = args.error
+	zero_test = args.zero
+	if error_test:	assert( ground_truth_path is not None and "Error test needs ground truth path." )
+	if zero_test:	assert( ground_truth_path is not None and "Zero energy test or zero test need ground truth path." )
+	
+	fancy_init_path = args.fancy_init
 	
 	rest_mesh = TriMesh.FromOBJ_FileName( args.rest_pose )
 	deformed_vs = format_loader.load_poses( args.deformed_vs )
@@ -824,35 +858,22 @@ if __name__ == '__main__':
 	
 	print( "The rank of the stack of all pose row matrices is: ", np.linalg.matrix_rank( np.vstack( all_flats ) ) )
 	
-	## find flat intersection
-#	start_time = time.time()
-#	intersect = all_flats[0]
-#	for flat in all_flats[1:]:
-#		intersect = intersect_flat( intersect, flat )
-#	print( "Time for intersect all flats iteratively: ", time.time() - start_time )
-
-	seed = []
-	for i in range( N ):
-		for j in range( P ):
-			dist = (deformed_vs[i,j] - rest_mesh.vs[i])[:,np.newaxis]
-			translation = np.hstack((np.eye(3), dist)).reshape(-1)
-			seed.append( translation )
-	seed = np.array( seed ).reshape( N, -1 )	
-	assert( np.max( abs( np.dot(all_flats[0], seed[0].reshape(-1,1)) - all_rights[0].reshape(-1,1) ) ) < 1e-10 )
-	
-#	optimize_flat_intersection(P, all_flats, seed)
+	start_time = time.time()
 	if H is None:
 		Hs = range(2, MAX_H)
 	else:
 		Hs = [H]
 	
 	x = None
+	
+	if ground_truth_path is not None:
+		gt_bones, gt_vertices = zero_energy_test(ground_truth_path)
+	
 	for H in Hs:
 	
 		x0 = None
 		## 0 energy test
-		if ground_truth_path is not None:
-			gt_bones, gt_vertices, gt_W = zero_energy_test(ground_truth_path)
+		if zero_test:
 
 			pt = gt_bones[0]
 			B = (gt_bones[1:] - pt).T
@@ -867,6 +888,8 @@ if __name__ == '__main__':
 
 		else:
 			print("#handles: ", H)
+			if error_test:		np.random.seed(0)
+			
 			x0 = np.random.rand(H*12*P)
 			
 			if x is None:
@@ -881,6 +904,15 @@ if __name__ == '__main__':
 			pt, B = unpack( x0, P )
 			for i in range(B.shape[1]):
 				B[:,i] /= np.linalg.norm(B[:,i])
+			
+			if fancy_init_path is not None: 		
+				qs_data = np.loadtxt(fancy_init_path)
+				print( "# of good valid vertices: ", qs_data.shape[0] )
+				from space_mapper import SpaceMapper
+				pca = SpaceMapper.Uncorrellated_Space( qs_data, dimension = H )
+				pt = pca.Xavg_
+				B = pca.V_[:H-1].T
+				
 			x0 = pack( pt, B )
 		
 		if 3*P < B.shape[1]:
@@ -920,7 +952,13 @@ if __name__ == '__main__':
 		if ground_truth_path is None and converged:
 			print("Converged at handle #", H)
 			break
+	print( "Time for solving: ", time.time() - start_time )
 	
-	if ground_truth_path is not None:
+	if ground_truth_path is not None and converged == False:
 		print("Exceed Maximum #handles ", MAX_H)
-
+	
+	rev_vertex_trans, vertex_dists = per_vertex_transformation(x, P, all_R_mats, deformed_vs)	
+	if error_test:
+		transformation_error = abs( rev_vertex_trans - gt_vertices )
+		print( "Largest, average and median transformation errors are: ", transformation_error.max(), transformation_error.mean(), np.median(transformation_error.ravel()) )
+		print( "Largest, average and meidan vertex errors are: ", vertex_dists.max(), vertex_dists.mean(), np.median(vertex_dists) )

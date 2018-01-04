@@ -55,8 +55,14 @@ class SpaceMapper( object ):
 	
 	## Formalize the above with functions, from Yotam's experiments
 	@staticmethod
-	def Uncorrellated_Space( X, enable_scale=True, threshold = 1e-6 ):
+	def Uncorrellated_Space( X, enable_scale=True, threshold = None, dimension = None ):
 		space_mapper = SpaceMapper()
+		
+		if threshold is not None and dimension is not None:
+			raise RuntimeError( "Please only set one of the optional parameters: threshold or dimension" )
+		
+		if threshold is None and dimension is None:
+			threshold = 1e-6
 	
 		## Subtract the average.
 		Xavg = numpy.average( X, axis = 0 )[numpy.newaxis,:]
@@ -69,8 +75,12 @@ class SpaceMapper( object ):
 		space_mapper.s_ = s
 		space_mapper.V_ = V
 	
-		## The first index less than threshold
-		stop_s = len(s) - numpy.searchsorted( s[::-1], threshold )
+		if threshold is not None:
+			## The first index less than threshold
+			stop_s = len(s) - numpy.searchsorted( s[::-1], threshold )
+		else:
+			assert dimension is not None
+			stop_s = dimension
 		# print( "s: ", s )
 		# print( "stop_s: ", stop_s )
 		space_mapper.stop_s = stop_s
