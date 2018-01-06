@@ -31,8 +31,8 @@ def write_DMAT( path, M ):
 	rows, cols = M.shape
 	with open( path, 'w' ) as f:
 		f.write(str(cols) + " " + str(rows) + "\n")
-		for col in M[:,]:
-			for e in col:
+		for i in range(cols):
+			for e in M[:,i]:
 				f.write(str(e) + "\n")
 	
 def load_Tmat( path ):	
@@ -68,7 +68,7 @@ def load_poses( path ):
 	
 def load_result( path ):
 	'''
-	Load the SSD output output.
+	Load the SSD output txt file.
 	'''
 	## M is Bone-by-Frame-by-12
 	M = []
@@ -110,6 +110,43 @@ def load_result( path ):
 	M = asarray( M ).reshape(B,-1,12)
 	
 	return M, W.T
+
+def write_result(path, res, weights, iter_num, time):
+	'''
+	write recovered per-bone tranformation matrix and weights following the SSD output format.
+	'''
+	B = len(res)
+	res = res.reshape(B,-1,12)
+	nframes = len(res[0])
+	with open( path, 'w' ) as f:
+		f.write("#####################################################\n")
+		f.write("# (C) Songrun (songruner@gmail.com)\n")
+		f.write("#\n")
+		f.write("# Running time: " + str(round(time, 3)) + " (s)\n")
+		f.write("# Repeat      : " + str(iter_num) + "\n")
+		f.write("#\n")
+		f.write("#####################################################\n")
+		for i in range(B):
+			f.write("*BONEANIMATION, BONEINDEX=" + str(i) + ", NFRAMES=" + str(nframes) + "\n")
+			for j in range(nframes):
+				s = str(j)
+				for k in range( 12 ):
+					s = s + " " + str(res[i,j,k])
+				s += " 0 0 0 1\n"
+				f.write(s)
+			f.write("#####################################################\n")
+			
+		## write weights
+		m, n = weights.shape[0], weights.shape[1]
+		f.write("*VERTEXWEIGHTS, NVERTICES=" + str(m) + "  #(vtx0Based bone0 w0 bone1 w1 ... )\n")	
+		for i in range(m):
+			s = str(i)+" "
+			for j in range(n):
+				s = s + " " + str(j) + " " + str(weights[i,j])
+			s += "\n"
+			f.write(s)
+		f.write("#####################################################\n")
+		
 
 def write_OBJ( path, vs, fs ):
 	with open( path, 'w' ) as file:

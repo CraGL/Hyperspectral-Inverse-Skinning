@@ -843,15 +843,15 @@ if __name__ == '__main__':
 	parser = argparse.ArgumentParser( description='Solve for transformation subspace.' )
 	parser.add_argument( 'rest_pose', type=str, help='Rest pose (OBJ).')
 	parser.add_argument( 'pose_folder', type=str, help='Folder containing deformed poses.')
-	parser.add_argument('--handles', '--H', type=int, help='Number of handles.')
-	parser.add_argument('--ground-truth', '--GT', type=str, help='Ground truth data path.')
-	parser.add_argument('--recovery', '--R', type=float, help='Recovery test epsilon (default no recovery test).')
-	parser.add_argument('--strategy', '--S', type=str, choices = ['function', 'gradient', 'hessian', 'mixed', 'grassmann', 'pinv', 'pinv+ssv:skip', 'pinv+ssv:weighted', 'ssv:skip', 'ssv:weighted'], help='Strategy: function, gradient (default), hessian, mixed, grassmann (for energy B only), pinv and ssv (for energy biquadratic only).')
-	parser.add_argument('--energy', '--E', type=str, default='B', choices = ['B', 'cayley', 'B+cayley', 'B+B', 'cayley+cayley', 'biquadratic', 'biquadratic+B'], help='Energy: B (default), cayley, B+cayley, B+B, cayley+cayley, biquadratic, biquadratic+B.')
+	parser.add_argument('--handles', '-H', type=int, help='Number of handles.')
+	parser.add_argument('--ground-truth', '-GT', type=str, help='Ground truth data path.')
+	parser.add_argument('--recovery', '-R', type=float, help='Recovery test epsilon (default no recovery test).')
+	parser.add_argument('--strategy', '-S', type=str, choices = ['function', 'gradient', 'hessian', 'mixed', 'grassmann', 'pinv', 'pinv+ssv:skip', 'pinv+ssv:weighted', 'ssv:skip', 'ssv:weighted'], help='Strategy: function, gradient (default), hessian, mixed, grassmann (for energy B only), pinv and ssv (for energy biquadratic only).')
+	parser.add_argument('--energy', '-E', type=str, default='B', choices = ['B', 'cayley', 'B+cayley', 'B+B', 'cayley+cayley', 'biquadratic', 'biquadratic+B'], help='Energy: B (default), cayley, B+cayley, B+B, cayley+cayley, biquadratic, biquadratic+B.')
 	parser.add_argument('--solve-for-rest-pose', type=bool, default=False, help='Whether to solve for the rest pose (only affects "biquadratic" energy (default: False).')
 	parser.add_argument('--error', type=bool, default=False, help='Whether to compute transformation error and vertex error compared with ground truth.')
 	parser.add_argument('--zero', type=bool, default=False, help='Given ground truth, zero test.')
-	parser.add_argument('--fancy-init', type=str, help='valid points generated from local subspace intersection.')
+	parser.add_argument('--fancy-init', '-I', type=str, help='valid points generated from local subspace intersection.')
 	parser.add_argument('--output', '-O', type=str, default="", help='output path.')
 	
 	args = parser.parse_args()
@@ -1022,16 +1022,15 @@ if __name__ == '__main__':
 	if output_folder == "":
 		output_folder = "results/" + OBJ_name + "/" + pose_name
 	
-	curr_folder = "."
-	for folder in os.path.split( output_folder ):	
-		curr_folder = curr_folder + "/" + folder
-		if not os.path.exists(curr_folder):
-			os.makedirs(curr_folder)
+	if not os.path.exists(output_folder):
+		os.makedirs(output_folder)
 	
 	H = int(rev_vertex_trans.shape[1]/12)
 	for i in range(H):
-		per_pose_transformtion = rev_vertex_trans[:,i*H:(1+i)*H]
-		output_path = output_folder + "/" + str(i) + ".DMAT"
+		per_pose_transformtion = rev_vertex_trans[:,i*12:(1+i)*12]
+		per_pose_transformtion = per_pose_transformtion.reshape(-1,4,3)
+		per_pose_transformtion = np.swapaxes(per_pose_transformtion, 1, 2).reshape(-1,12)
+		output_path = output_folder + "/" + str(i+1) + ".DMAT"
 		format_loader.write_DMAT( output_path, per_pose_transformtion )
 	
 	

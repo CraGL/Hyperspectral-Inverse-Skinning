@@ -125,11 +125,17 @@ def lbs_all(rest, bones, W):
 	
 
 if __name__ == '__main__':
-	if len(sys.argv) != 5:
-		print( 'Usage:', sys.argv[0], 'path/to/groundtruth', 'path/to/gt_rest_pose', 'path/to/gt_weights', 'path/to/poses.txt', file = sys.stderr )
-		exit(-1)
 	
-	base_dir = sys.argv[1]
+	parser = argparse.ArgumentParser( description='Compare our results and SSD approch results with ground truth.' )
+	parser.add_argument( 'rest_pose', type=str, help='Rest pose (OBJ).')
+	parser.add_argument( 'pose_folder', type=str, help='Folder containing deformed poses.')
+	parser.add_argument( 'weights', type=str, help='ground truth skinning weights.')
+	parser.add_argument( 'ssd_result', type=str, help='SSD results(txt).')
+	parser.add_argument( 'our_result', type=str, help='our results(txt).')
+	parser.add_argument( '--write-OBJ', '-W', type=bool, default=False, help='whether to save recovered and SSD poses.')
+	args = parser.parse_args()
+	
+	base_dir = args.pose_folder
 	## mesh at rest pose
 	gt_bone_paths = glob.glob(base_dir + "/*.Tmat")
 	gt_bone_paths.sort()
@@ -139,15 +145,14 @@ if __name__ == '__main__':
 	gt_mesh_paths = glob.glob(base_dir + "/*.obj")
 	gt_mesh_paths.sort()
 	gt_vs = np.array([ TriMesh.FromOBJ_FileName(mesh_path).vs for mesh_path in gt_mesh_paths ])
-	
-	recovered_path = base_dir + "/result.txt"
-	rev_bones_unordered, rev_w_unordered = format_loader.load_result(recovered_path)
-	
-	rest_mesh = TriMesh.FromOBJ_FileName(sys.argv[2])
+		
+	rest_mesh = TriMesh.FromOBJ_FileName(args.rest_pose)
 	rest_vs = np.array(rest_mesh.vs)
-	gt_w = format_loader.load_DMAT(sys.argv[3])
+	rest_fs = np.array(rest_mesh.faces)
+	gt_w = format_loader.load_DMAT(args.weights)
 	
-	ssd_bones_unordered, ssd_w_unordered = format_loader.load_result(sys.argv[4])
+	ssd_bones_unordered, ssd_w_unordered = format_loader.load_result(args.ssd_result)
+	rev_bones_unordered, rev_w_unordered = format_loader.load_result(args.our_result)
 	np.set_printoptions(precision=6, suppress=True)
 	
 	N = len(gt_bones)
@@ -207,18 +212,25 @@ if __name__ == '__main__':
 	print( "ssd error: ", linalg.norm(gt_vs - ssd_vs) )
 	print( "rev error: ", linalg.norm(gt_vs - rev_vs) )
 	print( "############################################" )
-
-	name = sys.argv[2].split("/")[-1]
-	gt_fs = rest_mesh.faces
 	
 # 	import pdb; pdb.set_trace()
-	for i, vs in enumerate(ssd_vs):
-		output_path = "SSD_res/recon_ssd_P"+str(i)+"_"+name
-		format_loader.write_OBJ( output_path, vs.round(6), gt_fs )
+	if args.write_OBJ:
+		output_folder = os.path.split(args.our_result)[0]
+		ssd_folder = output_folder + "/ssd_recovered"
+		our_folder = output_folder + "/our_recovered"
+		if not os.path.exists(ssd_folder):
+			os.makedirs(ssd_folder)
+			
+		if not os.path.exists(our_folder):
+			os.makedirs(our_folder)
+		
+		for i, vs in enumerate(ssd_vs):
+			output_path = os.path.join(ssd_folder, str(i+1) + ".obj")
+			format_loader.write_OBJ( output_path, vs.round(6), rest_fs )
 	
-	for i, vs in enumerate(rev_vs):
-		output_path = "SSD_res/recon_rev_P"+str(i)+"_"+name
-		format_loader.write_OBJ( output_path, vs.round(6), gt_fs )
+		for i, vs in enumerate(rev_vs):
+			output_path = os.path.join(our_folder, str(i+1) + ".obj")
+			format_loader.write_OBJ( output_path, vs.round(6), rest_fs )
 		
 # 	plot(gt_bones, ssd_bones, rev_bones )	
  

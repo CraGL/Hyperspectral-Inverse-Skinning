@@ -14,20 +14,11 @@ import time
 import numpy
 import scipy
 
+import format_loader
 from trimesh import TriMesh
 from scipy.spatial import ConvexHull
 import glob
 from space_mapper import SpaceMapper
-
-def create_parser():
-	""" Creates an ArgumentParser for this command line tool. """
-	parser = argparse.ArgumentParser(description = "From per-vertex transformations to per-bone transformations. ",
-		formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-		usage="%(prog)s path/to/input_model_folder")
-	parser.add_argument("pose_folder", metavar="path/to/input_models_folder",
-		help="Path to the folder containing input mesh files.")
-	
-	return parser
 
 def uniquify_points_and_return_input_index_to_unique_index_map( pts, digits = 0 ):
 	'''
@@ -61,50 +52,6 @@ def uniquify_points_and_return_input_index_to_unique_index_map( pts, digits = 0 
 	# return [ tuple( pt[ abs( asarray( pt ).round( digits ) - asarray( pt ) ).sum(axis=1).argmin() ] ) for i, pt in unique_pts.itervalues() ], pts_map
 	## Simplest, the first rounded point:
 	return [ tuple( pt ) for i, pt in unique_pts.itervalues() ], pts_map
-	
-def parse_args(parser=None):
-	"""
-	Uses ArgumentParser to parse the command line arguments.
-	Input:
-		parser - a precreated parser (If parser is None, creates a new parser)
-	Outputs:
-		Returns the arguments as a tuple in the following order:
-			(in_mesh, Ts, Tmat)
-	"""
-	if(parser is None):
-		parser = create_parser()
-	args = parser.parse_args()
-
-	# Check that in_mesh exists
-	if(not os.path.exists(args.pose_folder)):
-		parser.error("Path to pose folder does not exist.")
-	
-	path = args.pose_folder	 
-#	  if( path[-1] != '/' ):	path.append('/')
-	in_meshes = glob.glob(path + "/*.obj")
-	in_meshes.sort()
-	for in_mesh in in_meshes:	print(in_mesh)
-	meshes = [ TriMesh.FromOBJ_FileName(in_mesh) for in_mesh in in_meshes ]
-	
-	in_transformations = glob.glob(path + "/*.DMAT")
-	in_transformations.sort()
-	import format_loader
-	Ts = numpy.array([ format_loader.load_DMAT(transform_path).T for transform_path in in_transformations ])
-	
-	handle_trans = glob.glob(path + "/*.Tmat")
-	handle_trans.sort()
-	Tmat = numpy.array([ format_loader.load_Tmat(transform_path) for transform_path in handle_trans ])
-	
-	num_poses = Ts.shape[0]
-	num_verts = Ts.shape[1]
-	
-	Ts = numpy.swapaxes(Ts,0,1)
-	Ts = Ts.reshape(num_verts, -1)
-	
-	Tmat = numpy.swapaxes(Tmat,0,1)
-	Tmat = Tmat.reshape(Tmat.shape[0], Tmat.shape[1]*Tmat.shape[2])
-	
-	return (meshes, Ts, Tmat)
 
 def simplex_volumn( pts ):
 	'''
@@ -187,39 +134,6 @@ def divide_mesh_into_small_sets( mesh, Ts, MAX_DIMENSION = 5 ):
 # 			small_sets.append( mapper.unproject( hull_vertices ) )
 
 	return numpy.array( small_sets )
-
-def write_result(path, res, weights, iter_num, time):
-	B = len(res)
-	res = res.reshape(B,-1,12)
-	nframes = len(res[0])
-	with open( path, 'w' ) as f:
-		f.write("#####################################################\n")
-		f.write("# (C) Songrun (songruner@gmail.com)\n")
-		f.write("#\n")
-		f.write("# Running time: " + str(round(time, 3)) + " (s)\n")
-		f.write("# Repeat      : " + str(iter_num) + "\n")
-		f.write("#\n")
-		f.write("#####################################################\n")
-		for i in range(B):
-			f.write("*BONEANIMATION, BONEINDEX=" + str(i) + ", NFRAMES=" + str(nframes) + "\n")
-			for j in range(nframes):
-				s = str(j)
-				for k in range( 12 ):
-					s = s + " " + str(res[i,j,k])
-				s += " 0 0 0 1\n"
-				f.write(s)
-			f.write("#####################################################\n")
-			
-		## write weights
-		m, n = weights.shape[0], weights.shape[1]
-		f.write("*VERTEXWEIGHTS, NVERTICES=" + str(m) + "  #(vtx0Based bone0 w0 bone1 w1 ... )\n")	
-		for i in range(m):
-			s = str(i)+" "
-			for j in range(n):
-				s = s + " " + str(j) + " " + str(weights[i,j])
-			s += "\n"
-			f.write(s)
-		f.write("#####################################################\n")
 			
 
 ########################################
@@ -227,14 +141,42 @@ def write_result(path, res, weights, iter_num, time):
 ########################################
 if __name__ == '__main__':
 
-	# Time the amount of time this takes.
-	startTime = time.time()
-	(meshes, Ts, Tmat) = parse_args()
+	'''
+	Uses ArgumentParser to parse the command line arguments.
+	Input:
+		parser - a precreated parser (If parser is None, creates a new parser)
+	Outputs:
+		Returns the arguments as a tuple in the following order:
+			(in_mesh, Ts, Tmat)
+	'''
+		
+	parser = argparse.ArgumentParser(description = "From per-vertex transformations to per-bone transformations. ", usage="%(prog)s path/to/input_model_folder")
+	parser.add_argument("per_vertex_tranformation", type=str, help="Path to the folder containing input mesh files.")
+	parser.add_argument('--ground-truth', '-GT', type=str, help='Ground truth data path.')
+	args = parser.parse_args()
+
+	# Check that in_mesh exists
+	if(not os.path.exists(args.per_vertex_tranformation)):
+		parser.error("Path to per-vertex transformation folder does not exist.")
+
+	per_vertex_folder = args.per_vertex_tranformation
+	in_transformations = glob.glob(per_vertex_folder + "/*.DMAT")
+	in_transformations.sort()
+	Ts = numpy.array([ format_loader.load_DMAT(transform_path).T for transform_path in in_transformations ])	
+	num_poses = Ts.shape[0]
+	num_verts = Ts.shape[1]
+	Ts = numpy.swapaxes(Ts,0,1)
+	Ts = Ts.reshape(num_verts, -1)
+	
+	if args.ground_truth is not None:
+		handle_trans = glob.glob(args.ground_truth + "/*.Tmat")
+		handle_trans.sort()
+		Tmat = numpy.array([ format_loader.load_Tmat(transform_path) for transform_path in handle_trans ])
+		Tmat = numpy.swapaxes(Tmat,0,1)
+		Tmat = Tmat.reshape(Tmat.shape[0], Tmat.shape[1]*Tmat.shape[2])
 	
 	root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 	
-	print("\nReading pose meshes costs: %.2f seconds" % (time.time() - startTime))
-	startTime = time.time()
 	
 #	print( 'Ts.shape:', Ts.shape )
 #	Ts_unique, unique_to_original_map = uniquify_points_and_return_input_index_to_unique_index_map( Ts, digits = 5 )
@@ -249,7 +191,7 @@ if __name__ == '__main__':
 # 	N = len( uncorrelated )
 # 	Ts_sets = [ uncorrelated[:N/4], uncorrelated[N/4:N/2], uncorrelated[N/2:N*3/4], uncorrelated[N*3/4:] ]
 # 	print( "# small sets: ", len( Ts_sets ) )
-	print("\nDividing mesh into small sets costs: %.2f seconds" % (time.time() - startTime))
+	
 	startTime = time.time()
 	
 #	import os,sys
@@ -324,7 +266,6 @@ if __name__ == '__main__':
 	print( solution )
 	running_time = time.time() - startTime
 	print("\nOptimization costs: %.2f seconds" %running_time)
-	print( "ground truth simplex volumn: ", simplex_volumn( Ts_mapper.project( Tmat ).T ).round(4) )
 	print( "solution simplex volumn: ", simplex_volumn( solution[:-1] ).round(4) )
 	
 	recovered = Ts_mapper.unproject( solution[:-1].T )
@@ -332,9 +273,9 @@ if __name__ == '__main__':
 	print( recovered.round(3) )
 	
 	
-	output_path = "./" + sys.argv[1] + "/result.txt"
+	output_path = os.path.join(per_vertex_folder, "result.txt")
 	print( output_path )
-	write_result(output_path, recovered.round(6), weights.round(6), iter_num, running_time)
+	format_loader.write_result(output_path, recovered.round(6), weights.round(6), iter_num, running_time)
 	
 	def check_recovered( recovered, ground ):
 		flags = numpy.zeros( len(Tmat), dtype = bool )
@@ -349,17 +290,19 @@ if __name__ == '__main__':
 					break
 			dists[i] = min_dist
 		return flags, ground, dists
-	
-	status, remains, dists = check_recovered( recovered, Tmat )
-	print( "recovered deviation: ", dists )
-	print( "Average recovered deviation: ", dists.mean().round(4) )
-	if( all( status ) ):	print( "match ground truth" )
-	else:
-		print( "#unmatched: ", numpy.nonzero( ~status ) )
-		print( "Unmatched recovery:" )
-		print( recovered[ numpy.nonzero( ~status ) ].round(4) )
-		print( "Unmatched ground truth: " )
-		print( remains.round(4) )
+		
+	if args.ground_truth is not None:
+		print( "ground truth simplex volumn: ", simplex_volumn( Ts_mapper.project( Tmat ).T ).round(4) )
+		status, remains, dists = check_recovered( recovered, Tmat )
+		print( "recovered deviation: ", dists )
+		print( "Average recovered deviation: ", dists.mean().round(4) )
+		if( all( status ) ):	print( "match ground truth" )
+		else:
+			print( "#unmatched: ", numpy.nonzero( ~status ) )
+			print( "Unmatched recovery:" )
+			print( recovered[ numpy.nonzero( ~status ) ].round(4) )
+			print( "Unmatched ground truth: " )
+			print( remains.round(4) )
 		
 	
 
