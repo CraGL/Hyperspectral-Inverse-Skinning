@@ -26,6 +26,15 @@ def load_DMAT( path ):
 	
 	return M
 	
+def write_DMAT( path, M ):
+	assert( len( M.shape ) == 2 and "M is a matrix")
+	rows, cols = M.shape
+	with open( path, 'w' ) as f:
+		f.write(str(cols) + " " + str(rows) + "\n")
+		for col in M[:,]:
+			for e in col:
+				f.write(str(e) + "\n")
+	
 def load_Tmat( path ):	
 	with open( path ) as f:
 		v = []

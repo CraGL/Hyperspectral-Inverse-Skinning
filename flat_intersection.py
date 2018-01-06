@@ -842,7 +842,7 @@ if __name__ == '__main__':
 	
 	parser = argparse.ArgumentParser( description='Solve for transformation subspace.' )
 	parser.add_argument( 'rest_pose', type=str, help='Rest pose (OBJ).')
-	parser.add_argument( 'deformed_vs', type=str, help='Deformed vertices.')
+	parser.add_argument( 'pose_folder', type=str, help='Folder containing deformed poses.')
 	parser.add_argument('--handles', '--H', type=int, help='Number of handles.')
 	parser.add_argument('--ground-truth', '--GT', type=str, help='Ground truth data path.')
 	parser.add_argument('--recovery', '--R', type=float, help='Recovery test epsilon (default no recovery test).')
@@ -852,6 +852,7 @@ if __name__ == '__main__':
 	parser.add_argument('--error', type=bool, default=False, help='Whether to compute transformation error and vertex error compared with ground truth.')
 	parser.add_argument('--zero', type=bool, default=False, help='Given ground truth, zero test.')
 	parser.add_argument('--fancy-init', type=str, help='valid points generated from local subspace intersection.')
+	parser.add_argument('--output', '-O', type=str, default="", help='output path.')
 	
 	args = parser.parse_args()
 	H = args.handles
@@ -863,9 +864,15 @@ if __name__ == '__main__':
 	if zero_test:	assert( ground_truth_path is not None and "Zero energy test or zero test need ground truth path." )
 	
 	fancy_init_path = args.fancy_init
-	
 	rest_mesh = TriMesh.FromOBJ_FileName( args.rest_pose )
-	deformed_vs = format_loader.load_poses( args.deformed_vs )
+	OBJ_name = os.path.splitext(os.path.basename(args.rest_pose))[0]
+	print( "The name for the OBJ is:", OBJ_name )
+	
+	pose_paths = glob.glob(args.pose_folder + "/*.obj")
+	pose_paths.sort()
+	deformed_vs = np.array( [TriMesh.FromOBJ_FileName( path ).vs for path in pose_paths] )
+	pose_name = os.path.basename( args.pose_folder )
+	print( "The name for pose folder is:", pose_name )
 	
 	## build flats
 	assert( len(deformed_vs.shape) == 3 )
@@ -1006,3 +1013,25 @@ if __name__ == '__main__':
 		transformation_error = abs( rev_vertex_trans - gt_vertices )
 		print( "Largest, average and median transformation errors are: ", transformation_error.max(), transformation_error.mean(), np.median(transformation_error.ravel()) )
 		print( "Largest, average and meidan vertex errors are: ", vertex_dists.max(), vertex_dists.mean(), np.median(vertex_dists) )
+
+
+	curr_folder = os.path.abspath(".")
+	assert os.path.basename(curr_folder) == "InverseSkinning"
+	
+	output_folder = args.output
+	if output_folder == "":
+		output_folder = "results/" + OBJ_name + "/" + pose_name
+	
+	curr_folder = "."
+	for folder in os.path.split( output_folder ):	
+		curr_folder = curr_folder + "/" + folder
+		if not os.path.exists(curr_folder):
+			os.makedirs(curr_folder)
+	
+	H = int(rev_vertex_trans.shape[1]/12)
+	for i in range(H):
+		per_pose_transformtion = rev_vertex_trans[:,i*H:(1+i)*H]
+		output_path = output_folder + "/" + str(i) + ".DMAT"
+		format_loader.write_DMAT( output_path, per_pose_transformtion )
+	
+	
