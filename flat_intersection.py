@@ -247,10 +247,11 @@ def normalization_factor_from_xyzs( xyzs ):
 	diag = xyzs.max( axis = 0 ) - xyzs.min( axis = 0 )
 	diag = np.linalg.norm(diag)
 	normalization = 1./( len(xyzs) * diag )
+	print( "Normalization of 1/(bounding box diagonal * num-vertices):", normalization )
 	return normalization
 
-def optimize_nullspace_directly(P, H, row_mats, deformed_vs, x0, strategy = None):
-
+def optimize_nullspace_directly(P, H, row_mats, deformed_vs, x0, strategy = None, max_iter = None):
+	
 	## To make function values comparable, we need to normalize.
 	normalization = normalization_factor_from_row_mats( row_mats )
 	
@@ -372,18 +373,18 @@ def optimize_nullspace_directly(P, H, row_mats, deformed_vs, x0, strategy = None
 		## Without gradients (or autograd):
 		# solution = scipy.optimize.minimize( f_sum_and_gradient, x0, jac = True, constraints = constraints, callback = show_progress, options={'maxiter':10, 'disp':True} )
 		# solution = scipy.optimize.minimize( f_sum_and_gradient, x0, jac = True, constraints = constraints, method = 'L-BFGS-B', callback = show_progress, options={'maxiter':10, 'disp':True} )
-		solution = scipy.optimize.minimize( f_point_distance_sum, x0, constraints = constraints, method = 'L-BFGS-B', callback = show_progress, options={'maxiter':10, 'disp':True} )
+		solution = scipy.optimize.minimize( f_point_distance_sum, x0, constraints = constraints, method = 'L-BFGS-B', callback = show_progress, options={'maxiter':max_iter, 'disp':True} )
 	elif strategy == 'gradient':
 		## With gradients:
 		## check_grad() is too slow to always run.
 		# grad_err = scipy.optimize.check_grad( lambda x: f_point_distance_sum_and_gradient(x)[0], lambda x: f_point_distance_sum_and_gradient(x)[1], x0 )
 		# print( "scipy.optimize.check_grad() error:", grad_err )
 		# solution = scipy.optimize.minimize( f_point_distance_sum_and_gradient, x0, jac = True, method = 'L-BFGS-B', callback = show_progress, options={'disp':True} )
-		solution = scipy.optimize.minimize( f_point_distance_sum_and_gradient, x0, jac = True, callback = show_progress, options={'disp':True} )
+		solution = scipy.optimize.minimize( f_point_distance_sum_and_gradient, x0, jac = True, callback = show_progress, options={'maxiter':max_iter, 'disp':True} )
 	elif strategy == 'hessian':
 		## Use the Hessian:
 		# solution = scipy.optimize.minimize( f_point_distance_sum_and_gradient, x0, jac = True, hess = f_hess, method = 'Newton-CG', callback = show_progress, options={'disp':True} )
-		solution = scipy.optimize.minimize( f_point_distance_sum_and_gradient, x0, jac = True, hess = f_hess, method = 'Newton-CG', callback = show_progress, options={'disp':True} )
+		solution = scipy.optimize.minimize( f_point_distance_sum_and_gradient, x0, jac = True, hess = f_hess, method = 'Newton-CG', callback = show_progress, options={'maxiter':max_iter, 'disp':True} )
 	elif strategy == 'mixed':
 		## Mixed with quadratic for p:
 		x = x0.copy()
@@ -632,10 +633,22 @@ def optimize_biquadratic( P, H, row_mats, deformed_vs, x0, solve_for_rest_pose =
 	xyzs = np.asarray([ row_mat[0,:3] for row_mat in row_mats ])
 	diag = xyzs.max( axis = 0 ) - xyzs.min( axis = 0 )
 	diag = np.linalg.norm(diag)
-	normalization = 1./( len(row_mats) * diag )
+	# normalization = 1./( len(row_mats) * diag )
+	normalization = normalization_factor_from_row_mats( row_mats )
+	## We don't want this uniform per-vertex normalization because
+	## we may do special weight handling.
+	normalization *= len( row_mats )
+	print( "Normalization:", normalization )
+	
+	if strategy is None:
+		strategy = ['ssv:weighted']
+	else:
+		strategy = strategy.split('+')
+	
+	print( "Strategy:", strategy )
 	
 	use_pseudoinverse = False
-	if strategy == 'pinv':
+	if 'pinv' in strategy:
 		use_pseudoinverse = True
 	
 	def unpack_W( x, P ):
@@ -689,6 +702,7 @@ def optimize_biquadratic( P, H, row_mats, deformed_vs, x0, solve_for_rest_pose =
 		## 4 Solve for the new W.
 		
 		f = 0
+		weights = 0
 		
 		fis = np.zeros( len( deformed_vs ) )
 		As = []
@@ -705,8 +719,19 @@ def optimize_biquadratic( P, H, row_mats, deformed_vs, x0, solve_for_rest_pose =
 			vbar = row_mats[i]
 			
 			## 1
-			z, fi = biquadratic.solve_for_z( W_prev, vbar, vprime, return_energy = True, use_pseudoinverse = use_pseudoinverse )
+			z, ssz, fi = biquadratic.solve_for_z( W_prev, vbar, vprime, return_energy = True, use_pseudoinverse = use_pseudoinverse )
 			fis[i] = fi
+			
+			if 'ssv:skip' in strategy:
+				if ssz < 1e-5:
+					print( "Skipping vertex with small singular value this time" )
+					continue
+				else:
+					ssz = 1.0
+			elif 'ssv:weighted' in strategy:
+				pass
+			else:
+				ssz = 1.0
 			
 			## 2
 			if solve_for_rest_pose:
@@ -721,15 +746,16 @@ def optimize_biquadratic( P, H, row_mats, deformed_vs, x0, solve_for_rest_pose =
 			
 			## 3
 			A, B, Y = biquadratic.linear_matrix_equation_for_W( vbar, vprime, z )
-			As.append( A )
+			As.append( ssz*A )
 			Bs.append( B )
-			Ys.append( Y )
+			Ys.append( ssz*Y )
 			
-			f += fi
+			f += fi * ssz
+			weights += ssz
 		
 		## 4
 		W = biquadratic.solve_for_W( As, Bs, Ys, use_pseudoinverse = use_pseudoinverse )
-		f *= normalization
+		f *= normalization / weights
 		print( "Function value:", f )
 		print( "Max sub-function value:", fis.max() )
 		print( "Min sub-function value:", fis.min() )
@@ -778,6 +804,8 @@ def optimize(P, H, all_R_mats, deformed_vs, x0):
 
 def per_vertex_transformation(x, P, row_mats, deformed_vs):
 	
+	import flat_intersection_biquadratic_gradients as biquadratic
+	
 	rev_vertex_transformations = []
 	vertex_dists = []
 
@@ -793,9 +821,18 @@ def per_vertex_transformation(x, P, row_mats, deformed_vs):
 		z = np.dot( np.linalg.pinv( lh ), rh )
 		z = z.reshape(-1,1)
 		
+		sv = np.linalg.svd( lh, compute_uv = False )
+		if sv[-1] < 1e-5:
+			print( "Vertex", j, "has small singular values:", sv )
+		
 		transformation = pt + np.dot(B,z)
 		rev_vertex_transformations.append( transformation )
 		vertex_dists.append( np.linalg.norm( np.dot( vbar, transformation ) - vprime ) )
+		
+		z2, ssv = biquadratic.solve_for_z( np.hstack([ pt.reshape(-1,1), pt+B ]), vbar, vprime, return_energy = False, use_pseudoinverse = True )
+		if ssv < 1e-5: continue
+		transformation2 = np.dot( np.hstack([ pt.reshape(-1,1), pt+B ]), z2 )
+		assert abs( transformation.squeeze() - transformation2.squeeze() ).max() < 1e-9
 	
 	return np.array( rev_vertex_transformations ).squeeze(), np.array( vertex_dists )
 	
@@ -809,8 +846,8 @@ if __name__ == '__main__':
 	parser.add_argument('--handles', '--H', type=int, help='Number of handles.')
 	parser.add_argument('--ground-truth', '--GT', type=str, help='Ground truth data path.')
 	parser.add_argument('--recovery', '--R', type=float, help='Recovery test epsilon (default no recovery test).')
-	parser.add_argument('--strategy', '--S', type=str, choices = ['function', 'gradient', 'hessian', 'mixed', 'grassmann', 'pinv'], help='Strategy: function, gradient (default), hessian, mixed, grassmann (for energy B only), pinv (for energy biquadratic only).')
-	parser.add_argument('--energy', '--E', type=str, default='B', choices = ['B', 'cayley', 'B+cayley', 'B+B', 'cayley+cayley', 'biquadratic'], help='Energy: B (default), cayley, B+cayley, B+B, cayley+cayley.')
+	parser.add_argument('--strategy', '--S', type=str, choices = ['function', 'gradient', 'hessian', 'mixed', 'grassmann', 'pinv', 'pinv+ssv:skip', 'pinv+ssv:weighted', 'ssv:skip', 'ssv:weighted'], help='Strategy: function, gradient (default), hessian, mixed, grassmann (for energy B only), pinv and ssv (for energy biquadratic only).')
+	parser.add_argument('--energy', '--E', type=str, default='B', choices = ['B', 'cayley', 'B+cayley', 'B+B', 'cayley+cayley', 'biquadratic', 'biquadratic+B'], help='Energy: B (default), cayley, B+cayley, B+B, cayley+cayley, biquadratic, biquadratic+B.')
 	parser.add_argument('--solve-for-rest-pose', type=bool, default=False, help='Whether to solve for the rest pose (only affects "biquadratic" energy (default: False).')
 	parser.add_argument('--error', type=bool, default=False, help='Whether to compute transformation error and vertex error compared with ground truth.')
 	parser.add_argument('--zero', type=bool, default=False, help='Given ground truth, zero test.')
@@ -946,6 +983,13 @@ if __name__ == '__main__':
 				converged, x, new_all_R_mats = optimize_biquadratic( P, H, all_R_mats, deformed_vs, x0, strategy = args.strategy, solve_for_rest_pose = args.solve_for_rest_pose )
 			else:
 				converged, x = optimize_biquadratic( P, H, all_R_mats, deformed_vs, x0, strategy = args.strategy )
+		elif args.energy == 'biquadratic+B':
+			converged, x = optimize_biquadratic( P, H, all_R_mats, deformed_vs, x0, strategy = args.strategy )
+			for i in range(10):
+				print( "Now trying B for one iteration." )
+				converged, x = optimize_nullspace_directly(P, H, all_R_mats, deformed_vs, x, max_iter = 1)
+				print( "Now biquadratic again." )
+				converged, x = optimize_biquadratic( P, H, all_R_mats, deformed_vs, x, strategy = args.strategy )
 		else:
 			raise RuntimeError( "Unknown energy parameter: " + str(parser.energy) )
 		

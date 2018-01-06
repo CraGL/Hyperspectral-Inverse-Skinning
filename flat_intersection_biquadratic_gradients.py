@@ -77,6 +77,12 @@ def quadratic_for_z( W, V, vprime ):
 def solve_for_z( W, V, vprime, return_energy = False, use_pseudoinverse = True ):
     Q, L, C = quadratic_for_z( W, V, vprime )
     
+    sv = np.linalg.svd( Q, compute_uv = False )
+    smallest_singular_value = sv[-1]
+    #if sv[-1] < 1e-5:
+    #    print( "Vertex has small singular values:", sv )
+    #    return ( None, 0.0 ) if return_energy else None
+    
     ## We also need the constraint that z.sum() == 1
     handles = len(L)
     
@@ -102,9 +108,9 @@ def solve_for_z( W, V, vprime, return_energy = False, use_pseudoinverse = True )
     if return_energy:
         E = np.dot( np.dot( z, Q ), z ) + np.dot( L, z ) + C
         # print( "New function value after solve_for_z():", E )
-        return z, E
+        return z, smallest_singular_value, E
     else:
-        return z
+        return z, smallest_singular_value
 
 def quadratic_for_V( W, z, vprime ):
     '''
@@ -158,7 +164,7 @@ def solve_for_V( W, z, vprime, return_energy = False, use_pseudoinverse = False 
     
     if return_energy:
         E = np.dot( np.dot( v, Q ), v ) + np.dot( L, v ) + C
-        # print( "New function value after solve_for_z():", E )
+        # print( "New function value after solve_for_V():", E )
         return V, E
     else:
         return V
@@ -255,7 +261,7 @@ if __name__ == '__main__':
     
     W, V, vprime, poses, handles = generateRandomData( poses = 1, handles = 5 )
     
-    z, f = solve_for_z( W, V, vprime, return_energy = True, use_pseudoinverse = use_pseudoinverse )
+    z, ssv, f = solve_for_z( W, V, vprime, return_energy = True, use_pseudoinverse = use_pseudoinverse )
     
     import flat_intersection_direct_gradients
     f2, _, _ = flat_intersection_direct_gradients.fAndGpAndHp_fast( W[:,0], W[:,1:] - W[:,:1], V, vprime )
