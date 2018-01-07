@@ -130,9 +130,9 @@ if __name__ == '__main__':
 	parser.add_argument( 'rest_pose', type=str, help='Rest pose (OBJ).')
 	parser.add_argument( 'pose_folder', type=str, help='Folder containing deformed poses.')
 	parser.add_argument( 'weights', type=str, help='ground truth skinning weights.')
-	parser.add_argument( 'ssd_result', type=str, help='SSD results(txt).')
 	parser.add_argument( 'our_result', type=str, help='our results(txt).')
 	parser.add_argument( '--write-OBJ', '-W', type=bool, default=False, help='whether to save recovered and SSD poses.')
+	parser.add_argument( '--ssd_result', '--SSD', type=str, help='SSD results(txt).')
 	args = parser.parse_args()
 	
 	base_dir = args.pose_folder
@@ -150,32 +150,23 @@ if __name__ == '__main__':
 	rest_vs = np.array(rest_mesh.vs)
 	rest_fs = np.array(rest_mesh.faces)
 	gt_w = format_loader.load_DMAT(args.weights)
-	
-	ssd_bones_unordered, ssd_w_unordered = format_loader.load_result(args.ssd_result)
+		
 	rev_bones_unordered, rev_w_unordered = format_loader.load_result(args.our_result)
 	np.set_printoptions(precision=6, suppress=True)
 	
 	N = len(gt_bones)
-	assert( len(rev_bones_unordered) == N and len(ssd_bones_unordered) == N )
-	ssd_bones = ssd_bones_unordered.copy()
+	assert( len(rev_bones_unordered) == N )
 	rev_bones = rev_bones_unordered.copy()
-	ssd_w = ssd_w_unordered.copy()
 	rev_w = rev_w_unordered.copy()
-	
 		
 	for i, gt_vals in enumerate(gt_bones):
-	
-		rev_dist, ssd_dist = inf, inf
-		rev_idx, ssd_idx = -1, -1
+		rev_dist = inf
+		rev_idx = -1
 	
 		for j in range(i, N):
 			if( np.linalg.norm( gt_vals - rev_bones_unordered[j] ) < rev_dist ):
 				rev_idx = j
 				rev_dist = np.linalg.norm( gt_vals - rev_bones_unordered[j] )
-			
-			if( np.linalg.norm( gt_vals - ssd_bones_unordered[j] ) < ssd_dist ):
-				ssd_idx = j
-				ssd_dist = np.linalg.norm( gt_vals - ssd_bones_unordered[j] )
 		
 		rev_bones[i] = rev_bones_unordered[rev_idx]
 		rev_bones_unordered[rev_idx] = rev_bones_unordered[i]
@@ -183,40 +174,54 @@ if __name__ == '__main__':
 		rev_w[i] = rev_w_unordered[rev_idx]
 		rev_w_unordered[rev_idx] = rev_w_unordered[i]
 		
-		ssd_bones[i] = ssd_bones_unordered[ssd_idx]
-		ssd_bones_unordered[ssd_idx] = ssd_bones_unordered[i]
-		
-		ssd_w[i] = ssd_w_unordered[ssd_idx]
-		ssd_w_unordered[ssd_idx] = ssd_w_unordered[i]
-		
-# 	gt_vs = gt_vs.reshape(len(gt_vs), -1)
-	
 	## Adjust bones data to Pose-by-bone-by-transformation
 	gt_bones = np.swapaxes(gt_bones, 0, 1) 
-	ssd_bones = np.swapaxes(ssd_bones, 0, 1) 
-	rev_bones = np.swapaxes(rev_bones, 0, 1) 
-
-	ssd_vs = np.array([lbs_all(rest_vs, ssd_bones_per_pose, ssd_w.T) for ssd_bones_per_pose in ssd_bones ])
+	rev_bones = np.swapaxes(rev_bones, 0, 1)
 	rev_vs = np.array([lbs_all(rest_vs, rev_bones_per_pose, rev_w.T) for rev_bones_per_pose in rev_bones ])
+		
+	if args.ssd_result is not None:
+		ssd_bones_unordered, ssd_w_unordered = format_loader.load_result(args.ssd_result)
+		assert( len(ssd_bones_unordered) == N )
+		ssd_w = ssd_w_unordered.copy()
+		ssd_bones = ssd_bones_unordered.copy()
+		
+		for i, gt_vals in enumerate(gt_bones):
+			ssd_dist = inf
+			ssd_idx = -1
+			for j in range(i, N):
+				if( np.linalg.norm( gt_vals - ssd_bones_unordered[j] ) < ssd_dist ):
+					ssd_idx = j
+					ssd_dist = np.linalg.norm( gt_vals - ssd_bones_unordered[j] )
+		
+			ssd_bones[i] = ssd_bones_unordered[ssd_idx]
+			ssd_bones_unordered[ssd_idx] = ssd_bones_unordered[i]
+		
+			ssd_w[i] = ssd_w_unordered[ssd_idx]
+			ssd_w_unordered[ssd_idx] = ssd_w_unordered[i]
+			
+			ssd_bones = np.swapaxes(ssd_bones, 0, 1)
+			ssd_vs = np.array([lbs_all(rest_vs, ssd_bones_per_pose, ssd_w.T) for ssd_bones_per_pose in ssd_bones ])
 			
 	print( "############################################" )
 	print( "Pre-bone transformation Error: " )
-	print( "ssd error: ", linalg.norm(gt_bones - ssd_bones) )
+	if args.ssd_result is not None:
+		print( "ssd error: ", linalg.norm(gt_bones - ssd_bones) )
 	print( "rev error: ", linalg.norm(gt_bones - rev_bones) )
 	print( "############################################" )
 	print( "Weight Error: " )
-	print( "ssd error: ", linalg.norm(gt_w - ssd_w) )
+	if args.ssd_result is not None:
+		print( "ssd error: ", linalg.norm(gt_w - ssd_w) )
 	print( "rev error: ", linalg.norm(gt_w - rev_w) )
 	print( "############################################" )
 	print( "Reconstruction Mesh Error: " )
-	print( "ssd error: ", linalg.norm(gt_vs - ssd_vs) )
+	if args.ssd_result is not None:
+		print( "ssd error: ", linalg.norm(gt_vs - ssd_vs) )
 	print( "rev error: ", linalg.norm(gt_vs - rev_vs) )
 	print( "############################################" )
 	
 # 	import pdb; pdb.set_trace()
 	if args.write_OBJ:
 		output_folder = os.path.split(args.our_result)[0]
-		ssd_folder = output_folder + "/ssd_recovered"
 		our_folder = output_folder + "/our_recovered"
 		if not os.path.exists(ssd_folder):
 			os.makedirs(ssd_folder)
@@ -224,13 +229,15 @@ if __name__ == '__main__':
 		if not os.path.exists(our_folder):
 			os.makedirs(our_folder)
 		
-		for i, vs in enumerate(ssd_vs):
-			output_path = os.path.join(ssd_folder, str(i+1) + ".obj")
-			format_loader.write_OBJ( output_path, vs.round(6), rest_fs )
+		if args.ssd_result is not None:
+			ssd_folder = output_folder + "/ssd_recovered"
+			for i, vs in enumerate(ssd_vs):
+				output_path = os.path.join(ssd_folder, str(i+1) + ".obj")
+				format_loader.write_OBJ( output_path, vs.round(6), rest_fs )
 	
-		for i, vs in enumerate(rev_vs):
-			output_path = os.path.join(our_folder, str(i+1) + ".obj")
-			format_loader.write_OBJ( output_path, vs.round(6), rest_fs )
+			for i, vs in enumerate(rev_vs):
+				output_path = os.path.join(our_folder, str(i+1) + ".obj")
+				format_loader.write_OBJ( output_path, vs.round(6), rest_fs )
 		
 # 	plot(gt_bones, ssd_bones, rev_bones )	
  
