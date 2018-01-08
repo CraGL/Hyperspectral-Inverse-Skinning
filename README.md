@@ -10,6 +10,8 @@ This code depends on:
 - [GLFW3](http://www.glfw.org/) (e.g. `brew install glfw3`)
 - [numpy](http://www.numpy.org/) (e.g. `pip install numpy`)
 - [scipy](https://www.scipy.org/) (e.g. `pip install scipy`)
+- [MOSEK](https://mosek.com/) (download the software and license, `cd mosek/8/tools/platform/osx64x86/python/3/; python setup.py install`)
+- [cvxopt](http://cvxopt.org/) You need an unreleased version with import MOSEK binding fixes: `CVXOPT_BUILD_GLPK=1 pip install git+https://github.com/cvxopt/cvxopt/`
 
 ### Compile this project
     mkdir build

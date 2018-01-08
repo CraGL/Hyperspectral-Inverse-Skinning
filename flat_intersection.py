@@ -682,6 +682,8 @@ def optimize_biquadratic( P, H, row_mats, deformed_vs, x0, solve_for_rest_pose =
 	if f_zero_threshold is None:
 		f_zero_threshold = 0.0
 	
+	print( "optimize_biquadratic() with strategy:", strategy, "f_eps:", f_eps, "x_eps:", x_eps, "max_iter:", max_iter, "f_zero_threshold:", f_zero_threshold )
+	
 	import flat_intersection_biquadratic_gradients as biquadratic
 	
 	f_prev = None

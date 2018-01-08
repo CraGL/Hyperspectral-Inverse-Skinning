@@ -203,7 +203,7 @@ if __name__ == '__main__':
 			ssd_vs = np.array([lbs_all(rest_vs, ssd_bones_per_pose, ssd_w.T) for ssd_bones_per_pose in ssd_bones ])
 			
 	print( "############################################" )
-	print( "Pre-bone transformation Error: " )
+	print( "Per-bone transformation Error: " )
 	if args.ssd_result is not None:
 		print( "ssd error: ", linalg.norm(gt_bones - ssd_bones) )
 	print( "rev error: ", linalg.norm(gt_bones - rev_bones) )
