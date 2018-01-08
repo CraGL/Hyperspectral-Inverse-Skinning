@@ -86,3 +86,11 @@ Cube4 Pose1
 	
 	# Evaluate
 	python -u compare.py ./models/cube4/cube.obj ./models/cube4/poses-1 ./models/cube4/cube.DMAT ./results_yotam/cube4/pose1/result.txt 2>&1 | tee results_yotam/cube4/pose1/compare.out
+	
+	# Verify each step
+	
+	## Verify flat_intersection.py
+	### One pose:
+	python flat_intersection_apply_output.py models/cube4/cube.obj results/cube4/pose1/1.DMAT results/cube4/pose1/1.obj
+	### All at once:
+	parallel python flat_intersection_apply_output.py models/cube4/cube.obj '{}' '{.}.obj' ::: results/cube4/pose1/*.DMAT
