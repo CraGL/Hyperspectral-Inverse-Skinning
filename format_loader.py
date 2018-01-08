@@ -30,10 +30,10 @@ def write_DMAT( path, M ):
 	assert( len( M.shape ) == 2 and "M is a matrix")
 	rows, cols = M.shape
 	with open( path, 'w' ) as f:
-		f.write(str(cols) + " " + str(rows) + "\n")
+		f.write(repr(cols) + " " + repr(rows) + "\n")
 		for i in range(cols):
 			for e in M[:,i]:
-				f.write(str(e) + "\n")
+				f.write(repr(e) + "\n")
 	
 def load_Tmat( path ):	
 	with open( path ) as f:
@@ -122,27 +122,27 @@ def write_result(path, res, weights, iter_num, time):
 		f.write("#####################################################\n")
 		f.write("# (C) Songrun (songruner@gmail.com)\n")
 		f.write("#\n")
-		f.write("# Running time: " + str(round(time, 3)) + " (s)\n")
-		f.write("# Repeat      : " + str(iter_num) + "\n")
+		f.write("# Running time: " + repr(round(time, 3)) + " (s)\n")
+		f.write("# Repeat      : " + repr(iter_num) + "\n")
 		f.write("#\n")
 		f.write("#####################################################\n")
 		for i in range(B):
-			f.write("*BONEANIMATION, BONEINDEX=" + str(i) + ", NFRAMES=" + str(nframes) + "\n")
+			f.write("*BONEANIMATION, BONEINDEX=" + repr(i) + ", NFRAMES=" + repr(nframes) + "\n")
 			for j in range(nframes):
-				s = str(j)
+				s = repr(j)
 				for k in range( 12 ):
-					s = s + " " + str(res[i,j,k])
+					s = s + " " + repr(res[i,j,k])
 				s += " 0 0 0 1\n"
 				f.write(s)
 			f.write("#####################################################\n")
 			
 		## write weights
 		m, n = weights.shape[0], weights.shape[1]
-		f.write("*VERTEXWEIGHTS, NVERTICES=" + str(m) + "  #(vtx0Based bone0 w0 bone1 w1 ... )\n")	
+		f.write("*VERTEXWEIGHTS, NVERTICES=" + repr(m) + "  #(vtx0Based bone0 w0 bone1 w1 ... )\n")	
 		for i in range(m):
-			s = str(i)+" "
+			s = repr(i)+" "
 			for j in range(n):
-				s = s + " " + str(j) + " " + str(weights[i,j])
+				s = s + " " + repr(j) + " " + repr(weights[i,j])
 			s += "\n"
 			f.write(s)
 		f.write("#####################################################\n")
@@ -151,9 +151,9 @@ def write_result(path, res, weights, iter_num, time):
 def write_OBJ( path, vs, fs ):
 	with open( path, 'w' ) as file:
 		for v in vs:
-			file.write("v " + str(v[0]) + " " + str(v[1]) + " " + str(v[2]) + "\n")	
+			file.write("v " + repr(v[0]) + " " + repr(v[1]) + " " + repr(v[2]) + "\n")	
 		for f in fs:
-			file.write("f " + str(f[0]+1) + " " + str(f[1]+1) + " " + str(f[2]+1) + "\n")
+			file.write("f " + repr(f[0]+1) + " " + repr(f[1]+1) + " " + repr(f[2]+1) + "\n")
 
 
 ## test load poses
