@@ -79,10 +79,10 @@ SSD input includes a rest pose OBJ file and a TXT file containing pose informati
 Cube4 Pose1
 
 	# Generate
-	mkdir -p results/cube4/pose1/
-	python -u PerVertex/local_subspace_recover.py --svd_threshold 1e-15 --transformation_threshold 1e-4 --version 0 ./models/cube4/cube.obj ./models/cube4/poses-1/cube-*.obj -o ./results/cube4/pose1/local_subspace_recover.txt 2>&1 | tee results/cube4/pose1/local_subspace_recover.out
-	python -u flat_intersection.py ./models/cube4/cube.obj models/cube4/poses-1 --energy biquadratic -GT ./models/cube4/poses-1 --error True --handles 4 --fancy-init ./results/cube4/pose1/local_subspace_recover.txt --output ./results/cube4/pose1/ 2>&1 | tee results/cube4/pose1/flat_intersection.out
-	python3 -u simplex_hull.py ./results/cube4/pose1/ 2>&1 | tee results/cube4/pose1/simplex_hull.out
+	mkdir -p results_yotam/cube4/pose1/
+	python -u PerVertex/local_subspace_recover.py --svd_threshold 1e-15 --transformation_threshold 1e-4 --version 0 ./models/cube4/cube.obj ./models/cube4/poses-1/cube-*.obj -o ./results_yotam/cube4/pose1/local_subspace_recover.txt 2>&1 | tee results_yotam/cube4/pose1/local_subspace_recover.out
+	python -u flat_intersection.py ./models/cube4/cube.obj models/cube4/poses-1 --energy biquadratic -GT ./models/cube4/poses-1 --error True --handles 4 --fancy-init ./results_yotam/cube4/pose1/local_subspace_recover.txt --output ./results_yotam/cube4/pose1/ 2>&1 | tee results_yotam/cube4/pose1/flat_intersection.out
+	python3 -u simplex_hull.py ./results_yotam/cube4/pose1/ 2>&1 | tee results_yotam/cube4/pose1/simplex_hull.out
 	
 	# Evaluate
-	python -u compare.py ./models/cube4/cube.obj ./models/cube4/poses-1 ./models/cube4/cube.DMAT ./results/cube4/pose1/result.txt 2>&1 | tee results/cube4/pose1/compare.out
+	python -u compare.py ./models/cube4/cube.obj ./models/cube4/poses-1 ./models/cube4/cube.DMAT ./results_yotam/cube4/pose1/result.txt 2>&1 | tee results_yotam/cube4/pose1/compare.out
