@@ -103,6 +103,9 @@ def plot(gt_bones, ssd_bones, rev_bones):
 	
 	
 def lbs_all(rest, bones, W):
+	'''
+	bones are a list of flattened row-major matrices
+	'''
 	assert( len(bones.shape) == 2 )
 	assert( len(W.shape) == 2 )
 	assert( bones.shape[0] == W.shape[1] )
@@ -115,7 +118,7 @@ def lbs_all(rest, bones, W):
 	result = np.zeros((N,3))
 	
 	for i in range(N):
-		tran = per_vertex[i].reshape(4,3).T
+		tran = per_vertex[i].reshape(3,4)
 		p = rest[i]
 		result[i] = np.dot(tran[:, :3], p[:,np.newaxis]).squeeze() + tran[:, 3]
 	
@@ -142,6 +145,11 @@ if __name__ == '__main__':
 	gt_bones = np.array([ format_loader.load_Tmat(transform_path) for transform_path in gt_bone_paths ])
 	gt_bones = np.swapaxes(gt_bones, 0, 1)
 	
+	## Tmat are col-major, convert it to row-major
+	gt_bones = gt_bones.reshape( gt_bones.shape[0], gt_bones.shape[1], 4, 3 )
+	gt_bones = np.swapaxes(gt_bones, 2, 3)
+	gt_bones = gt_bones.reshape( gt_bones.shape[0], gt_bones.shape[1], 12 )
+		
 	gt_mesh_paths = glob.glob(base_dir + "/*.obj")
 	gt_mesh_paths.sort()
 	gt_vs = np.array([ TriMesh.FromOBJ_FileName(mesh_path).vs for mesh_path in gt_mesh_paths ])
@@ -199,8 +207,8 @@ if __name__ == '__main__':
 			ssd_w[i] = ssd_w_unordered[ssd_idx]
 			ssd_w_unordered[ssd_idx] = ssd_w_unordered[i]
 			
-			ssd_bones = np.swapaxes(ssd_bones, 0, 1)
-			ssd_vs = np.array([lbs_all(rest_vs, ssd_bones_per_pose, ssd_w.T) for ssd_bones_per_pose in ssd_bones ])
+		ssd_bones = np.swapaxes(ssd_bones, 0, 1)
+		ssd_vs = np.array([lbs_all(rest_vs, ssd_bones_per_pose, ssd_w.T) for ssd_bones_per_pose in ssd_bones ])
 			
 	print( "############################################" )
 	print( "Per-bone transformation Error: " )
@@ -223,21 +231,23 @@ if __name__ == '__main__':
 	if args.write_OBJ:
 		output_folder = os.path.split(args.our_result)[0]
 		our_folder = output_folder + "/our_recovered"
-		if not os.path.exists(ssd_folder):
-			os.makedirs(ssd_folder)
-			
 		if not os.path.exists(our_folder):
 			os.makedirs(our_folder)
+			
+		for i, vs in enumerate(rev_vs):
+			output_path = os.path.join(our_folder, str(i+1) + ".obj")
+			format_loader.write_OBJ( output_path, vs.round(6), rest_fs )
 		
 		if args.ssd_result is not None:
 			ssd_folder = output_folder + "/ssd_recovered"
+			if not os.path.exists(ssd_folder):
+				os.makedirs(ssd_folder)
+			
 			for i, vs in enumerate(ssd_vs):
 				output_path = os.path.join(ssd_folder, str(i+1) + ".obj")
 				format_loader.write_OBJ( output_path, vs.round(6), rest_fs )
 	
-			for i, vs in enumerate(rev_vs):
-				output_path = os.path.join(our_folder, str(i+1) + ".obj")
-				format_loader.write_OBJ( output_path, vs.round(6), rest_fs )
+
 		
 # 	plot(gt_bones, ssd_bones, rev_bones )	
  

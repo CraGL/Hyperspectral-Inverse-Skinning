@@ -111,12 +111,18 @@ def load_result( path ):
 	
 	return M, W.T
 
-def write_result(path, res, weights, iter_num, time):
+def write_result(path, res, weights, iter_num, time, col_major=False):
 	'''
 	write recovered per-bone tranformation matrix and weights following the SSD output format.
+	The bone transformations are flattened row-major matrices.
 	'''
 	B = len(res)
 	res = res.reshape(B,-1,12)
+	if col_major:
+		res = res.reshape(B,-1,4,3)
+		res = swapaxes( res,2,3 )
+		res = res.reshape(B,-1,12)
+		
 	nframes = len(res[0])
 	with open( path, 'w' ) as f:
 		f.write("#####################################################\n")

@@ -1,5 +1,5 @@
 """
-Compute Convex hull from a set of OBJ poses.
+Compute Convex hull from a set of OBJ poses. Affine transformations are col-major here.
 
 Written by Songrun Liu
 """
@@ -274,8 +274,8 @@ if __name__ == '__main__':
 	
 	
 	output_path = os.path.join(per_vertex_folder, "result.txt")
-	print( "Saving to:", output_path )
-	format_loader.write_result(output_path, recovered.round(6), weights.round(6), iter_num, running_time)
+	print( "Saving recovered results to:", output_path )
+	format_loader.write_result(output_path, recovered.round(6), weights.round(6), iter_num, running_time, col_major=True)
 	
 	def check_recovered( recovered, ground ):
 		flags = numpy.zeros( len(Tmat), dtype = bool )
