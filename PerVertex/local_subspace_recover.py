@@ -223,7 +223,7 @@ if __name__ == '__main__':
     start_time = time.time()
     qs = find_subspace_intersections( args.rest_pose, args.other_poses, args.svd_threshold, args.transformation_threshold, args.version )
     print( "... Finished generating transformations." )
-    print( "Finding subspace intersection costs: ", time.time()-start_time )
+    print( "Finding subspace intersection duration (seconds): ", time.time()-start_time )
 
     if args.out is None:
         np.set_printoptions( precision = 24, linewidth = 2000 )
