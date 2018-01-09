@@ -849,12 +849,14 @@ if __name__ == '__main__':
 	parser.add_argument('--ground-truth', '-GT', type=str, help='Ground truth data path.')
 	parser.add_argument('--recovery', '-R', type=float, help='Recovery test epsilon (default no recovery test).')
 	parser.add_argument('--strategy', '-S', type=str, choices = ['function', 'gradient', 'hessian', 'mixed', 'grassmann', 'pinv', 'pinv+ssv:skip', 'pinv+ssv:weighted', 'ssv:skip', 'ssv:weighted'], help='Strategy: function, gradient (default), hessian, mixed, grassmann (for energy B only), pinv and ssv (for energy biquadratic only).')
-	parser.add_argument('--energy', '-E', type=str, default='B', choices = ['B', 'cayley', 'B+cayley', 'B+B', 'cayley+cayley', 'biquadratic', 'biquadratic+B'], help='Energy: B (default), cayley, B+cayley, B+B, cayley+cayley, biquadratic, biquadratic+B.')
+	parser.add_argument('--energy', '-E', type=str, default='B', choices = ['B', 'cayley', 'B+cayley', 'B+B', 'cayley+cayley', 'biquadratic', 'biquadratic+B', 'biquadratic+handles'], help='Energy: B (default), cayley, B+cayley, B+B, cayley+cayley, biquadratic, biquadratic+B, biquadratic+handles.')
 	parser.add_argument('--solve-for-rest-pose', type=bool, default=False, help='Whether to solve for the rest pose (only affects "biquadratic" energy (default: False).')
 	parser.add_argument('--error', type=bool, default=False, help='Whether to compute transformation error and vertex error compared with ground truth.')
 	parser.add_argument('--zero', type=bool, default=False, help='Given ground truth, zero test.')
 	parser.add_argument('--fancy-init', '-I', type=str, help='valid points generated from local subspace intersection.')
 	parser.add_argument('--output', '-O', type=str, default="", help='output path.')
+	parser.add_argument('--f-eps', type=float, help='Function change epsilon (biquadratic).')
+	parser.add_argument('--x-eps', type=float, help='Variable change epsilon (biquadratic).')
 	
 	args = parser.parse_args()
 	H = args.handles
@@ -989,16 +991,22 @@ if __name__ == '__main__':
 			converged, x = optimize_nullspace_directly(P, H, all_R_mats, deformed_vs, x, strategy = args.strategy)
 		elif args.energy == 'biquadratic':
 			if args.solve_for_rest_pose:
-				converged, x, new_all_R_mats = optimize_biquadratic( P, H, all_R_mats, deformed_vs, x0, strategy = args.strategy, solve_for_rest_pose = args.solve_for_rest_pose )
+				converged, x, new_all_R_mats = optimize_biquadratic( P, H, all_R_mats, deformed_vs, x0, strategy = args.strategy, solve_for_rest_pose = args.solve_for_rest_pose, f_eps = args.f_eps, x_eps = args.x_eps )
 			else:
-				converged, x = optimize_biquadratic( P, H, all_R_mats, deformed_vs, x0, strategy = args.strategy )
+				converged, x = optimize_biquadratic( P, H, all_R_mats, deformed_vs, x0, strategy = args.strategy, f_eps = args.f_eps, x_eps = args.x_eps )
+		elif args.energy == 'biquadratic+handles':
+			converged, x = optimize_biquadratic( P, H, all_R_mats, deformed_vs, x0, strategy = args.strategy, f_eps = args.f_eps, x_eps = args.x_eps )
+			p, B = unpack( x, P )
+			B = B[:,:-1]
+			x = pack( p, B )
+			converged, x = optimize_biquadratic( P, H-1, all_R_mats, deformed_vs, x, strategy = args.strategy, f_eps = args.f_eps, x_eps = args.x_eps )
 		elif args.energy == 'biquadratic+B':
-			converged, x = optimize_biquadratic( P, H, all_R_mats, deformed_vs, x0, strategy = args.strategy )
+			converged, x = optimize_biquadratic( P, H, all_R_mats, deformed_vs, x0, strategy = args.strategy, f_eps = args.f_eps, x_eps = args.x_eps )
 			for i in range(10):
 				print( "Now trying B for one iteration." )
 				converged, x = optimize_nullspace_directly(P, H, all_R_mats, deformed_vs, x, max_iter = 1)
 				print( "Now biquadratic again." )
-				converged, x = optimize_biquadratic( P, H, all_R_mats, deformed_vs, x, strategy = args.strategy )
+				converged, x = optimize_biquadratic( P, H, all_R_mats, deformed_vs, x, strategy = args.strategy, f_eps = args.f_eps, x_eps = args.x_eps )
 		else:
 			raise RuntimeError( "Unknown energy parameter: " + str(parser.energy) )
 		

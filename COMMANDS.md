@@ -93,4 +93,4 @@ Cube4 Pose1
 	### One pose:
 	python flat_intersection_apply_output.py models/cube4/cube.obj results/cube4/pose1/1.DMAT results/cube4/pose1/1.obj
 	### All at once:
-	parallel python flat_intersection_apply_output.py models/cube4/cube.obj '{}' '{.}.obj' ::: results/cube4/pose1/*.DMAT
+	parallel python flat_intersection_apply_output.py models/cube4/cube.obj '{}' '{.}.obj' ::: results_yotam/cube4/pose1/*.DMAT

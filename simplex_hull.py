@@ -153,6 +153,8 @@ if __name__ == '__main__':
 	parser = argparse.ArgumentParser(description = "From per-vertex transformations to per-bone transformations. ", usage="%(prog)s path/to/input_model_folder")
 	parser.add_argument("per_vertex_tranformation", type=str, help="Path to the folder containing input mesh files.")
 	parser.add_argument('--ground-truth', '-GT', type=str, help='Ground truth data path.')
+	parser.add_argument('--robust-percentile', '-R', type=float, help='Fraction of outliers to discard. Default: 0.')
+	parser.add_argument('--dimension', '-D', type=int, help='Dimension (number of handles minus one). Default: automatic.')
 	args = parser.parse_args()
 
 	# Check that in_mesh exists
@@ -183,7 +185,7 @@ if __name__ == '__main__':
 #	Ts_unique = numpy.asarray( Ts_unique )
 #	print( 'Unique Ts.shape:', Ts_unique.shape )
 	
-	Ts_mapper = SpaceMapper.Uncorrellated_Space( Ts )
+	Ts_mapper = SpaceMapper.Uncorrellated_Space( Ts, dimension = args.dimension )
 	uncorrelated = Ts_mapper.project( Ts )
 	print( "uncorrelated data shape" )
 	print( uncorrelated.shape )
@@ -264,6 +266,21 @@ if __name__ == '__main__':
 	
 	print( "solution" )
 	print( solution )
+	
+	## Cheap robustness; discard the % of data which ended up with the smallest weights.
+	## Outliers will always have 
+	if args.robust_percentile is not None:
+		argsorted = weights.argsort(axis=0)
+		num_rows_to_discard = int( args.robust_percentile*len(weights) )
+		print( "Deleting", num_rows_to_discard, "rows with the smallest weights." )
+		rows_to_discard = argsorted[ :num_rows_to_discard ].ravel()
+		uncorrelated_robust = numpy.delete( uncorrelated, rows_to_discard, axis = 0 )
+		print( "Re-running MVES" )
+		solution, weights_robust, iter_num = mves2.MVES( uncorrelated_robust )
+		weights = numpy.dot( numpy.linalg.inv( solution ), numpy.concatenate( ( uncorrelated.T, numpy.ones((1,uncorrelated.shape[0])) ), axis=0 ) ).T
+		print( "robust solution" )
+		print( solution )
+	
 	running_time = time.time() - startTime
 	print("\nOptimization costs: %.2f seconds" %running_time)
 	print( "solution simplex volumn: ", simplex_volumn( solution[:-1] ).round(4) )
