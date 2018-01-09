@@ -64,7 +64,7 @@ def to_spmatrix( M ):
 	import cvxopt
 	return cvxopt.spmatrix( M.data, numpy.asarray( M.row, dtype = int ), numpy.asarray( M.col, dtype = int ) )
 
-def MVES( pts, initial_guess_vertices = None ):
+def MVES( pts, initial_guess_vertices = None, linear_solver = None ):
 	'''
 	Given:
 		pts: A sequence of n-dimensional points (e.g. points are rows)
@@ -75,6 +75,9 @@ def MVES( pts, initial_guess_vertices = None ):
 		matrix has the points as the columns. The last coordinate of each point will
 		always be 1.
 	'''
+	
+	if linear_solver is None:
+		linear_solver = 'glpk'
 	
 	pts = numpy.asfarray( pts )
 	print( "All pts #: ", len(pts) )
@@ -363,8 +366,9 @@ def MVES( pts, initial_guess_vertices = None ):
 		while True:		
 			Hc = numpy.dot( f_log_volume_hess_inv( x0 ), f_log_volume_grad( x0 ) )
 			c = f_log_volume_grad( x0 )
-# 			solution = cvxopt.solvers.lp( cvxopt.matrix(c), sparse_G, cvxopt.matrix(h), sparse_A, cvxopt.matrix(b), solver='glpk' )
-			solution = cvxopt.solvers.lp( cvxopt.matrix(Hc*0.9+c*0.1), sparse_G, cvxopt.matrix(h), sparse_A, cvxopt.matrix(b), solver='mosek' )
+			solution = cvxopt.solvers.lp( cvxopt.matrix(c), sparse_G, cvxopt.matrix(h), sparse_A, cvxopt.matrix(b), solver=linear_solver )
+# 			solution = cvxopt.solvers.lp( cvxopt.matrix(Hc*0.9+c*0.1), sparse_G, cvxopt.matrix(h), sparse_A, cvxopt.matrix(b), solver='mosek' )
+
 			x = solution['x']
 			fx = f_log_volume( numpy.array(x) )
 			print( "Current log volume: ", fx  )
