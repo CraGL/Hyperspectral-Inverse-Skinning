@@ -1025,12 +1025,11 @@ if __name__ == '__main__':
 		print( "Largest, average and meidan vertex errors are: ", vertex_dists.max(), vertex_dists.mean(), np.median(vertex_dists) )
 
 
-	curr_folder = os.path.abspath(".")
-	assert os.path.basename(curr_folder) == "InverseSkinning"
-	
 	output_folder = args.output
 	if output_folder == "":
-		output_folder = "results/" + OBJ_name + "/" + pose_name
+		curr_folder = os.path.abspath(".")
+		assert os.path.basename(curr_folder) == "InverseSkinning"
+		output_folder = os.path.join( "results", OBJ_name, + pose_name )
 	
 	if not os.path.exists(output_folder):
 		os.makedirs(output_folder)
@@ -1040,7 +1039,7 @@ if __name__ == '__main__':
 		per_pose_transformtion = rev_vertex_trans[:,i*12:(1+i)*12]
 		per_pose_transformtion = per_pose_transformtion.reshape(-1,3,4)
 		per_pose_transformtion = np.swapaxes(per_pose_transformtion, 1, 2).reshape(-1,12)
-		output_path = output_folder + "/" + str(i+1) + ".DMAT"
+		output_path = os.path.join( output_folder, str(i+1) + ".DMAT" )
 		format_loader.write_DMAT( output_path, per_pose_transformtion )
 	
 	
