@@ -2,10 +2,13 @@
 
 *.obj
 *.DMAT
-compare.out
+our_recovered
+
+## Let's keep some files so we can use git diff.
+# compare.out
+
 flat_intersection.out
 local_subspace_recover.out
 local_subspace_recover.txt
-result.txt
 simplex_hull.out
-our_recovered
+result.txt
