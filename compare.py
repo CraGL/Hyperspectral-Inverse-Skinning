@@ -158,6 +158,11 @@ if __name__ == '__main__':
 	rest_mesh = TriMesh.FromOBJ_FileName(args.rest_pose)
 	rest_vs = np.array(rest_mesh.vs)
 	rest_fs = np.array(rest_mesh.faces)
+	
+	## diagonal
+	diag = rest_vs.max( axis = 0 ) - rest_vs.min( axis = 0 )
+	diag = np.linalg.norm(diag)
+	
 	gt_w = format_loader.load_DMAT(args.weights)
 		
 	rev_bones_unordered, rev_w_unordered = format_loader.load_result(args.our_result)
@@ -242,18 +247,18 @@ if __name__ == '__main__':
 	print( "############################################" )
 	print( "Per-bone transformation Error: " )
 	if args.ssd_result is not None:
-		print( "ssd error: ", linalg.norm(gt_bones - ssd_bones) )
-	print( "rev error: ", linalg.norm(gt_bones - rev_bones) )
+		print( "ssd error: ", linalg.norm(gt_bones - ssd_bones)/gt_bones.size )
+	print( "rev error: ", linalg.norm(gt_bones - rev_bones)/gt_bones.size )
 	print( "############################################" )
 	print( "Weight Error: " )
 	if args.ssd_result is not None:
-		print( "ssd error: ", linalg.norm(gt_w - ssd_w) )
-	print( "rev error: ", linalg.norm(gt_w - rev_w) )
+		print( "ssd error: ", linalg.norm(gt_w - ssd_w)/gt_w.size )
+	print( "rev error: ", linalg.norm(gt_w - rev_w)/gt_w.size )
 	print( "############################################" )
 	print( "Reconstruction Mesh Error: " )
 	if args.ssd_result is not None:
-		print( "ssd error: ", linalg.norm(gt_vs - ssd_vs) )
-	print( "rev error: ", linalg.norm(gt_vs - rev_vs) )
+		print( "ssd error: ", linalg.norm(gt_vs - ssd_vs)/(diag*gt_vs.size) )
+	print( "rev error: ", linalg.norm(gt_vs - rev_vs)/(diag*gt_vs.size) )
 	print( "############################################" )
 	
 # 	import pdb; pdb.set_trace()
