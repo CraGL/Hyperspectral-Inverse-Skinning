@@ -77,9 +77,11 @@ def quadratic_for_z( W, V, vprime ):
 def solve_for_z( W, V, vprime, return_energy = False, use_pseudoinverse = True ):
     Q, L, C = quadratic_for_z( W, V, vprime )
     
-    sv = np.linalg.svd( Q, compute_uv = False )
-    smallest_singular_value = sv[-1]
-    #if sv[-1] < 1e-5:
+    # sv = np.linalg.svd( Q, compute_uv = False )
+    # smallest_singular_value = sv[-1]
+    smallest_singular_value = np.linalg.norm( Q, ord = -2 )
+    # print( smallest_singular_value - sv2 )
+    #if smallest_singular_value < 1e-5:
     #    print( "Vertex has small singular values:", sv )
     #    return ( None, 0.0 ) if return_energy else None
     
@@ -198,7 +200,7 @@ def linear_matrix_equation_for_W( V, vprime, z ):
     
     return A, B, Y
 
-def solve_for_W( As, Bs, Ys, use_pseudoinverse = True ):
+def solve_for_W( As, Bs, Ys, use_pseudoinverse = True, projection = None ):
     assert len( As ) == len( Bs )
     assert len( As ) == len( Ys )
     assert len( As ) > 0
@@ -240,7 +242,15 @@ def solve_for_W( As, Bs, Ys, use_pseudoinverse = True ):
     # W /= np.sqrt( columns_norm2 ).reshape( 1, -1 )
     
     ## We could normalize the difference from the average, but it's always large:
-    # print( "W column norm:", ( ( W - np.average( W, axis = 1 ).reshape(-1,1) )**2 ).sum(axis=0) )
+    print( "W column norm:", ( ( W - np.average( W, axis = 1 ).reshape(-1,1) )**2 ).sum(axis=0) )
+    ## Actually, it grows. Let's stop that.
+    if projection == 'normalize':
+        avg = np.average( W, axis = 1 ).reshape(-1,1)
+        B = W - avg
+        B /= np.sqrt( ( B*B ).sum( axis = 0 ) ).reshape(1,-1)
+        W = avg + B
+    elif projection is not None:
+        raise RuntimeError( "Unknown projection: " + repr(projection) )
     
     return W
 
