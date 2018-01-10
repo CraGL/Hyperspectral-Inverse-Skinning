@@ -12,14 +12,13 @@ import sys
 import argparse
 import time
 import numpy as np
-import scipy
+import scipy.optimize
 import glob
 import includes
 import format_loader
+import recover_poses
 
 from trimesh import TriMesh
-from space_mapper import SpaceMapper
-from PerVertex.Extract_Transformation_matrix_minimize_SVD_singular_value_allPoses import *
 
 def plot(gt_bones, ssd_bones, rev_bones):
 	########## visualize difference of recovered M and groundtruth M.
@@ -100,31 +99,6 @@ def plot(gt_bones, ssd_bones, rev_bones):
 	ani = matplotlib.animation.FuncAnimation(fig, update_graph, frames, interval=1000)
 
 	plt.show()
-	
-	
-def lbs_all(rest, bones, W):
-	'''
-	bones are a list of flattened row-major matrices
-	'''
-	assert( len(bones.shape) == 2 )
-	assert( len(W.shape) == 2 )
-	assert( bones.shape[0] == W.shape[1] )
-	assert( bones.shape[1] == 12 )
-	assert( W.shape[0] == rest.shape[0] )
-	assert( rest.shape[1] == 3 )
-	
-	per_vertex = np.dot(W, bones)
-	N = rest.shape[0]
-	result = np.zeros((N,3))
-	
-	for i in range(N):
-		tran = per_vertex[i].reshape(3,4)
-		p = rest[i]
-		result[i] = np.dot(tran[:, :3], p[:,np.newaxis]).squeeze() + tran[:, 3]
-	
-# 	import pdb; pdb.set_trace()
-	
-	return result
 	
 
 if __name__ == '__main__':
@@ -228,11 +202,11 @@ if __name__ == '__main__':
 	## Adjust bones data to Pose-by-bone-by-transformation
 	gt_bones = np.swapaxes(gt_bones, 0, 1) 
 	rev_bones = np.swapaxes(rev_bones, 0, 1)
-	rev_vs = np.array([lbs_all(rest_vs, rev_bones_per_pose, rev_w.T) for rev_bones_per_pose in rev_bones ])
+	rev_vs = np.array([recover_poses.lbs_all(rest_vs, rev_bones_per_pose, rev_w.T) for rev_bones_per_pose in rev_bones ])
 	ssd_vs = np.zeros(rev_vs.shape)
 	if args.ssd_result is not None:
 		ssd_bones = np.swapaxes(ssd_bones, 0, 1)
-		ssd_vs = np.array([lbs_all(rest_vs, ssd_bones_per_pose, ssd_w.T) for ssd_bones_per_pose in ssd_bones ])
+		ssd_vs = np.array([recover_poses.lbs_all(rest_vs, ssd_bones_per_pose, ssd_w.T) for ssd_bones_per_pose in ssd_bones ])
 	
 	if args.debug:
 		np.set_printoptions(threshold=np.nan)
@@ -247,18 +221,18 @@ if __name__ == '__main__':
 	print( "############################################" )
 	print( "Per-bone transformation Error: " )
 	if args.ssd_result is not None:
-		print( "ssd error: ", linalg.norm(gt_bones - ssd_bones)/gt_bones.size )
-	print( "rev error: ", linalg.norm(gt_bones - rev_bones)/gt_bones.size )
+		print( "ssd error: ", np.linalg.norm(gt_bones - ssd_bones)/gt_bones.size )
+	print( "rev error: ", np.linalg.norm(gt_bones - rev_bones)/gt_bones.size )
 	print( "############################################" )
 	print( "Weight Error: " )
 	if args.ssd_result is not None:
-		print( "ssd error: ", linalg.norm(gt_w - ssd_w)/gt_w.size )
-	print( "rev error: ", linalg.norm(gt_w - rev_w)/gt_w.size )
+		print( "ssd error: ", np.linalg.norm(gt_w - ssd_w)/gt_w.size )
+	print( "rev error: ", np.linalg.norm(gt_w - rev_w)/gt_w.size )
 	print( "############################################" )
 	print( "Reconstruction Mesh Error: " )
 	if args.ssd_result is not None:
-		print( "ssd error: ", linalg.norm(gt_vs - ssd_vs)/(diag*gt_vs.size) )
-	print( "rev error: ", linalg.norm(gt_vs - rev_vs)/(diag*gt_vs.size) )
+		print( "ssd error: ", np.linalg.norm(gt_vs - ssd_vs)/(diag*gt_vs.size) )
+	print( "rev error: ", np.linalg.norm(gt_vs - rev_vs)/(diag*gt_vs.size) )
 	print( "############################################" )
 	
 # 	import pdb; pdb.set_trace()
