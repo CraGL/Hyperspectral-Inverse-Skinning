@@ -139,13 +139,12 @@ def find_scale(Vertices):
     return scale
 
 
-def find_subspace_intersections( *args, **kwargs ):
+def find_subspace_intersections( rest_pose_name, other_poses_name, svd_threshold, transformation_threshold, version, method = None ):
+    
+    if method is None:
+        method = "vertex"
+    
     #### read obj file into mesh
-    rest_pose_name=args[0]
-    other_poses_name=args[1]
-    svd_threshold=args[2]
-    transformation_threshold=args[3]
-    version=args[4]
     
     mesh0=TriMesh.FromOBJ_FileName(rest_pose_name[0])
     mesh1_list=[]
@@ -189,7 +188,7 @@ def find_subspace_intersections( *args, **kwargs ):
             # errors.append(cost)
 
             #### solve directly
-            q,cost=solve_directly(V0, V1, "vertex", version)
+            q,cost=solve_directly(V0, V1, method, version)
 
             if q is not None:
                 q_space.append(q)
@@ -215,13 +214,14 @@ if __name__ == '__main__':
     parser.add_argument( '--svd_threshold', '-s', type=float, help='Threshold for determining a singular vertex neighborhood (flat).' )
     parser.add_argument( '--transformation_threshold', '-t', type=float, help='Threshold for determining whether the subspaces intersect.' )
     parser.add_argument( '--version', '-v', type=int, help='0 means basic least square linear solver. 1 means constrained least square' )
+    parser.add_argument( '--method', '-m', type=str, choices=["vertex","nullspace"], help='vertex: minimize transformed vertex error (default). nullspace: minimize distance to 3p-dimensional flats.' )
     parser.add_argument( '--out', '-o', type=str, help='Path to store the result (prints to stdout if not specified).' )
 
     args = parser.parse_args()
 
     print( "Generating transformations..." )
     start_time = time.time()
-    qs = find_subspace_intersections( args.rest_pose, args.other_poses, args.svd_threshold, args.transformation_threshold, args.version )
+    qs = find_subspace_intersections( args.rest_pose, args.other_poses, args.svd_threshold, args.transformation_threshold, args.version, method = args.method )
     print( "... Finished generating transformations." )
     print( "Finding subspace intersection duration (seconds): ", time.time()-start_time )
 

@@ -245,7 +245,15 @@ def solve_for_W( As, Bs, Ys, use_pseudoinverse = True, projection = None ):
     # import scipy.linalg
     # system_big = scipy.linalg.block_diag( *( [system]*(3*poses) ) )
     
-    if use_pseudoinverse:
+    if projection == 'constrain_magnitude':
+        assert not use_pseudoinverse
+        import cvxopt.solvers
+        n = system.shape[0]
+        bounds_system = cvxopt.matrix( np.vstack( [ np.eye(n)[:3*B.shape[0]], -np.eye(n)[:3*B.shape[0]] ] ) )
+        bounds_rhs = cvxopt.matrix( np.ones( ( 2*3*B.shape[0], 1 ) ) )
+        W = [ np.array( cvxopt.solvers.qp( cvxopt.matrix( system ), cvxopt.matrix( col.reshape(-1,1) ), bounds_system, bounds_rhs )['x'] ) for col in rhs.reshape( -1, n ) ]
+        W = np.hstack(W).T.reshape( 12*poses, B.shape[1] )
+    elif use_pseudoinverse:
         # W1 = np.dot( np.linalg.pinv(system_big), rhs.ravel() ).reshape( 12*poses, B.shape[1] )
         W = np.dot( np.linalg.pinv(system), rhs.reshape( -1, system.shape[0] ).T ).T.reshape( 12*poses, B.shape[1] )
         # print( "pinv block difference:", abs( W - W1 ).max() )
@@ -268,7 +276,7 @@ def solve_for_W( As, Bs, Ys, use_pseudoinverse = True, projection = None ):
         B = W - avg
         B /= np.sqrt( ( B*B ).sum( axis = 0 ) ).reshape(1,-1)
         W = avg + B
-    elif projection in ( 'regularize_translation', 'regularize_identity' ):
+    elif projection in ( 'regularize_translation', 'regularize_identity', 'constrain_magnitude' ):
         ## We handled this above.
         pass
     elif projection is not None:

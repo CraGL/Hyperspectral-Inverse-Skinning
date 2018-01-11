@@ -856,7 +856,7 @@ if __name__ == '__main__':
 	parser.add_argument('--output', '-O', type=str, default="", help='output path.')
 	parser.add_argument('--f-eps', type=float, help='Function change epsilon (biquadratic).')
 	parser.add_argument('--x-eps', type=float, help='Variable change epsilon (biquadratic).')
-	parser.add_argument('--W-projection', type=str, choices = ['normalize', 'regularize_translation', 'regularize_identity'], help='How to project W (biquadratic): normalize, regularize_translation, regularize_identity.')
+	parser.add_argument('--W-projection', type=str, choices = ['normalize', 'regularize_translation', 'regularize_identity', 'constrain_magnitude'], help='How to project W (biquadratic): normalize, regularize_translation, regularize_identity, constrain_magnitude.')
 	
 	args = parser.parse_args()
 	H = args.handles
