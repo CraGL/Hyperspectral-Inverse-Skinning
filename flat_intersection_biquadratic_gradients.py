@@ -223,6 +223,25 @@ def solve_for_W( As, Bs, Ys, use_pseudoinverse = True, projection = None ):
         # system += np.kron( A[1], B.T )
         rhs -= Y
     
+    if projection == 'regularize_translation':
+        ## Let's add a small weight penalizing non-zero values for the elements
+        ## of W corresponding to translations.
+        assert system.shape[0] == 4*B.shape[0]
+        reg = np.zeros( system.shape[0] )
+        reg[ 3*B.shape[0] : 4*B.shape[0] ] = 1e-3 # 1.0
+        system[ np.diag_indices_from(system) ] += reg
+    elif projection == 'regularize_identity':
+        ## Let's add a small weight penalizing non-zero values for the elements
+        ## of W corresponding to translations.
+        assert system.shape[0] == 4*B.shape[0]
+        w = 1e-3
+        reg = w*np.ones( system.shape[0] )
+        system[ np.diag_indices_from(system) ] += reg
+        assert rhs.shape[0] == 12*poses
+        assert rhs.shape[1] == B.shape[0]
+        identity = np.tile( w*np.eye(4)[:3].ravel(), poses ).reshape(-1,1)
+        rhs += identity
+    
     # import scipy.linalg
     # system_big = scipy.linalg.block_diag( *( [system]*(3*poses) ) )
     
@@ -249,6 +268,9 @@ def solve_for_W( As, Bs, Ys, use_pseudoinverse = True, projection = None ):
         B = W - avg
         B /= np.sqrt( ( B*B ).sum( axis = 0 ) ).reshape(1,-1)
         W = avg + B
+    elif projection in ( 'regularize_translation', 'regularize_identity' ):
+        ## We handled this above.
+        pass
     elif projection is not None:
         raise RuntimeError( "Unknown projection: " + repr(projection) )
     
