@@ -73,7 +73,8 @@ def solve(q0, V0, V1):
     return q, cost
 
 
-def solve_directly(V0, V1, method, version=0):
+def solve_directly(V0, V1, method, version=0, use_pseudoinverse = None):
+    if use_pseudoinverse is None: use_pseudoinverse = False
     pose_num=V0.shape[1]//4
     left=np.zeros((12*pose_num, 12*pose_num))
     right=np.zeros((12*pose_num))
@@ -118,13 +119,19 @@ def solve_directly(V0, V1, method, version=0):
             raise RuntimeError
     
     if version==0:
-        x=scipy.linalg.solve(left,right)
+        if use_pseudoinverse:
+            x=np.linalg.pinv(left).dot(right)
+        else:
+            x=scipy.linalg.solve(left,right)
     elif version==1:
         new_left=np.hstack((left, v_expand_center.T))
         temp=np.hstack((v_expand_center, np.zeros((3*pose_num, 3*pose_num))))
         new_left=np.vstack((new_left, temp))
         new_right=np.concatenate((right, v1_center))
-        x_full=scipy.linalg.solve(new_left,new_right)
+        if use_pseudoinverse:
+            x_full=np.linalg.pinv(new_left).dot(new_right)
+        else:
+            x_full=scipy.linalg.solve(new_left,new_right)
         x=x_full[:12*pose_num]
 
     return x, (x.T.dot(left).dot(x)-2*right.T.dot(x)+constant).squeeze()
@@ -139,7 +146,7 @@ def find_scale(Vertices):
     return scale
 
 
-def find_subspace_intersections( rest_pose_name, other_poses_name, svd_threshold, transformation_threshold, version, method = None ):
+def find_subspace_intersections( rest_pose_name, other_poses_name, svd_threshold, transformation_threshold, version, method = None, use_pseudoinverse = None ):
     
     if method is None:
         method = "vertex"
@@ -188,8 +195,9 @@ def find_subspace_intersections( rest_pose_name, other_poses_name, svd_threshold
             # errors.append(cost)
 
             #### solve directly
-            q,cost=solve_directly(V0, V1, method, version)
+            q,cost=solve_directly(V0, V1, method = method, version = version, use_pseudoinverse = use_pseudoinverse)
 
+            assert q is not None
             if q is not None:
                 q_space.append(q)
                 errors.append(np.sqrt(max(cost/(pose_num*scale*scale), 1e-30)))
@@ -215,13 +223,14 @@ if __name__ == '__main__':
     parser.add_argument( '--transformation_threshold', '-t', type=float, help='Threshold for determining whether the subspaces intersect.' )
     parser.add_argument( '--version', '-v', type=int, help='0 means basic least square linear solver. 1 means constrained least square' )
     parser.add_argument( '--method', '-m', type=str, choices=["vertex","nullspace"], help='vertex: minimize transformed vertex error (default). nullspace: minimize distance to 3p-dimensional flats.' )
+    parser.add_argument( '--pinv', type=bool, help='If True, use the pseudoinverse to solve the systems.' )
     parser.add_argument( '--out', '-o', type=str, help='Path to store the result (prints to stdout if not specified).' )
 
     args = parser.parse_args()
 
     print( "Generating transformations..." )
     start_time = time.time()
-    qs = find_subspace_intersections( args.rest_pose, args.other_poses, args.svd_threshold, args.transformation_threshold, args.version, method = args.method )
+    qs = find_subspace_intersections( args.rest_pose, args.other_poses, args.svd_threshold, args.transformation_threshold, args.version, method = args.method, use_pseudoinverse = args.pinv )
     print( "... Finished generating transformations." )
     print( "Finding subspace intersection duration (seconds): ", time.time()-start_time )
 
