@@ -176,6 +176,17 @@ def quadratic_for_E_data( vs, vprimes ):
     return Q, L, C
 
 def evaluate_E_data( QLC, T ):
+    '''
+    Given:
+        QLC: The return value of quadratic_for_E_data().
+        T: A 12p-by-#vertices matrix where each column is the transform for a neighbor of vertex i.
+    
+    Returns the energy.
+    '''
+    
+    assert len( T.shape ) == 2
+    assert T.shape[0] % 12 == 0
+    
     Q, L, C = QLC
     return np.dot( T.ravel(order='F'), Q.dot( T.ravel(order='F') ) ) + np.dot( L, T.ravel(order='F') ) + C
 
@@ -197,12 +208,14 @@ def quadratic_for_E_local( neighbors, ws, poses ):
     N = len( neighbors )
     
     ## Make room for the diagonal elements plus an element for everything in neighbors/ws.
-    ijs = np.zeros( ( 2, len(neighbors) + np.sum([ len(neighs) for neighs in neighbors ]) ), dtype=int )
+    ijs = np.zeros( ( 2, N + np.sum([ len(neighs) for neighs in neighbors ]) ), dtype=int )
     vals = np.zeros( ijs.shape[1] )
     
     count = 0
     for i, neigh_i in enumerate( neighbors ):
         assert len( neigh_i ) == len( ws[i] )
+        
+        assert i not in neigh_i
         
         ## The diagonal element is always -1
         ijs[ :, count ] = i
@@ -227,9 +240,29 @@ def quadratic_for_E_local( neighbors, ws, poses ):
     return Q
 
 def evaluate_E_local( Q, T ):
+    '''
+    Given:
+        Q: The return value of quadratic_for_E_local().
+        T: A 12p-by-#vertices matrix where each column is the transform for a neighbor of vertex i.
+    
+    Returns the energy.
+    '''
+    
+    assert len( T.shape ) == 2
+    assert T.shape[0] % 12 == 0
+    
     return np.dot( T.ravel(order='F'), Q.dot( T.ravel(order='F') ) )
 
 def solve_for_T( E_data_quadratic, E_local_quadratic, poses ):
+    '''
+    Given:
+        E_data_quadratic: The return value of quadratic_for_E_data().
+        E_local_quadratic: The return value of quadratic_for_E_local().
+        poses: The number of poses p
+    
+    Returns
+        T: A 12p-by-#vertices matrix where each column is the transform for a neighbor of vertex i.
+    '''
     
     import cvxopt, cvxopt.cholmod
     
@@ -252,10 +285,13 @@ def solve_for_T( E_data_quadratic, E_local_quadratic, poses ):
     ## Reshape so that the first 12p elements become the first column, etc.
     T = result.reshape( ( 12*poses, -1 ), order = 'F' )
     
+    assert len( T.shape ) == 2
+    assert T.shape[0] % 12 == 0
+    
     return T
 
 def generateRandomData( poses = None, num_vertices = None ):
-    # np.random.seed(0)
+    np.random.seed(0)
     
     vs = np.random.random( ( num_vertices, 3 ) )
     vprimes = np.random.random( ( num_vertices, 3*poses ) )
@@ -274,7 +310,7 @@ def generateRandomData( poses = None, num_vertices = None ):
 if __name__ == '__main__':
     np.set_printoptions( linewidth = 2000 )
     
-    vs, vprimes, Ts, neighbors, poses, num_vertices = generateRandomData( poses = 10, num_vertices = 100 )
+    vs, vprimes, Ts, neighbors, poses, num_vertices = generateRandomData( poses = 1, num_vertices = 4 )
     assert len( Ts ) == num_vertices
     
     E_data = quadratic_for_E_data( vs, vprimes )
@@ -295,6 +331,12 @@ if __name__ == '__main__':
         
         print( "=> E_total:", E_data_val + E_local_val )
         Ts = solve_for_T( E_data, E_local, poses ).T
+        
+        E_local_val = evaluate_E_local( E_local, Ts.T )
+        print( "(E_local next from Ts point of view:", E_local_val, ")" )
+        
+        E_data_val = evaluate_E_data( E_data, Ts.T )
+        print( "(E_data next from Ts point of view:", E_data_val, ")" )
         
         print( "Ts singular values:", np.linalg.svd( Ts, compute_uv = False ) )
     
