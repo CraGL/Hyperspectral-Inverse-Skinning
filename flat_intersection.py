@@ -622,7 +622,7 @@ def optimize_approximated_quadratic(P, H, row_mats, deformed_vs, x0, f_eps = Non
 	
 	return converged, x
 
-def optimize_biquadratic( P, H, row_mats, deformed_vs, x0, solve_for_rest_pose = False, f_eps = None, x_eps = None, max_iter = None, f_zero_threshold = None, strategy = None, W_projection = None ):
+def optimize_biquadratic( P, H, row_mats, deformed_vs, x0, solve_for_rest_pose = False, f_eps = None, x_eps = None, max_iter = None, f_zero_threshold = None, strategy = None, W_projection = None, z_strategy = None ):
 	'''
 	If solve_for_rest_pose is False (the default), returns ( converged, final x ).
 	If solve_for_rest_pose is True, returns ( converged, final x, and updated row_mats ).
@@ -681,7 +681,7 @@ def optimize_biquadratic( P, H, row_mats, deformed_vs, x0, solve_for_rest_pose =
 	if f_zero_threshold is None:
 		f_zero_threshold = 0.0
 	
-	print( "optimize_biquadratic() with strategy:", strategy, "f_eps:", f_eps, "x_eps:", x_eps, "max_iter:", max_iter, "f_zero_threshold:", f_zero_threshold, "W_projection:", W_projection )
+	print( "optimize_biquadratic() with strategy:", strategy, "f_eps:", f_eps, "x_eps:", x_eps, "max_iter:", max_iter, "f_zero_threshold:", f_zero_threshold, "W_projection:", W_projection, "z_strategy:", z_strategy )
 	
 	import flat_intersection_biquadratic_gradients as biquadratic
 	
@@ -720,7 +720,7 @@ def optimize_biquadratic( P, H, row_mats, deformed_vs, x0, solve_for_rest_pose =
 			vbar = row_mats[i]
 			
 			## 1
-			z, ssz, fi = biquadratic.solve_for_z( W_prev, vbar, vprime, return_energy = True, use_pseudoinverse = use_pseudoinverse )
+			z, ssz, fi = biquadratic.solve_for_z( W_prev, vbar, vprime, return_energy = True, use_pseudoinverse = use_pseudoinverse, strategy = z_strategy )
 			fis[i] = fi
 			
 			if 'ssv:skip' in strategy:
@@ -857,6 +857,7 @@ if __name__ == '__main__':
 	parser.add_argument('--f-eps', type=float, help='Function change epsilon (biquadratic).')
 	parser.add_argument('--x-eps', type=float, help='Variable change epsilon (biquadratic).')
 	parser.add_argument('--W-projection', type=str, choices = ['normalize', 'regularize_translation', 'regularize_identity', 'constrain_magnitude'], help='How to project W (biquadratic): normalize, regularize_translation, regularize_identity, constrain_magnitude.')
+	parser.add_argument('--z-strategy', type=str, choices = ['positive'], help='How to solve for z (biquadratic): positive.')
 	
 	args = parser.parse_args()
 	H = args.handles
@@ -991,22 +992,22 @@ if __name__ == '__main__':
 			converged, x = optimize_nullspace_directly(P, H, all_R_mats, deformed_vs, x, strategy = args.strategy)
 		elif args.energy == 'biquadratic':
 			if args.solve_for_rest_pose:
-				converged, x, new_all_R_mats = optimize_biquadratic( P, H, all_R_mats, deformed_vs, x0, strategy = args.strategy, solve_for_rest_pose = args.solve_for_rest_pose, f_eps = args.f_eps, x_eps = args.x_eps, W_projection = args.W_projection )
+				converged, x, new_all_R_mats = optimize_biquadratic( P, H, all_R_mats, deformed_vs, x0, strategy = args.strategy, solve_for_rest_pose = args.solve_for_rest_pose, f_eps = args.f_eps, x_eps = args.x_eps, W_projection = args.W_projection, z_strategy = args.z_strategy )
 			else:
-				converged, x = optimize_biquadratic( P, H, all_R_mats, deformed_vs, x0, strategy = args.strategy, f_eps = args.f_eps, x_eps = args.x_eps, W_projection = args.W_projection )
+				converged, x = optimize_biquadratic( P, H, all_R_mats, deformed_vs, x0, strategy = args.strategy, f_eps = args.f_eps, x_eps = args.x_eps, W_projection = args.W_projection, z_strategy = args.z_strategy )
 		elif args.energy == 'biquadratic+handles':
-			converged, x = optimize_biquadratic( P, H, all_R_mats, deformed_vs, x0, strategy = args.strategy, f_eps = args.f_eps, x_eps = args.x_eps, W_projection = args.W_projection )
+			converged, x = optimize_biquadratic( P, H, all_R_mats, deformed_vs, x0, strategy = args.strategy, f_eps = args.f_eps, x_eps = args.x_eps, W_projection = args.W_projection, z_strategy = args.z_strategy )
 			p, B = unpack( x, P )
 			B = B[:,:-1]
 			x = pack( p, B )
-			converged, x = optimize_biquadratic( P, H-1, all_R_mats, deformed_vs, x, strategy = args.strategy, f_eps = args.f_eps, x_eps = args.x_eps, W_projection = args.W_projection )
+			converged, x = optimize_biquadratic( P, H-1, all_R_mats, deformed_vs, x, strategy = args.strategy, f_eps = args.f_eps, x_eps = args.x_eps, W_projection = args.W_projection, z_strategy = args.z_strategy )
 		elif args.energy == 'biquadratic+B':
-			converged, x = optimize_biquadratic( P, H, all_R_mats, deformed_vs, x0, strategy = args.strategy, f_eps = args.f_eps, x_eps = args.x_eps, W_projection = args.W_projection )
+			converged, x = optimize_biquadratic( P, H, all_R_mats, deformed_vs, x0, strategy = args.strategy, f_eps = args.f_eps, x_eps = args.x_eps, W_projection = args.W_projection, z_strategy = args.z_strategy )
 			for i in range(10):
 				print( "Now trying B for one iteration." )
 				converged, x = optimize_nullspace_directly(P, H, all_R_mats, deformed_vs, x, max_iter = 1)
 				print( "Now biquadratic again." )
-				converged, x = optimize_biquadratic( P, H, all_R_mats, deformed_vs, x, strategy = args.strategy, f_eps = args.f_eps, x_eps = args.x_eps, W_projection = args.W_projection )
+				converged, x = optimize_biquadratic( P, H, all_R_mats, deformed_vs, x, strategy = args.strategy, f_eps = args.f_eps, x_eps = args.x_eps, W_projection = args.W_projection, z_strategy = args.z_strategy )
 		else:
 			raise RuntimeError( "Unknown energy parameter: " + str(parser.energy) )
 		

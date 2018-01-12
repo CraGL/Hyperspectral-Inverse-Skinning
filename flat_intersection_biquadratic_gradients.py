@@ -74,7 +74,7 @@ def quadratic_for_z( W, V, vprime ):
     
     return Q, L, C
 
-def solve_for_z( W, V, vprime, return_energy = False, use_pseudoinverse = True ):
+def solve_for_z( W, V, vprime, return_energy = False, use_pseudoinverse = True, strategy = None ):
     Q, L, C = quadratic_for_z( W, V, vprime )
     
     # sv = np.linalg.svd( Q, compute_uv = False )
@@ -99,7 +99,24 @@ def solve_for_z( W, V, vprime, return_energy = False, use_pseudoinverse = True )
     rhs = np.zeros( ( len(L) + 1 ) )
     rhs[:-1] = -0.5*L
     rhs[-1] = 1
-    if use_pseudoinverse:
+    
+    if strategy not in (None, 'positive'):
+        raise RuntimeError( "Unknown strategy: " + repr(strategy) )
+    
+    if strategy == 'positive':
+        assert not use_pseudoinverse
+        import cvxopt.solvers
+        bounds_system = cvxopt.matrix( -np.eye(len(L)) )
+        bounds_rhs = cvxopt.matrix( np.zeros( ( len(L), 1 ) ) )
+        eq_system = cvxopt.matrix( np.ones( ( 1, len(L) ) ) )
+        eq_rhs = cvxopt.matrix( np.ones( ( 1, 1 ) ) )
+        z = np.array( cvxopt.solvers.qp(
+            cvxopt.matrix( Q ), cvxopt.matrix( np.zeros( (len(L),1) ) ),
+            bounds_system, bounds_rhs, eq_system, eq_rhs,
+            options = {'show_progress': False}
+            )['x'] ).squeeze()
+        # print( 'z:', z )
+    elif use_pseudoinverse:
         z = np.dot( np.linalg.pinv(Qbig), rhs )[:-1]
     else:
         z = np.linalg.solve( Qbig, rhs )[:-1]
