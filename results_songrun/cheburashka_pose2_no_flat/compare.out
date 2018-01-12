@@ -8,6 +8,6 @@ ssd error:  0.000565804731135
 rev error:  0.000903991419754
 ############################################
 Reconstruction Mesh Error: 
-ssd error:  8.64795120153e-05
-rev error:  0.000201035088703
+ssd: max, mean and median per-vertex distance 0.0214067829977 0.00130548380108 0.000660873662708
+rev: max, mean and median per-vertex distance 0.0350247982235 0.00218848153487 0.00044750328947
 ############################################
