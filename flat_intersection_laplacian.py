@@ -235,7 +235,13 @@ def quadratic_for_E_local( neighbors, ws, poses ):
     L = scipy.sparse.coo_matrix( ( vals, ijs ), shape = ( N, N ) )
     LTL = L.T.dot(L)
     
-    Q = scipy.sparse.block_diag( [LTL]*(12*poses) )
+    ## UPDATE: This expansion, equivalent to ( I_12p kron LTL )
+    ## is designed for a column-major vectorization of Q.T.
+    ## That's a row-major vectorization of Q!
+    # Q = scipy.sparse.block_diag( [LTL]*(12*poses) )
+    ## To be compatible with our other term, which uses a column-major vectorization of Q,
+    ## we should use:
+    Q = scipy.sparse.kron( LTL, scipy.sparse.eye(12*poses) )
     
     return Q
 
@@ -253,7 +259,7 @@ def evaluate_E_local( Q, T ):
     
     return np.dot( T.ravel(order='F'), Q.dot( T.ravel(order='F') ) )
 
-def solve_for_T( E_data_quadratic, E_local_quadratic, poses ):
+def solve_for_T( E_data_quadratic, E_local_quadratic, poses, E_data_weight = 1.0, E_local_weight = 1.0 ):
     '''
     Given:
         E_data_quadratic: The return value of quadratic_for_E_data().
@@ -269,14 +275,17 @@ def solve_for_T( E_data_quadratic, E_local_quadratic, poses ):
     # system = E_data_quadratic[0].tocoo() + E_local_quadratic.tocoo()
     # system = cvxopt.spmatrix( system.data, np.asarray( system.row, dtype = int ), np.asarray( system.col, dtype = int ) )
     
-    rows = np.append( E_data_quadratic[0].row, E_local_quadratic.row )
-    cols = np.append( E_data_quadratic[0].col, E_local_quadratic.col )
-    vals = np.append( E_data_quadratic[0].data, E_local_quadratic.data )
+    E_data_quadratic_Q = E_data_quadratic[0].tocoo()
+    E_local_quadratic_Q = E_local_quadratic.tocoo()
+    
+    rows = np.append( E_data_quadratic_Q.row, E_local_quadratic_Q.row )
+    cols = np.append( E_data_quadratic_Q.col, E_local_quadratic_Q.col )
+    vals = np.append( E_data_quadratic_Q.data*E_data_weight, E_local_quadratic_Q.data*E_local_weight )
     system = cvxopt.spmatrix( vals, np.asarray( rows, dtype = int ), np.asarray( cols, dtype = int ) )
     
     # print( "solve_for_T() singular values:", np.linalg.svd( scipy.sparse.coo_matrix( ( vals, (rows, cols) ) ).todense(), compute_uv=False ) )
     
-    rhs = cvxopt.matrix( -0.5*E_data_quadratic[1] )
+    rhs = cvxopt.matrix( (-0.5*E_data_weight)*E_data_quadratic[1] )
     
     cvxopt.cholmod.linsolve( system, rhs )
     

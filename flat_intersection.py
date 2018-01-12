@@ -797,15 +797,19 @@ def optimize_biquadratic( P, H, row_mats, deformed_vs, x0, solve_for_rest_pose =
 	else:
 		return converged, pack_W( W )
 
-def optimize_laplacian( P, H, rest_mesh, deformed_vs, qs_data, f_eps = None, x_eps = None, max_iter = None, f_zero_threshold = None, z_strategy = None ):
+def optimize_laplacian( P, H, rest_mesh, deformed_vs, qs_data, qs_errors, qs_ssv, f_eps = None, x_eps = None, max_iter = None, f_zero_threshold = None, z_strategy = None ):
 	'''
 	Returns ( converged, final x ).
 	'''
 	
 	vs = np.asfarray( rest_mesh.vs )
 	## To make function values comparable, we need to normalize.
-	normalization = normalization_factor_from_xyzs( vs )
-	print( "Normalization:", normalization )
+	E_data_weight = 100.*normalization_factor_from_xyzs( vs )/P
+	E_local_weight = 1./(len(vs)*P)
+	E_input_weight = 1.0
+	print( "E_data_weight:", E_data_weight )
+	print( "E_local_weight:", E_local_weight )
+	print( "E_input_weight:", E_input_weight )
 	
 	if f_eps is None:
 		f_eps = 1e-6
@@ -817,7 +821,11 @@ def optimize_laplacian( P, H, rest_mesh, deformed_vs, qs_data, f_eps = None, x_e
 	if f_zero_threshold is None:
 		f_zero_threshold = 0.0
 	
-	print( "optimize_laplacian():", "f_eps:", f_eps, "x_eps:", x_eps, "max_iter:", max_iter, "f_zero_threshold:", f_zero_threshold, "z_strategy:", z_strategy )
+	strategy = None
+	if strategy is None:
+		strategy = 'lsq'
+	
+	print( "optimize_laplacian():", "strategy:", strategy, "f_eps:", f_eps, "x_eps:", x_eps, "max_iter:", max_iter, "f_zero_threshold:", f_zero_threshold, "z_strategy:", z_strategy )
 	
 	import flat_intersection_laplacian as laplacian
 	
@@ -833,6 +841,46 @@ def optimize_laplacian( P, H, rest_mesh, deformed_vs, qs_data, f_eps = None, x_e
 	neighbors = [ np.asarray( rest_mesh.vertex_vertex_neighbors(i) ) for i in range(num_vertices) ]
 	poses = P
 	
+	## We should have an initial guess transformation for each point.
+	assert len( qs_data ) == len( vs )
+	assert qs_data.shape[1]%12 == 0
+	## We should have error and smallest singular value information for the guesses.
+	assert len( qs_data ) == len( qs_errors )
+	assert len( qs_data ) == len( qs_ssv )
+	## Errors and ssv should be 1D arrays.
+	qs_errors = qs_errors.squeeze()
+	qs_ssv = qs_ssv.squeeze()
+	assert len( qs_errors.shape ) == 1
+	assert len( qs_ssv.shape ) == 1
+	## Errors should be positive
+	assert ( qs_errors > -1e-10 ).all()
+	## We assume that there is a large variation in error, so the median should be far from 0.
+	assert abs( np.median(qs_errors) ) > 1e-5
+	## Convert error into [0,1] lerp values (0 error is very confident so 0,
+	## median error is not confidence so 1).
+	lerpval = ( qs_errors/np.median(qs_errors) ).clip( 0.0, 1.0 )
+	## Small singular values mean no confidence, too.
+	lerpval[qs_ssv<1e-8] = 1.0
+	## Make lerpval a column matrix for broadcasting.
+	assert len( lerpval.shape ) == 1
+	lerpval = lerpval.reshape(-1,1)
+	
+	plot = False
+	if plot:
+		import matplotlib.pyplot as plt
+		from mpl_toolkits.mplot3d import axes3d
+		plt.ion()
+		fig = plt.figure()
+		ax = fig.add_subplot(1, 1, 1, axisbg="1.0")
+		ax = fig.gca(projection='3d')
+		from space_mapper import SpaceMapper
+		mapper = SpaceMapper.Uncorrellated_Space( qs_data, dimension = 3 )
+		
+		Ts3D = mapper.project( qs_data )
+		ax.scatter( Ts3D.T[0], Ts3D.T[1], Ts3D.T[2] )
+		plt.show()
+		plt.pause(2)
+	
 	f_prev = None
 	Ts = qs_data.copy()
 	Ts_prev = Ts.copy()
@@ -846,8 +894,8 @@ def optimize_laplacian( P, H, rest_mesh, deformed_vs, qs_data, f_eps = None, x_e
 		
 		print( "Starting iteration", iterations )
 		
-		## 1 Find some ws.
-		## 2 Find the optimal Ts.
+		## 1 Solve for ws.
+		## 2 Solve for Ts.
 		
 		## 1
 		ws_ssv_energy = [ laplacian.solve_for_w( Ts[i], Ts[ neighbors[i] ].T, return_energy = True ) for i in range( num_vertices ) ]
@@ -857,19 +905,57 @@ def optimize_laplacian( P, H, rest_mesh, deformed_vs, qs_data, f_eps = None, x_e
 		## 2
 		E_local = laplacian.quadratic_for_E_local( neighbors, ws, poses )
 		E_local_val = laplacian.evaluate_E_local( E_local, Ts.T )
-		print( "E_local from Ts point of view:", E_local_val )
+		print( "E_local from Ts point of view (before solving for Ts):", E_local_val )
 		
 		E_data_val = laplacian.evaluate_E_data( E_data, Ts.T )
-		print( "E_data from Ts point of view:", E_data_val )
+		print( "E_data from Ts point of view (before solving for Ts):", E_data_val )
 		
-		f = E_data_val + E_local_val
+		f = E_data_val * E_data_weight + E_local_val * E_local_weight
 		print( "=> E_total:", E_data_val + E_local_val )
-		Ts = laplacian.solve_for_T( E_data, E_local, poses ).T
+		print( "=> E_total (weighted):", f )
+		
+		## Solve for T
+		
+		if strategy is None:
+			Ts = laplacian.solve_for_T( E_data, E_local, poses, E_data_weight = E_data_weight, E_local_weight = E_local_weight ).T
+		elif strategy == 'lerp':
+			Ts = laplacian.solve_for_T( E_data, E_local, poses, E_data_weight = E_data_weight, E_local_weight = E_local_weight ).T
+			## Lerp from the previous Ts
+			Ts = Ts_prev + lerpval*(Ts - Ts_prev)
+		elif strategy == 'lsq':
+			Q_data, L_data, C_data = E_data
+			## This could be done in advance.
+			Q_data = ( Q_data + scipy.sparse.diags( [ E_input_weight*np.ones( len(Ts.ravel()) ) ], [0] ) )
+			## This could not.
+			L_data = L_data - (2*E_input_weight) * ((1.0-lerpval) * qs_data).T.ravel(order='F')
+			C_data = C_data + E_input_weight * np.dot( qs_data.ravel(order='F'), qs_data.ravel(order='F') )
+			
+			Ts = laplacian.solve_for_T( ( Q_data, L_data, C_data ), E_local, poses, E_data_weight = E_data_weight, E_local_weight = E_local_weight ).T
+		
+		## Plot
+		if plot:
+			Ts3D = mapper.project( Ts )
+			ax.scatter( Ts3D.T[0], Ts3D.T[1], Ts3D.T[2] )
+			plt.draw()
+			plt.pause(0.05)
+		
+		## Get the function value after solving.
+		E_local_val = laplacian.evaluate_E_local( E_local, Ts.T )
+		print( "E_local from Ts point of view (after solving for Ts):", E_local_val )
+		
+		E_data_val = laplacian.evaluate_E_data( E_data, Ts.T )
+		print( "E_data from Ts point of view (after solving for Ts):", E_data_val )
+		
+		f = E_data_val * E_data_weight + E_local_val * E_local_weight
+		print( "=> E_total (after solving for Ts):", E_data_val + E_local_val )
+		print( "=> E_total (weighted, after solving for Ts):", f )
+		
+		print( "Function value:", f )
+		
+		
+		
 		
 		print( "Ts singular values:", np.linalg.svd( Ts, compute_uv = False ) )
-		
-		f *= normalization
-		print( "Function value:", f )
 		
 		## If this is the first iteration, pretend that the old function value was
 		## out of termination range.
@@ -884,8 +970,11 @@ def optimize_laplacian( P, H, rest_mesh, deformed_vs, qs_data, f_eps = None, x_e
 		# x_change = abs( W_prev - W ).max()
 		## To make xtol approximately match scipy's default gradient tolerance (gtol) for BFGS,
 		## use norm() instead of the max change.
-		x_change = np.linalg.norm( Ts_prev - Ts )
-		print( "x change:", x_change )
+		x_change_norm = np.linalg.norm( Ts_prev - Ts )
+		x_change_max = abs( Ts_prev - Ts ).max()
+		print( "x change (norm):", x_change_norm )
+		print( "x change (max):", x_change_max )
+		x_change = x_change_max
 		if x_change < x_eps:
 			print( "Variables change too small, terminating:", x_change )
 			converged = True
@@ -904,6 +993,10 @@ def optimize_laplacian( P, H, rest_mesh, deformed_vs, qs_data, f_eps = None, x_e
 	pca = SpaceMapper.Uncorrellated_Space( Ts, dimension = H )
 	p = pca.Xavg_
 	B = pca.V_[:H-1].T
+	
+	if plot:
+		while True:
+			plt.pause(0.05)
 	
 	return converged, pack( p, B )
 
@@ -962,7 +1055,9 @@ if __name__ == '__main__':
 	parser.add_argument('--solve-for-rest-pose', type=bool, default=False, help='Whether to solve for the rest pose (only affects "biquadratic" energy (default: False).')
 	parser.add_argument('--error', type=bool, default=False, help='Whether to compute transformation error and vertex error compared with ground truth.')
 	parser.add_argument('--zero', type=bool, default=False, help='Given ground truth, zero test.')
-	parser.add_argument('--fancy-init', '-I', type=str, help='valid points generated from local subspace intersection.')
+	parser.add_argument('--fancy-init', '-I', type=str, help='Valid points generated from local subspace intersection.')
+	parser.add_argument('--fancy-init-errors', type=str, help='Errors for data generated from local subspace intersection.')
+	parser.add_argument('--fancy-init-ssv', type=str, help='Smallest singular values for data generated from local subspace intersection.')
 	parser.add_argument('--output', '-O', type=str, default="", help='output path.')
 	parser.add_argument('--f-eps', type=float, help='Function change epsilon (biquadratic).')
 	parser.add_argument('--x-eps', type=float, help='Variable change epsilon (biquadratic).')
@@ -1121,7 +1216,11 @@ if __name__ == '__main__':
 				print( "Now biquadratic again." )
 				converged, x = optimize_biquadratic( P, H, all_R_mats, deformed_vs, x, strategy = args.strategy, f_eps = args.f_eps, x_eps = args.x_eps, W_projection = args.W_projection, z_strategy = args.z_strategy )
 		elif args.energy == 'laplacian':
-			converged, x = optimize_laplacian( P, H, rest_mesh, deformed_vs, qs_data, f_eps = args.f_eps, x_eps = args.x_eps, z_strategy = args.z_strategy )
+			qs_errors = None
+			if args.fancy_init_errors is not None: qs_errors = np.loadtxt(args.fancy_init_errors)
+			qs_ssv = None
+			if args.fancy_init_ssv is not None: qs_ssv = np.loadtxt(args.fancy_init_ssv)
+			converged, x = optimize_laplacian( P, H, rest_mesh, deformed_vs, qs_data, qs_errors, qs_ssv, f_eps = args.f_eps, x_eps = args.x_eps, z_strategy = args.z_strategy )
 		else:
 			raise RuntimeError( "Unknown energy parameter: " + str(parser.energy) )
 		

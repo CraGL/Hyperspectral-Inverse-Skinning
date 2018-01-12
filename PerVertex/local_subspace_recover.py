@@ -146,7 +146,7 @@ def find_scale(Vertices):
     return scale
 
 
-def find_subspace_intersections( rest_pose_name, other_poses_name, svd_threshold, transformation_threshold, version, method = None, use_pseudoinverse = None ):
+def find_subspace_intersections( rest_pose_name, other_poses_name, version, method = None, use_pseudoinverse = None ):
     
     if method is None:
         method = "vertex"
@@ -170,6 +170,7 @@ def find_subspace_intersections( rest_pose_name, other_poses_name, svd_threshold
     scale=find_scale(vertices0[:,:3])
     q_space=[]
     errors=[]
+    smallest_singular_values=[]
 
     for i in range(len(vertices1)):
         indices = mesh0.vertex_vertex_neighbors(i)
@@ -185,8 +186,9 @@ def find_subspace_intersections( rest_pose_name, other_poses_name, svd_threshold
             V1=np.vstack((v1, v1_neighbor))
 
             s=compute_I_Projection_matrix(V0)
-            if s[-1] < svd_threshold:
-                continue
+            smallest_singular_values.append( s[-1] )
+            #if s[-1] < svd_threshold:
+            #    continue
 
             #### solve using optimization 
             # q0=np.random.random((12*pose_num,))
@@ -195,21 +197,25 @@ def find_subspace_intersections( rest_pose_name, other_poses_name, svd_threshold
             # errors.append(cost)
 
             #### solve directly
-            q,cost=solve_directly(V0, V1, method = method, version = version, use_pseudoinverse = use_pseudoinverse)
+            q,cost=solve_directly(V0, V1, method = method, version = version, use_pseudoinverse = use_pseudoinverse or s[-1] < 1e-10)
 
             assert q is not None
-            if q is not None:
-                q_space.append(q)
-                errors.append(np.sqrt(max(cost/(pose_num*scale*scale), 1e-30)))
+            # if q is not None:
+            q_space.append(q)
+            errors.append(np.sqrt(max(cost/(pose_num*scale*scale), 1e-30)))
 
 
     q_space=np.asarray(q_space)
     errors=np.asarray(errors)
+    smallest_singular_values=np.asarray(smallest_singular_values)
 
     # print (len(q_space))
     # print (max(errors))
     # print (len(q_space[errors<transformation_threshold]))
-    return q_space[errors<transformation_threshold]
+    # return q_space[errors<transformation_threshold]
+    # return q_space[np.logical_and( errors<args.transformation_threshold, smallest_singular_values>=args.svd_threshold )]
+    assert len( q_space ) == len( mesh0.vs )
+    return q_space, errors, smallest_singular_values
 
 
 
@@ -224,19 +230,41 @@ if __name__ == '__main__':
     parser.add_argument( '--version', '-v', type=int, help='0 means basic least square linear solver. 1 means constrained least square' )
     parser.add_argument( '--method', '-m', type=str, choices=["vertex","nullspace"], help='vertex: minimize transformed vertex error (default). nullspace: minimize distance to 3p-dimensional flats.' )
     parser.add_argument( '--pinv', type=bool, help='If True, use the pseudoinverse to solve the systems.' )
+    parser.add_argument( '--print-all', type=bool, help='If True, prints all transformations, all costs, and all smallest singular values. Ignored if --out is specified.' )
     parser.add_argument( '--out', '-o', type=str, help='Path to store the result (prints to stdout if not specified).' )
+    parser.add_argument( '--out-errors', type=str, help='Path to store the resulting cost.' )
+    parser.add_argument( '--out-ssv', type=str, help='Path to store the smallest singular values.' )
 
     args = parser.parse_args()
 
     print( "Generating transformations..." )
     start_time = time.time()
-    qs = find_subspace_intersections( args.rest_pose, args.other_poses, args.svd_threshold, args.transformation_threshold, args.version, method = args.method, use_pseudoinverse = args.pinv )
+    qs, errors, smallest_singular_values = find_subspace_intersections( args.rest_pose, args.other_poses, args.version, method = args.method, use_pseudoinverse = args.pinv )
     print( "... Finished generating transformations." )
     print( "Finding subspace intersection duration (seconds): ", time.time()-start_time )
 
     if args.out is None:
         np.set_printoptions( precision = 24, linewidth = 2000 )
-        print( repr( qs ) )
-    else:
+        if args.print_all:
+            print( "# qs" )
+            print( repr( qs ) )
+            print( "# transformation errors" )
+            print( repr( errors ) )
+            print( "# smallest_singular_values" )
+            print( repr( smallest_singular_values ) )
+        else:
+            print( repr( qs[np.logical_and( errors<args.transformation_threshold, smallest_singular_values>=args.svd_threshold )] ) )
+    elif args.print_all:
         np.savetxt( args.out, qs )
+        print( "Saved:", args.out )
+        
+        if args.out_errors is not None:
+            np.savetxt( args.out_errors, errors )
+            print( "Saved:", args.out_errors )
+        
+        if args.out_ssv is not None:
+            np.savetxt( args.out_ssv, smallest_singular_values )
+            print( "Saved:", args.out_ssv )
+    else:
+        np.savetxt( args.out, qs[np.logical_and( errors<args.transformation_threshold, smallest_singular_values>=args.svd_threshold )] )
         print( "Saved:", args.out )

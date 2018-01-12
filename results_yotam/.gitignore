@@ -6,5 +6,7 @@ compare.out
 flat_intersection.out
 local_subspace_recover.out
 local_subspace_recover.txt
+local_subspace_recover_errors.txt
+local_subspace_recover_ssv.txt
 result.txt
 simplex_hull.out
