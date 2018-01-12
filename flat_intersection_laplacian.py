@@ -68,12 +68,15 @@ def solve_for_w( t_i, T_js, return_energy = False, strategy = None ):
     Returns `w`, a #neighbors vector of weights (which sum to 1) for averaging the T_js.
     '''
     
+    assert len( t_i ) % 12 == 0
+    assert T_js.shape[0] == len( t_i )
+    
     Q, L, C = quadratic_for_w( t_i, T_js )
     
     use_pseudoinverse = False
     smallest_singular_value = np.linalg.norm( Q, ord = -2 )
     if smallest_singular_value < 1e-5:
-        print( "Vertex has small singular values (will use pseudoinverse):", np.linalg.svd( T_js, compute_uv = False ) )
+        print( "Vertex has small singular values (will use pseudoinverse):", np.linalg.svd( Q, compute_uv = False ) )
         # return ( None, 0.0 ) if return_energy else None
         use_pseudoinverse = True
     
@@ -246,9 +249,8 @@ def solve_for_T( E_data_quadratic, E_local_quadratic, poses ):
     
     result = np.array( rhs ).squeeze()
     
-    ## Reshape so that the first 12p elements become the first row, etc. Then transpose
-    ## to make those transformations the columns.
-    T = result.reshape( 12*poses, -1 ).T
+    ## Reshape so that the first 12p elements become the first column, etc.
+    T = result.reshape( ( 12*poses, -1 ), order = 'F' )
     
     return T
 
@@ -258,7 +260,7 @@ def generateRandomData( poses = None, num_vertices = None ):
     vs = np.random.random( ( num_vertices, 3 ) )
     vprimes = np.random.random( ( num_vertices, 3*poses ) )
     ## Some linearly changing data plus 0.1 * some noise.
-    Ts = ( np.outer( np.linspace( 0, 1, num_vertices ), np.random.random( 12*poses ) ) + 0.1*np.random.random( ( num_vertices, 12*poses ) ) ).T
+    Ts = ( np.outer( np.linspace( 0, 1, num_vertices ), np.random.random( 12*poses ) ) + 0.1*np.random.random( ( num_vertices, 12*poses ) ) )
     
     def shuffled( a ):
         a = np.array(a)
@@ -273,23 +275,26 @@ if __name__ == '__main__':
     np.set_printoptions( linewidth = 2000 )
     
     vs, vprimes, Ts, neighbors, poses, num_vertices = generateRandomData( poses = 10, num_vertices = 100 )
+    assert len( Ts ) == num_vertices
     
     E_data = quadratic_for_E_data( vs, vprimes )
     
     for i in range( 1000 ):
+        assert len( Ts ) == num_vertices
+        
         ws_ssv_energy = [ solve_for_w( Ts[i], Ts[ neighbors[i] ].T, return_energy = True ) for i in range( num_vertices ) ]
         ws = [ w for w, ssv, energy in ws_ssv_energy ]
         print( "E_local from ws point of view:", np.sum([ energy for w, ssv, energy in ws_ssv_energy ]) )
         
         E_local = quadratic_for_E_local( neighbors, ws, poses )
-        E_local_val = evaluate_E_local( E_local, Ts )
+        E_local_val = evaluate_E_local( E_local, Ts.T )
         print( "E_local from Ts point of view:", E_local_val )
         
-        E_data_val = evaluate_E_data( E_data, Ts )
+        E_data_val = evaluate_E_data( E_data, Ts.T )
         print( "E_data from Ts point of view:", E_data_val )
         
         print( "=> E_total:", E_data_val + E_local_val )
-        Ts = solve_for_T( E_data, E_local, poses )
+        Ts = solve_for_T( E_data, E_local, poses ).T
         
         print( "Ts singular values:", np.linalg.svd( Ts, compute_uv = False ) )
     

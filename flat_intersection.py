@@ -797,6 +797,116 @@ def optimize_biquadratic( P, H, row_mats, deformed_vs, x0, solve_for_rest_pose =
 	else:
 		return converged, pack_W( W )
 
+def optimize_laplacian( P, H, rest_mesh, deformed_vs, qs_data, f_eps = None, x_eps = None, max_iter = None, f_zero_threshold = None, z_strategy = None ):
+	'''
+	Returns ( converged, final x ).
+	'''
+	
+	vs = np.asfarray( rest_mesh.vs )
+	## To make function values comparable, we need to normalize.
+	normalization = normalization_factor_from_xyzs( vs )
+	print( "Normalization:", normalization )
+	
+	if f_eps is None:
+		f_eps = 1e-6
+	if x_eps is None:
+		## To make xtol approximately match scipy's default gradient tolerance (gtol) for BFGS.
+		x_eps = 1e-4
+	if max_iter is None:
+		max_iter = 9999
+	if f_zero_threshold is None:
+		f_zero_threshold = 0.0
+	
+	print( "optimize_laplacian():", "f_eps:", f_eps, "x_eps:", x_eps, "max_iter:", max_iter, "f_zero_threshold:", f_zero_threshold, "z_strategy:", z_strategy )
+	
+	import flat_intersection_laplacian as laplacian
+	
+	deformed_vs = deformed_vs.reshape(-1,3*P)
+	
+	assert len( vs ) == len( deformed_vs )
+	assert vs.shape[1] == 3
+	assert deformed_vs.shape[1] == 3*P
+	
+	## This never changes. Precompute it.
+	E_data = laplacian.quadratic_for_E_data( vs, deformed_vs )
+	num_vertices = len( vs )
+	neighbors = [ np.asarray( rest_mesh.vertex_vertex_neighbors(i) ) for i in range(num_vertices) ]
+	poses = P
+	
+	f_prev = None
+	Ts = qs_data.copy()
+	Ts_prev = Ts.copy()
+	iterations = 0
+	converged = False
+	while( True ):
+		iterations += 1
+		if iterations > max_iter:
+			print( "Terminating due to too many iterations: ", max_iter )
+			break
+		
+		print( "Starting iteration", iterations )
+		
+		## 1 Find some ws.
+		## 2 Find the optimal Ts.
+		
+		## 1
+		ws_ssv_energy = [ laplacian.solve_for_w( Ts[i], Ts[ neighbors[i] ].T, return_energy = True ) for i in range( num_vertices ) ]
+		ws = [ w for w, ssv, energy in ws_ssv_energy ]
+		print( "E_local from ws point of view:", np.sum([ energy for w, ssv, energy in ws_ssv_energy ]) )
+		
+		## 2
+		E_local = laplacian.quadratic_for_E_local( neighbors, ws, poses )
+		E_local_val = laplacian.evaluate_E_local( E_local, Ts.T )
+		print( "E_local from Ts point of view:", E_local_val )
+		
+		E_data_val = laplacian.evaluate_E_data( E_data, Ts.T )
+		print( "E_data from Ts point of view:", E_data_val )
+		
+		f = E_data_val + E_local_val
+		print( "=> E_total:", E_data_val + E_local_val )
+		Ts = laplacian.solve_for_T( E_data, E_local, poses ).T
+		
+		print( "Ts singular values:", np.linalg.svd( Ts, compute_uv = False ) )
+		
+		f *= normalization
+		print( "Function value:", f )
+		
+		## If this is the first iteration, pretend that the old function value was
+		## out of termination range.
+		if f_prev is None: f_prev = f + 100*f_eps
+		
+		if f - f_prev > 0:
+			print( "WARNING: Function value increased." )
+		if abs( f_prev - f ) < f_eps:
+			print( "Function change too small, terminating:", f_prev - f )
+			converged = True
+			break
+		# x_change = abs( W_prev - W ).max()
+		## To make xtol approximately match scipy's default gradient tolerance (gtol) for BFGS,
+		## use norm() instead of the max change.
+		x_change = np.linalg.norm( Ts_prev - Ts )
+		print( "x change:", x_change )
+		if x_change < x_eps:
+			print( "Variables change too small, terminating:", x_change )
+			converged = True
+			break
+		if f < f_zero_threshold:
+			print( "Function below zero threshold, terminating." )
+			converged = True
+			break
+		
+		f_prev = f
+		Ts_prev = Ts.copy()
+	
+	print( "Terminated after", iterations, "iterations." )
+	
+	from space_mapper import SpaceMapper
+	pca = SpaceMapper.Uncorrellated_Space( Ts, dimension = H )
+	p = pca.Xavg_
+	B = pca.V_[:H-1].T
+	
+	return converged, pack( p, B )
+
 def optimize(P, H, all_R_mats, deformed_vs, x0):
 	converged, x = optimize_approximated_quadratic(P, H, all_R_mats, deformed_vs, x0 )
 	converged, x = optimize_nullspace_directly(P, H, all_R_mats, deformed_vs, x )
@@ -848,7 +958,7 @@ if __name__ == '__main__':
 	parser.add_argument('--ground-truth', '-GT', type=str, help='Ground truth data path.')
 	parser.add_argument('--recovery', '-R', type=float, help='Recovery test epsilon (default no recovery test).')
 	parser.add_argument('--strategy', '-S', type=str, choices = ['function', 'gradient', 'hessian', 'mixed', 'grassmann', 'pinv', 'pinv+ssv:skip', 'pinv+ssv:weighted', 'ssv:skip', 'ssv:weighted'], help='Strategy: function, gradient (default), hessian, mixed, grassmann (for energy B only), pinv and ssv (for energy biquadratic only).')
-	parser.add_argument('--energy', '-E', type=str, default='B', choices = ['B', 'cayley', 'B+cayley', 'B+B', 'cayley+cayley', 'biquadratic', 'biquadratic+B', 'biquadratic+handles'], help='Energy: B (default), cayley, B+cayley, B+B, cayley+cayley, biquadratic, biquadratic+B, biquadratic+handles.')
+	parser.add_argument('--energy', '-E', type=str, default='B', choices = ['B', 'cayley', 'B+cayley', 'B+B', 'cayley+cayley', 'biquadratic', 'biquadratic+B', 'biquadratic+handles', 'laplacian'], help='Energy: B (default), cayley, B+cayley, B+B, cayley+cayley, biquadratic, biquadratic+B, biquadratic+handles, laplacian.')
 	parser.add_argument('--solve-for-rest-pose', type=bool, default=False, help='Whether to solve for the rest pose (only affects "biquadratic" energy (default: False).')
 	parser.add_argument('--error', type=bool, default=False, help='Whether to compute transformation error and vertex error compared with ground truth.')
 	parser.add_argument('--zero', type=bool, default=False, help='Given ground truth, zero test.')
@@ -923,6 +1033,8 @@ if __name__ == '__main__':
 		x0 = None
 		## 0 energy test
 		if zero_test:
+			## Make it a fancy load, too.
+			qs_data = gt_vertices
 
 			pt = gt_bones[0]
 			B = (gt_bones[1:] - pt).T
@@ -1008,6 +1120,8 @@ if __name__ == '__main__':
 				converged, x = optimize_nullspace_directly(P, H, all_R_mats, deformed_vs, x, max_iter = 1)
 				print( "Now biquadratic again." )
 				converged, x = optimize_biquadratic( P, H, all_R_mats, deformed_vs, x, strategy = args.strategy, f_eps = args.f_eps, x_eps = args.x_eps, W_projection = args.W_projection, z_strategy = args.z_strategy )
+		elif args.energy == 'laplacian':
+			converged, x = optimize_laplacian( P, H, rest_mesh, deformed_vs, qs_data, f_eps = args.f_eps, x_eps = args.x_eps, z_strategy = args.z_strategy )
 		else:
 			raise RuntimeError( "Unknown energy parameter: " + str(parser.energy) )
 		
