@@ -3,7 +3,7 @@ from recordclass import recordclass
 
 import numpy as np
 import glob
-import trimesh
+from trimesh import TriMesh
 
 '''
 Given a folder, serialize the pose meshes in folder into a txt file.
@@ -22,7 +22,7 @@ if __name__ == "__main__":
 	data_set = []
 	for path in mesh_paths:	
 		print(path)
-		vs = trimesh.FromOBJ_FileName(path).vs
+		vs = TriMesh.FromOBJ_FileName(path).vs
 		vs = np.array( vs ).flatten()
 		data_set.append( vs )
 		

@@ -149,55 +149,20 @@ if __name__ == '__main__':
 	
 	ssd_bones = np.zeros(rev_bones.shape)
 	ssd_w = np.zeros(rev_w.shape)
-		
-# 	for i, gt_vals in enumerate(gt_bones):
-# 		rev_dist = inf
-# 		rev_idx = -1
-# 	
-# 		for j in range(i, N):
-# 			if( np.linalg.norm( gt_vals - rev_bones_unordered[j] ) < rev_dist ):
-# 				rev_idx = j
-# 				rev_dist = np.linalg.norm( gt_vals - rev_bones_unordered[j] )
-# 		
-# 		rev_bones[i] = rev_bones_unordered[rev_idx]
-# 		rev_bones_unordered[rev_idx] = rev_bones_unordered[i]
-# 		
-# 		rev_w[i] = rev_w_unordered[rev_idx]
-# 		rev_w_unordered[rev_idx] = rev_w_unordered[i]
-# 				
-# 	if args.ssd_result is not None:
-# 		ssd_bones_unordered, ssd_w_unordered = format_loader.load_result(args.ssd_result)
-# 		assert( len(ssd_bones_unordered) == N )
-# 		ssd_w = ssd_w_unordered.copy()
-# 		ssd_bones = ssd_bones_unordered.copy()
-# 		
-# 		for i, gt_vals in enumerate(gt_bones):
-# 			ssd_dist = inf
-# 			ssd_idx = -1
-# 			for j in range(i, N):
-# 				if( np.linalg.norm( gt_vals - ssd_bones_unordered[j] ) < ssd_dist ):
-# 					ssd_idx = j
-# 					ssd_dist = np.linalg.norm( gt_vals - ssd_bones_unordered[j] )
-# 		
-# 			ssd_bones[i] = ssd_bones_unordered[ssd_idx]
-# 			ssd_bones_unordered[ssd_idx] = ssd_bones_unordered[i]
-# 		
-# 			ssd_w[i] = ssd_w_unordered[ssd_idx]
-# 			ssd_w_unordered[ssd_idx] = ssd_w_unordered[i]
 
-	B = gt_bones.shape[0]
-	rev_bones_match = np.zeros((B,B))
-	rev_bones_match=((gt_bones.reshape((B,1,-1))-rev_bones.reshape((1,B,-1)))**2).sum(-1)
-	row_ind, col_ind = scipy.optimize.linear_sum_assignment( rev_bones_match )
-	rev_bones = np.array([ rev_bones[i] for i in col_ind ])
-	rev_w = np.array([ rev_w[i] for i in col_ind ])
-	
-	if args.ssd_result is not None:
-		ssd_bones, ssd_w = format_loader.load_result(args.ssd_result)
-		ssd_bones_match=((gt_bones.reshape((B,1,-1))-ssd_bones.reshape((1,B,-1)))**2).sum(-1)
-		row_ind, col_ind = scipy.optimize.linear_sum_assignment( ssd_bones_match )
-		ssd_bones = np.array([ ssd_bones[i] for i in col_ind ])
-		ssd_w = np.array([ ssd_w[i] for i in col_ind ])
+# 	B = gt_bones.shape[0]
+# 	rev_bones_match = np.zeros((B,B))
+# 	rev_bones_match=((gt_bones.reshape((B,1,-1))-rev_bones.reshape((1,B,-1)))**2).sum(-1)
+# 	row_ind, col_ind = scipy.optimize.linear_sum_assignment( rev_bones_match )
+# 	rev_bones = np.array([ rev_bones[i] for i in col_ind ])
+# 	rev_w = np.array([ rev_w[i] for i in col_ind ])
+# 	
+# 	if args.ssd_result is not None:
+# 		ssd_bones, ssd_w = format_loader.load_result(args.ssd_result)
+# 		ssd_bones_match=((gt_bones.reshape((B,1,-1))-ssd_bones.reshape((1,B,-1)))**2).sum(-1)
+# 		row_ind, col_ind = scipy.optimize.linear_sum_assignment( ssd_bones_match )
+# 		ssd_bones = np.array([ ssd_bones[i] for i in col_ind ])
+# 		ssd_w = np.array([ ssd_w[i] for i in col_ind ])
 				
 	## Adjust bones data to Pose-by-bone-by-transformation
 	gt_bones = np.swapaxes(gt_bones, 0, 1) 
@@ -217,7 +182,7 @@ if __name__ == '__main__':
 		print( "weights N-by-B:" )
 		print( rev_w.T )
 	
-			
+	N = len( rest_vs )		
 	print( "############################################" )
 	print( "Per-bone transformation Error: " )
 	if args.ssd_result is not None:
@@ -231,8 +196,8 @@ if __name__ == '__main__':
 	print( "############################################" )
 	print( "Reconstruction Mesh Error: " )
 	if args.ssd_result is not None:
-		print( "ssd error: ", np.linalg.norm(gt_vs - ssd_vs)/(diag*gt_vs.size) )
-	print( "rev error: ", np.linalg.norm(gt_vs - rev_vs)/(diag*gt_vs.size) )
+		print( "ssd error: ", np.linalg.norm(gt_vs - ssd_vs)/(diag*N) )
+	print( "rev error: ", np.linalg.norm(gt_vs - rev_vs)/(diag*N) )
 	print( "############################################" )
 	
 # 	import pdb; pdb.set_trace()
