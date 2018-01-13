@@ -806,7 +806,7 @@ def optimize_laplacian( P, H, rest_mesh, deformed_vs, qs_data, qs_errors, qs_ssv
 	## To make function values comparable, we need to normalize.
 	E_data_weight = 100.*normalization_factor_from_xyzs( vs )/P
 	E_local_weight = 1./(len(vs)*P)
-	E_input_weight = 1.0
+	E_input_weight = 1.0 ## See strategy = 'lsq' below.
 	print( "E_data_weight:", E_data_weight )
 	print( "E_local_weight:", E_local_weight )
 	print( "E_input_weight:", E_input_weight )
@@ -821,9 +821,11 @@ def optimize_laplacian( P, H, rest_mesh, deformed_vs, qs_data, qs_errors, qs_ssv
 	if f_zero_threshold is None:
 		f_zero_threshold = 0.0
 	
+	graph_laplacian = True
+	
 	strategy = None
-	if strategy is None:
-		strategy = 'lsq'
+	# strategy = 'lsq'
+	# strategy = 'lerp'
 	
 	print( "optimize_laplacian():", "strategy:", strategy, "f_eps:", f_eps, "x_eps:", x_eps, "max_iter:", max_iter, "f_zero_threshold:", f_zero_threshold, "z_strategy:", z_strategy )
 	
@@ -898,9 +900,12 @@ def optimize_laplacian( P, H, rest_mesh, deformed_vs, qs_data, qs_errors, qs_ssv
 		## 2 Solve for Ts.
 		
 		## 1
-		ws_ssv_energy = [ laplacian.solve_for_w( Ts[i], Ts[ neighbors[i] ].T, return_energy = True ) for i in range( num_vertices ) ]
-		ws = [ w for w, ssv, energy in ws_ssv_energy ]
-		print( "E_local from ws point of view:", np.sum([ energy for w, ssv, energy in ws_ssv_energy ]) )
+		if graph_laplacian:
+			ws = [ 1./np.ones(len(neighs)) for neighs in neighbors ]
+		else:
+			ws_ssv_energy = [ laplacian.solve_for_w( Ts[i], Ts[ neighbors[i] ].T, return_energy = True ) for i in range( num_vertices ) ]
+			ws = [ w for w, ssv, energy in ws_ssv_energy ]
+			print( "E_local from ws point of view:", np.sum([ energy for w, ssv, energy in ws_ssv_energy ]) )
 		
 		## 2
 		E_local = laplacian.quadratic_for_E_local( neighbors, ws, poses )
@@ -925,10 +930,14 @@ def optimize_laplacian( P, H, rest_mesh, deformed_vs, qs_data, qs_errors, qs_ssv
 		elif strategy == 'lsq':
 			Q_data, L_data, C_data = E_data
 			## This could be done in advance.
-			Q_data = ( Q_data + scipy.sparse.diags( [ E_input_weight*np.ones( len(Ts.ravel()) ) ], [0] ) )
+			# Q_data = ( Q_data + scipy.sparse.diags( [ E_input_weight*(np.outer((1.0-lerpval),np.ones(12*P)).ravel(order='C')) ], [0] ) )
+			Q_data = scipy.sparse.diags( [ E_input_weight*(np.outer((1.0-lerpval),np.ones(12*P)).ravel(order='C')) ], [0] )
 			## This could not.
-			L_data = L_data - (2*E_input_weight) * ((1.0-lerpval) * qs_data).T.ravel(order='F')
-			C_data = C_data + E_input_weight * np.dot( qs_data.ravel(order='F'), qs_data.ravel(order='F') )
+			# L_data = L_data - (2*E_input_weight) * ((1.0-lerpval) * qs_data).T.ravel(order='F')
+			## This could.
+			L_data = - (2*E_input_weight) * ((1.0-lerpval) * qs_data).T.ravel(order='F')
+			# C_data = C_data + E_input_weight * np.dot( qs_data.ravel(order='F'), qs_data.ravel(order='F') )
+			C_data = E_input_weight * np.dot( qs_data.ravel(order='F'), qs_data.ravel(order='F') )
 			
 			Ts = laplacian.solve_for_T( ( Q_data, L_data, C_data ), E_local, poses, E_data_weight = E_data_weight, E_local_weight = E_local_weight ).T
 		
