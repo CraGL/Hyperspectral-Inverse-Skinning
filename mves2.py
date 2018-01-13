@@ -312,7 +312,7 @@ def MVES( pts, initial_guess_vertices = None, linear_solver = None ):
 	solvers = ["IPOPT", "CVXOPT_IP", "SCIPY", "BINARY", "CVXOPT_QP"]
 	used_solver = "CVXOPT_IP"
 	iter_num = 0
-	MAX_ITER = 20
+	MAX_ITER = 1000
 
 	## Solve.
 	solution = numpy.linalg.inv( unpack( x0 ) )

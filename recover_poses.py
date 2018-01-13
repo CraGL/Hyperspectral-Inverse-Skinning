@@ -49,6 +49,17 @@ def lbs_all(rest, bones, W, scale=None):
 		
 	return result
 
+def match_data( gt_data, target ):
+	assert( gt_data.shape == target.shape )
+	
+	ordering = []
+	N = gt_data.shape[0]
+	match_board=((gt_data.reshape((N,1,-1))-target.reshape((1,N,-1)))**2).sum(-1)
+			
+	row_ind, col_ind = scipy.optimize.linear_sum_assignment( match_board )
+		
+	return col_ind
+
 if __name__ == '__main__':
 	
 	parser = argparse.ArgumentParser( description='Compare our results and SSD approch results with ground truth.' )
@@ -89,6 +100,10 @@ if __name__ == '__main__':
 	N = len(rest_vs)
 	P = len( gt_vs )
 	
+	ordering = match_data( gt_vs, rev_vs )
+	print( "match order of our recovery: ", ordering )
+	rev_vs = np.array([ rev_vs[i] for i in ordering ])
+	
 	for i, vs in enumerate(rev_vs):
 		output_path = os.path.join(our_folder, gt_names[i])
 		format_loader.write_OBJ( output_path, vs.round(6), rest_fs )
@@ -112,6 +127,10 @@ if __name__ == '__main__':
 		ssd_bones, ssd_w = format_loader.load_result(args.ssd_result)
 		ssd_bones = np.swapaxes(ssd_bones, 0, 1)
 		ssd_vs = np.array([lbs_all(rest_vs, ssd_bones_per_pose, ssd_w.T) for ssd_bones_per_pose in ssd_bones ])
+		
+		ordering = match_data( gt_vs, ssd_vs )
+		print( "match order of ssd recovery: ", ordering )
+		ssd_vs = np.array([ ssd_vs[i] for i in ordering ])
 		
 		# print( "ssd error: ", np.linalg.norm(gt_vs - ssd_vs)/(diag*N) )
 		ssd_error = compute_error(gt_vs, ssd_vs)/diag
