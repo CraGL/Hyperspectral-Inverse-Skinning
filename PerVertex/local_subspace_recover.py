@@ -84,10 +84,12 @@ def solve_directly(V0, V1, method, version=0, use_pseudoinverse = None):
     for i in range(len(V0)):
         v0=V0[i]
         v1=V1[i]
+        
         v0_expand=np.zeros((3*pose_num,12*pose_num))
         for j in range(pose_num):
             for k in range(3):
                 v0_expand[j*3+k, (j*3+k)*4:(j*3+k)*4+4]=v0[4*j:4*j+4]
+        
         if i==0:
             v_expand_center=v0_expand.copy()
             v1_center=v1.copy()
@@ -135,8 +137,51 @@ def solve_directly(V0, V1, method, version=0, use_pseudoinverse = None):
         x=x_full[:12*pose_num]
 
     return x, (x.T.dot(left).dot(x)-2*right.T.dot(x)+constant).squeeze()
-    
 
+def solve_directly_vertex(V0, V1, version=0, use_pseudoinverse = None):
+    if use_pseudoinverse is None: use_pseudoinverse = False
+    pose_num=V0.shape[1]//4
+    ## left is block diagonal with the same block along the diagonal. Just store the block.
+    left=np.zeros((4,4))
+    right=np.zeros((4,3*pose_num))
+    constant=0.0
+    v0_center=V0[0,:4].reshape(-1,1)
+    v1_center=V1[0].copy().reshape(-1,1)
+    for i in range(len(V0)):
+        v0=V0[i,:4].reshape(-1,1)
+        v1=V1[i].reshape(-1,1)
+        
+        ##### version 2
+        left     += v0.dot( v0.T )
+        right    += v0.dot( v1.T )
+        constant += v1.T.dot(v1).squeeze()
+    
+    ssv = np.linalg.norm( left, ord = -2 )
+    if ssv < 1e-10: use_pseudoinverse = True
+    
+    if version==0:
+        if use_pseudoinverse:
+            ## Reshape the right-hand-side in column-major order (F).
+            x=np.linalg.pinv(left).dot( right ).ravel( order='F' )
+        else:
+            ## Reshape the right-hand-side in column-major order (F).
+            x=scipy.linalg.solve( left, right ).ravel( order='F' )
+    elif version==1:
+        new_left = np.zeros( ( 5,5 ) )
+        new_left[:4,:4] = left
+        new_left[:-1,-1] = v0_center.T.squeeze()
+        new_left[-1,:-1] = v0_center.squeeze()
+        new_right = np.vstack( ( right, v1_center.reshape( (1,-1) ) ) )
+        if use_pseudoinverse:
+            x_full=np.linalg.pinv(new_left).dot(new_right)
+        else:
+            x_full=scipy.linalg.solve(new_left,new_right)
+        ## Reshape the right-hand-side in column-major order (F).
+        x=x_full[:-1].ravel( order='F' )
+
+    y = x.reshape( (4,-1), order='F' )
+    cost = (y*left.dot(y)).sum()-2*(right*y).sum()+constant
+    return x, cost, ssv
 
 def find_scale(Vertices):
     Dmin=Vertices.min(axis=0)
@@ -176,33 +221,32 @@ def find_subspace_intersections( rest_pose_name, other_poses_name, version, meth
         indices = mesh0.vertex_vertex_neighbors(i)
         indices=np.asarray(indices)
         
-        if len(indices)>=3:
-            v0=vertices0[i].reshape((1,-1))
-            v0_neighbor=vertices0[indices,:]
-            v1=vertices1[i].reshape((1,-1))
-            v1_neighbor=vertices1[indices,:]
-            
-            V0=np.vstack((v0, v0_neighbor))
-            V1=np.vstack((v1, v1_neighbor))
+        ## We want everything, we'll use the pseudoinverse.
+        # if len(indices)>=3:
+        v0=vertices0[i].reshape((1,-1))
+        v0_neighbor=vertices0[indices,:]
+        v1=vertices1[i].reshape((1,-1))
+        v1_neighbor=vertices1[indices,:]
+        
+        V0=np.vstack((v0, v0_neighbor))
+        V1=np.vstack((v1, v1_neighbor))
 
+        #### solve directly
+        if method == 'vertex':
+            q,cost,ssv=solve_directly_vertex(V0, V1, version = version, use_pseudoinverse = use_pseudoinverse)
+            smallest_singular_values.append( ssv )
+        else:
             s=compute_I_Projection_matrix(V0)
             smallest_singular_values.append( s[-1] )
             #if s[-1] < svd_threshold:
             #    continue
-
-            #### solve using optimization 
-            # q0=np.random.random((12*pose_num,))
-            # q,cost=solve(q0, V0, V1)
-            # q_space.append(q)
-            # errors.append(cost)
-
-            #### solve directly
+            
             q,cost=solve_directly(V0, V1, method = method, version = version, use_pseudoinverse = use_pseudoinverse or s[-1] < 1e-10)
 
-            assert q is not None
-            # if q is not None:
-            q_space.append(q)
-            errors.append(np.sqrt(max(cost/(pose_num*scale*scale), 1e-30)))
+        assert q is not None
+        # if q is not None:
+        q_space.append(q)
+        errors.append(np.sqrt(max(cost/(pose_num*scale*scale), 1e-30)))
 
 
     q_space=np.asarray(q_space)
