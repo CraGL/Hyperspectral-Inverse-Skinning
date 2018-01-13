@@ -15,12 +15,14 @@ import numpy as np
 import scipy
 import glob
 import format_loader
+import scipy.optimize
 
 from trimesh import TriMesh
 	
-def lbs_all(rest, bones, W):
+def lbs_all(rest, bones, W, scale=None):
 	'''
 	bones are a list of flattened row-major matrices
+	scale has shape of B-by-3
 	'''
 	assert( len(bones.shape) == 2 )
 	assert( len(W.shape) == 2 )
@@ -28,6 +30,11 @@ def lbs_all(rest, bones, W):
 	assert( bones.shape[1] == 12 )
 	assert( W.shape[0] == rest.shape[0] )
 	assert( rest.shape[1] == 3 )
+	
+	if scale is not None:
+		assert( len(scale.shape) == 2)
+		assert( scale.shape[0] == bones.shape[0] )
+		assert( scale.shape[1] == 3 )
 	
 	per_vertex = np.dot(W, bones)
 	N = rest.shape[0]
@@ -37,9 +44,10 @@ def lbs_all(rest, bones, W):
 		tran = per_vertex[i].reshape(3,4)
 		p = rest[i]
 		result[i] = np.dot(tran[:, :3], p[:,np.newaxis]).squeeze() + tran[:, 3]
+		if scale is not None:
+			pass
 		
 	return result
-	
 
 if __name__ == '__main__':
 	
@@ -62,33 +70,63 @@ if __name__ == '__main__':
 	rev_bones = np.swapaxes(rev_bones, 0, 1)
 	rev_vs = np.array([lbs_all(rest_vs, rev_bones_per_pose, rev_w.T) for rev_bones_per_pose in rev_bones ])	
 	
-	output_folder = os.path.split(args.result)[0] + "/our_recovered"		
+	output_folder = os.path.split(args.result)[0]		
 	if args.output is not None:
 		output_folder = args.output
-	
-	if not os.path.exists(output_folder):
-		os.makedirs(output_folder)
 		
-	for i, vs in enumerate(rev_vs):
-		output_path = os.path.join(output_folder, str(i+1) + ".obj")
-		format_loader.write_OBJ( output_path, vs.round(6), rest_fs )
+	our_folder = output_folder + "/our_recovered"
+	if not os.path.exists(our_folder):
+		os.makedirs(our_folder)
 	
 	gt_mesh_paths = glob.glob(args.pose_folder + "/*.obj")
 	gt_mesh_paths.sort()
 	gt_vs = np.array([ TriMesh.FromOBJ_FileName(mesh_path).vs for mesh_path in gt_mesh_paths ])
+	gt_names = [os.path.basename(mesh_path) for mesh_path in gt_mesh_paths]
 	
 	## diagonal
 	diag = rest_vs.max( axis = 0 ) - rest_vs.min( axis = 0 )
 	diag = np.linalg.norm(diag)
+	N = len(rest_vs)
+	P = len( gt_vs )
+	
+	for i, vs in enumerate(rev_vs):
+		output_path = os.path.join(our_folder, gt_names[i])
+		format_loader.write_OBJ( output_path, vs.round(6), rest_fs )
+		
+	def compute_error( gt, data ):
+		error = []
+		for pose_gt, pose_data in zip(gt, data):
+			error.append( np.array([np.linalg.norm(pt_gt - pt_data) for pt_gt, pt_data in zip(pose_gt, pose_data)]) )
+			
+		return np.array(error)
 		
 	print( "############################################" )
 	print( "Reconstruction Mesh Error: " )
-	print( "rev error: ", np.linalg.norm(gt_vs - rev_vs)/(diag*gt_vs.size) )
+	# print( "rev error: ", np.linalg.norm(gt_vs - rev_vs)/(diag*N) )
+	rev_error = compute_error(gt_vs, rev_vs)/diag
+	print( "rev: max, mean and median per-vertex distance", np.max(rev_error), np.mean(rev_error), np.median(rev_error) )
+	print( "rev per pose max, mean and median error:")
+	for i in range( len(rev_error) ):
+		print( gt_names[i], np.max(rev_error[i]), np.mean(rev_error[i]), np.median(rev_error[i]) )
 	if args.ssd_result is not None:
 		ssd_bones, ssd_w = format_loader.load_result(args.ssd_result)
 		ssd_bones = np.swapaxes(ssd_bones, 0, 1)
 		ssd_vs = np.array([lbs_all(rest_vs, ssd_bones_per_pose, ssd_w.T) for ssd_bones_per_pose in ssd_bones ])
-		print( "ssd error: ", np.linalg.norm(gt_vs - ssd_vs)/(diag*gt_vs.size) )
+		
+		# print( "ssd error: ", np.linalg.norm(gt_vs - ssd_vs)/(diag*N) )
+		ssd_error = compute_error(gt_vs, ssd_vs)/diag
+		print( "ssd: max, mean and median per-vertex distance", np.max(ssd_error), np.mean(ssd_error), np.median(ssd_error) )
+		print( "ssd per pose max, mean and median error:")
+		for i in range( len(ssd_error) ):
+			print( gt_names[i], np.max(ssd_error[i]), np.mean(ssd_error[i]), np.median(ssd_error[i]) )
+
+		ssd_folder = output_folder + "/ssd_recovered"
+		if not os.path.exists(ssd_folder):
+			os.makedirs(ssd_folder)
+		
+		for i, vs in enumerate(ssd_vs):
+			output_path = os.path.join(ssd_folder, gt_names[i])
+			format_loader.write_OBJ( output_path, vs.round(6), rest_fs )
 	print( "############################################" )
 
 
