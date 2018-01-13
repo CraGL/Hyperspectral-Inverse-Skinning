@@ -689,106 +689,110 @@ def optimize_biquadratic( P, H, row_mats, deformed_vs, x0, solve_for_rest_pose =
 	W_prev = unpack_W( x0.copy(), P )
 	iterations = 0
 	converged = False
-	while( True ):
-		iterations += 1
-		if iterations > max_iter:
-			print( "Terminating due to too many iterations: ", max_iter )
-			break
-		
-		print( "Starting iteration", iterations )
-		
-		## 1 Find the optimal z.
-		## (optional) 2 Solve for the new V.
-		## 3 Accumulate the linear matrix equation for W.
-		## 4 Solve for the new W.
-		
-		f = 0
-		weights = 0
-		
-		fis = np.zeros( len( deformed_vs ) )
-		As = []
-		Bs = []
-		Ys = []
-		
-		## If we are solving for the rest pose, make a copy of row_mats, because
-		## we will modify it.
-		if solve_for_rest_pose:
-			row_mats = row_mats.copy()
-		
-		for i, vs in enumerate(deformed_vs):
-			vprime = vs.reshape((3*P,1))
-			vbar = row_mats[i]
+	try:
+		while( True ):
+			iterations += 1
+			if iterations > max_iter:
+				print( "Terminating due to too many iterations: ", max_iter )
+				break
 			
-			## 1
-			z, ssz, fi = biquadratic.solve_for_z( W_prev, vbar, vprime, return_energy = True, use_pseudoinverse = use_pseudoinverse, strategy = z_strategy )
-			fis[i] = fi
+			print( "Starting iteration", iterations )
 			
-			if 'ssv:skip' in strategy:
-				if ssz < 1e-5:
-					print( "Skipping vertex with small singular value this time" )
-					continue
+			## 1 Find the optimal z.
+			## (optional) 2 Solve for the new V.
+			## 3 Accumulate the linear matrix equation for W.
+			## 4 Solve for the new W.
+			
+			f = 0
+			weights = 0
+			
+			fis = np.zeros( len( deformed_vs ) )
+			As = []
+			Bs = []
+			Ys = []
+			
+			## If we are solving for the rest pose, make a copy of row_mats, because
+			## we will modify it.
+			if solve_for_rest_pose:
+				row_mats = row_mats.copy()
+			
+			for i, vs in enumerate(deformed_vs):
+				vprime = vs.reshape((3*P,1))
+				vbar = row_mats[i]
+				
+				## 1
+				z, ssz, fi = biquadratic.solve_for_z( W_prev, vbar, vprime, return_energy = True, use_pseudoinverse = use_pseudoinverse, strategy = z_strategy )
+				fis[i] = fi
+				
+				if 'ssv:skip' in strategy:
+					if ssz < 1e-5:
+						print( "Skipping vertex with small singular value this time" )
+						continue
+					else:
+						ssz = 1.0
+				elif 'ssv:weighted' in strategy:
+					pass
 				else:
 					ssz = 1.0
-			elif 'ssv:weighted' in strategy:
-				pass
-			else:
-				ssz = 1.0
-			
-			## 2
-			if solve_for_rest_pose:
-				Q,L,C = biquadratic.quadratic_for_V( W_prev, z, vprime )
-				v = vbar[:3,0]
-				old_fi = np.dot( np.dot( v, Q ), v ) + np.dot( L, v ) + C
 				
-				vbar, fi = biquadratic.solve_for_V( W_prev, z, vprime, return_energy = True, use_pseudoinverse = use_pseudoinverse )
-				## Store the new vbar.
-				row_mats[i] = vbar
-				fis[i] = fi
+				## 2
+				if solve_for_rest_pose:
+					Q,L,C = biquadratic.quadratic_for_V( W_prev, z, vprime )
+					v = vbar[:3,0]
+					old_fi = np.dot( np.dot( v, Q ), v ) + np.dot( L, v ) + C
+					
+					vbar, fi = biquadratic.solve_for_V( W_prev, z, vprime, return_energy = True, use_pseudoinverse = use_pseudoinverse )
+					## Store the new vbar.
+					row_mats[i] = vbar
+					fis[i] = fi
+				
+				## 3
+				A, B, Y = biquadratic.linear_matrix_equation_for_W( vbar, vprime, z )
+				As.append( ssz*A )
+				Bs.append( B )
+				Ys.append( ssz*Y )
+				
+				f += fi * ssz
+				weights += ssz
 			
-			## 3
-			A, B, Y = biquadratic.linear_matrix_equation_for_W( vbar, vprime, z )
-			As.append( ssz*A )
-			Bs.append( B )
-			Ys.append( ssz*Y )
+			## 4
+			W = biquadratic.solve_for_W( As, Bs, Ys, use_pseudoinverse = use_pseudoinverse, projection = W_projection )
+			f *= normalization / weights
+			print( "Function value:", f )
+			print( "Max sub-function value:", fis.max() )
+			print( "Min sub-function value:", fis.min() )
+			print( "Average sub-function value:", np.average( fis ) )
+			print( "Median sub-function value:", np.median( fis ) )
 			
-			f += fi * ssz
-			weights += ssz
-		
-		## 4
-		W = biquadratic.solve_for_W( As, Bs, Ys, use_pseudoinverse = use_pseudoinverse, projection = W_projection )
-		f *= normalization / weights
-		print( "Function value:", f )
-		print( "Max sub-function value:", fis.max() )
-		print( "Min sub-function value:", fis.min() )
-		print( "Average sub-function value:", np.average( fis ) )
-		print( "Median sub-function value:", np.median( fis ) )
-		
-		## If this is the first iteration, pretend that the old function value was
-		## out of termination range.
-		if f_prev is None: f_prev = f + 100*f_eps
-		
-		if f - f_prev > 0:
-			print( "WARNING: Function value increased." )
-		if abs( f_prev - f ) < f_eps:
-			print( "Function change too small, terminating:", f_prev - f )
-			converged = True
-			break
-		# x_change = abs( W_prev - W ).max()
-		## To make xtol approximately match scipy's default gradient tolerance (gtol) for BFGS,
-		## use norm() instead of the max change.
-		x_change = np.linalg.norm( W_prev - W )
-		print( "x change:", x_change )
-		if x_change < x_eps:
-			print( "Variables change too small, terminating:", x_change )
-			converged = True
-			break
-		if f < f_zero_threshold:
-			print( "Function below zero threshold, terminating." )
-			converged = True
-			break
-		
-		f_prev = f
-		W_prev = W.copy()
+			## If this is the first iteration, pretend that the old function value was
+			## out of termination range.
+			if f_prev is None: f_prev = f + 100*f_eps
+			
+			if f - f_prev > 0:
+				print( "WARNING: Function value increased." )
+			if abs( f_prev - f ) < f_eps:
+				print( "Function change too small, terminating:", f_prev - f )
+				converged = True
+				break
+			# x_change = abs( W_prev - W ).max()
+			## To make xtol approximately match scipy's default gradient tolerance (gtol) for BFGS,
+			## use norm() instead of the max change.
+			x_change = np.linalg.norm( W_prev - W )
+			print( "x change:", x_change )
+			if x_change < x_eps:
+				print( "Variables change too small, terminating:", x_change )
+				converged = True
+				break
+			if f < f_zero_threshold:
+				print( "Function below zero threshold, terminating." )
+				converged = True
+				break
+			
+			f_prev = f
+			W_prev = W.copy()
+	
+	except KeyboardInterrupt:
+		print( "Terminated by KeyboardInterrupt." )
 	
 	print( "Terminated after", iterations, "iterations." )
 	
@@ -888,113 +892,116 @@ def optimize_laplacian( P, H, rest_mesh, deformed_vs, qs_data, qs_errors, qs_ssv
 	Ts_prev = Ts.copy()
 	iterations = 0
 	converged = False
-	while( True ):
-		iterations += 1
-		if iterations > max_iter:
-			print( "Terminating due to too many iterations: ", max_iter )
-			break
-		
-		print( "Starting iteration", iterations )
-		
-		## 1 Solve for ws.
-		## 2 Solve for Ts.
-		
-		## 1
-		if graph_laplacian:
-			ws = [ 1./np.ones(len(neighs)) for neighs in neighbors ]
-		else:
-			ws_ssv_energy = [ laplacian.solve_for_w( Ts[i], Ts[ neighbors[i] ].T, return_energy = True ) for i in range( num_vertices ) ]
-			ws = [ w for w, ssv, energy in ws_ssv_energy ]
-			print( "E_local from ws point of view:", np.sum([ energy for w, ssv, energy in ws_ssv_energy ]) )
-		
-		## 2
-		E_local = laplacian.quadratic_for_E_local( neighbors, ws, poses )
-		E_local_val = laplacian.evaluate_E_local( E_local, Ts.T )
-		print( "E_local from Ts point of view (before solving for Ts):", E_local_val )
-		
-		E_data_val = laplacian.evaluate_E_data( E_data, Ts.T )
-		print( "E_data from Ts point of view (before solving for Ts):", E_data_val )
-		
-		f = E_data_val * E_data_weight + E_local_val * E_local_weight
-		print( "=> E_total:", E_data_val + E_local_val )
-		print( "=> E_total (weighted):", f )
-		
-		## Solve for T
-		
-		if strategy is None:
-			Ts = laplacian.solve_for_T( E_data, E_local, poses, E_data_weight = E_data_weight, E_local_weight = E_local_weight ).T
-		elif strategy == 'lerp':
-			Ts = laplacian.solve_for_T( E_data, E_local, poses, E_data_weight = E_data_weight, E_local_weight = E_local_weight ).T
-			## Lerp from the previous Ts
-			Ts = Ts_prev + lerpval*(Ts - Ts_prev)
-		elif strategy == 'lsq':
-			Q_data, L_data, C_data = E_data
-			## This could be done in advance.
-			# Q_data = ( Q_data + scipy.sparse.diags( [ E_input_weight*(np.outer((1.0-lerpval),np.ones(12*P)).ravel(order='C')) ], [0] ) )
-			Q_data = scipy.sparse.diags( [ E_input_weight*(np.outer((1.0-lerpval),np.ones(12*P)).ravel(order='C')) ], [0] )
-			## This could not.
-			# L_data = L_data - (2*E_input_weight) * ((1.0-lerpval) * qs_data).T.ravel(order='F')
-			## This could.
-			L_data = - (2*E_input_weight) * ((1.0-lerpval) * qs_data).T.ravel(order='F')
-			# C_data = C_data + E_input_weight * np.dot( qs_data.ravel(order='F'), qs_data.ravel(order='F') )
-			C_data = E_input_weight * np.dot( qs_data.ravel(order='F'), qs_data.ravel(order='F') )
+	try:
+		while( True ):
+			iterations += 1
+			if iterations > max_iter:
+				print( "Terminating due to too many iterations: ", max_iter )
+				break
 			
-			Ts = laplacian.solve_for_T( ( Q_data, L_data, C_data ), E_local, poses, E_data_weight = E_data_weight, E_local_weight = E_local_weight ).T
-		
-		## Plot
-		if plot:
-			Ts3D = mapper.project( Ts )
-			ax.scatter( Ts3D.T[0], Ts3D.T[1], Ts3D.T[2] )
-			plt.draw()
-			plt.pause(0.05)
-		
-		## Get the function value after solving.
-		E_local_val = laplacian.evaluate_E_local( E_local, Ts.T )
-		print( "E_local from Ts point of view (after solving for Ts):", E_local_val )
-		
-		E_data_val = laplacian.evaluate_E_data( E_data, Ts.T )
-		print( "E_data from Ts point of view (after solving for Ts):", E_data_val )
-		
-		f = E_data_val * E_data_weight + E_local_val * E_local_weight
-		print( "=> E_total (after solving for Ts):", E_data_val + E_local_val )
-		print( "=> E_total (weighted, after solving for Ts):", f )
-		
-		print( "Function value:", f )
-		
-		
-		
-		
-		print( "Ts singular values:", np.linalg.svd( Ts, compute_uv = False ) )
-		
-		## If this is the first iteration, pretend that the old function value was
-		## out of termination range.
-		if f_prev is None: f_prev = f + 100*f_eps
-		
-		if f - f_prev > 0:
-			print( "WARNING: Function value increased." )
-		if abs( f_prev - f ) < f_eps:
-			print( "Function change too small, terminating:", f_prev - f )
-			converged = True
-			break
-		# x_change = abs( W_prev - W ).max()
-		## To make xtol approximately match scipy's default gradient tolerance (gtol) for BFGS,
-		## use norm() instead of the max change.
-		x_change_norm = np.linalg.norm( Ts_prev - Ts )
-		x_change_max = abs( Ts_prev - Ts ).max()
-		print( "x change (norm):", x_change_norm )
-		print( "x change (max):", x_change_max )
-		x_change = x_change_max
-		if x_change < x_eps:
-			print( "Variables change too small, terminating:", x_change )
-			converged = True
-			break
-		if f < f_zero_threshold:
-			print( "Function below zero threshold, terminating." )
-			converged = True
-			break
-		
-		f_prev = f
-		Ts_prev = Ts.copy()
+			print( "Starting iteration", iterations )
+			
+			## 1 Solve for ws.
+			## 2 Solve for Ts.
+			
+			## 1
+			if graph_laplacian:
+				ws = [ 1./np.ones(len(neighs)) for neighs in neighbors ]
+			else:
+				ws_ssv_energy = [ laplacian.solve_for_w( Ts[i], Ts[ neighbors[i] ].T, return_energy = True ) for i in range( num_vertices ) ]
+				ws = [ w for w, ssv, energy in ws_ssv_energy ]
+				print( "E_local from ws point of view:", np.sum([ energy for w, ssv, energy in ws_ssv_energy ]) )
+			
+			## 2
+			E_local = laplacian.quadratic_for_E_local( neighbors, ws, poses )
+			E_local_val = laplacian.evaluate_E_local( E_local, Ts.T )
+			print( "E_local from Ts point of view (before solving for Ts):", E_local_val )
+			
+			E_data_val = laplacian.evaluate_E_data( E_data, Ts.T )
+			print( "E_data from Ts point of view (before solving for Ts):", E_data_val )
+			
+			f = E_data_val * E_data_weight + E_local_val * E_local_weight
+			print( "=> E_total:", E_data_val + E_local_val )
+			print( "=> E_total (weighted):", f )
+			
+			## Solve for T
+			
+			if strategy is None:
+				Ts = laplacian.solve_for_T( E_data, E_local, poses, E_data_weight = E_data_weight, E_local_weight = E_local_weight ).T
+			elif strategy == 'lerp':
+				Ts = laplacian.solve_for_T( E_data, E_local, poses, E_data_weight = E_data_weight, E_local_weight = E_local_weight ).T
+				## Lerp from the previous Ts
+				Ts = Ts_prev + lerpval*(Ts - Ts_prev)
+			elif strategy == 'lsq':
+				Q_data, L_data, C_data = E_data
+				## This could be done in advance.
+				# Q_data = ( Q_data + scipy.sparse.diags( [ E_input_weight*(np.outer((1.0-lerpval),np.ones(12*P)).ravel(order='C')) ], [0] ) )
+				Q_data = scipy.sparse.diags( [ E_input_weight*(np.outer((1.0-lerpval),np.ones(12*P)).ravel(order='C')) ], [0] )
+				## This could not.
+				# L_data = L_data - (2*E_input_weight) * ((1.0-lerpval) * qs_data).T.ravel(order='F')
+				## This could.
+				L_data = - (2*E_input_weight) * ((1.0-lerpval) * qs_data).T.ravel(order='F')
+				# C_data = C_data + E_input_weight * np.dot( qs_data.ravel(order='F'), qs_data.ravel(order='F') )
+				C_data = E_input_weight * np.dot( qs_data.ravel(order='F'), qs_data.ravel(order='F') )
+				
+				Ts = laplacian.solve_for_T( ( Q_data, L_data, C_data ), E_local, poses, E_data_weight = E_data_weight, E_local_weight = E_local_weight ).T
+			
+			## Plot
+			if plot:
+				Ts3D = mapper.project( Ts )
+				ax.scatter( Ts3D.T[0], Ts3D.T[1], Ts3D.T[2] )
+				plt.draw()
+				plt.pause(0.05)
+			
+			## Get the function value after solving.
+			E_local_val = laplacian.evaluate_E_local( E_local, Ts.T )
+			print( "E_local from Ts point of view (after solving for Ts):", E_local_val )
+			
+			E_data_val = laplacian.evaluate_E_data( E_data, Ts.T )
+			print( "E_data from Ts point of view (after solving for Ts):", E_data_val )
+			
+			f = E_data_val * E_data_weight + E_local_val * E_local_weight
+			print( "=> E_total (after solving for Ts):", E_data_val + E_local_val )
+			print( "=> E_total (weighted, after solving for Ts):", f )
+			
+			print( "Function value:", f )
+			
+			
+			
+			
+			print( "Ts singular values:", np.linalg.svd( Ts, compute_uv = False ) )
+			
+			## If this is the first iteration, pretend that the old function value was
+			## out of termination range.
+			if f_prev is None: f_prev = f + 100*f_eps
+			
+			if f - f_prev > 0:
+				print( "WARNING: Function value increased." )
+			if abs( f_prev - f ) < f_eps:
+				print( "Function change too small, terminating:", f_prev - f )
+				converged = True
+				break
+			# x_change = abs( W_prev - W ).max()
+			## To make xtol approximately match scipy's default gradient tolerance (gtol) for BFGS,
+			## use norm() instead of the max change.
+			x_change_norm = np.linalg.norm( Ts_prev - Ts )
+			x_change_max = abs( Ts_prev - Ts ).max()
+			print( "x change (norm):", x_change_norm )
+			print( "x change (max):", x_change_max )
+			x_change = x_change_max
+			if x_change < x_eps:
+				print( "Variables change too small, terminating:", x_change )
+				converged = True
+				break
+			if f < f_zero_threshold:
+				print( "Function below zero threshold, terminating." )
+				converged = True
+				break
+			
+			f_prev = f
+			Ts_prev = Ts.copy()
+	except KeyboardInterrupt:
+		print( "Terminated by KeyboardInterrupt." )
 	
 	print( "Terminated after", iterations, "iterations." )
 	
