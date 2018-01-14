@@ -12,6 +12,7 @@ import sys
 import argparse
 import time
 import numpy
+import numpy as np
 import scipy
 
 import format_loader
@@ -161,6 +162,9 @@ if __name__ == '__main__':
 	parser.add_argument('--output', '-O', type=str, help="output path")
 	## Only if the solver is still slow for big examples:
 	parser.add_argument('--random-percent', type=float, help='If specified, compute with a random % subset of the points. Default: off (equivalent to 100).')
+	## UPDATE: type=bool does not do what we think it does. bool("False") == True.
+	##         For more, see https://stackoverflow.com/questions/15008758/parsing-boolean-values-with-argparse
+	def str2bool(s): return {'true': True, 'false': False}[s.lower()]
 	## This option is not recommended.
 	parser.add_argument('--random-after-PCA', type=str2bool, default=False, help='Whether to take the random subset after computing PCA. Default: False.')
 	parser.add_argument('--random-reps', type=int, default=1, help='How many times to repeat the random subsampling. Default: 1.')
@@ -194,101 +198,142 @@ if __name__ == '__main__':
 #	Ts_unique = numpy.asarray( Ts_unique )
 #	print( 'Unique Ts.shape:', Ts_unique.shape )
 	
-	Ts_mapper = SpaceMapper.Uncorrellated_Space( Ts, dimension = args.dimension )
-	uncorrelated = Ts_mapper.project( Ts )
-	print( "uncorrelated data shape" )
-	print( uncorrelated.shape )
-# 	Ts_sets = divide_mesh_into_small_sets(meshes[0], uncorrelated, 2)
-# 	N = len( uncorrelated )
-# 	Ts_sets = [ uncorrelated[:N/4], uncorrelated[N/4:N/2], uncorrelated[N/2:N*3/4], uncorrelated[N*3/4:] ]
-# 	print( "# small sets: ", len( Ts_sets ) )
+	numpy.set_printoptions(precision=4, suppress=True)
+	import os,sys
+	import mves2
 	
 	startTime = time.time()
 	
-#	import os,sys
-#	dirs = sys.argv[-1].split(os.path.sep)
-#	assert( len(dirs) > 2 )
-#	path = "benchmarks/" + dirs[-2] + "-" + dirs[-1] + ".csv"
-#	print("path: ", path)
-#	numpy.savetxt(path, uncorrelated, fmt="%1.6f", delimiter=",")
-#	outpath = "benchmarks/" + dirs[-2] + "-" + dirs[-1] + ".mat"
-#	import scipy.io
-#	scipy.io.savemat( outpath, { 'X': uncorrelated } )
+	all_Ts = Ts.copy()
+	## results stores: volume, solution, iter_num
+	results = []
 	
-	numpy.set_printoptions(precision=4, suppress=True)
- 
-	## plot uncorrelated data
-#	import matplotlib.pyplot as plt
-#	from mpl_toolkits.mplot3d import Axes3D
-#	
-#	plt3d = plt.figure().gca(projection='3d')
-#	plt3d.scatter(uncorrelated[:,0] , uncorrelated[:,1] , uncorrelated[:,2],  color='green')
-#	plt.show()
- 
-	## Compute minimum-volume enclosing simplex
-	import mves2
-	solution, weights, iter_num = mves2.MVES( uncorrelated, method = args.method, linear_solver = args.linear_solver, max_iter = args.max_iter )
-	
-	'''
-	## Option 1: Run MVES on the union of convex hull vertices:
-	good_verts = []
-	for verts in Ts_sets:
-		mapper = SpaceMapper.Uncorrellated_Space( verts, False )
-		projected_verts = mapper.project( verts )
-		if len( projected_verts ) > mapper.stop_s+1:
-			hull = ConvexHull( projected_verts )
-			projected_hulls = numpy.take( hull.points, hull.vertices, axis=0 )
-			if good_verts == []: 
-				good_verts = mapper.unproject( projected_hulls )
+	for random_rep in range( args.random_reps ):
+		Ts = all_Ts.copy()
+		
+		if args.random_percent is not None and not args.random_after_PCA:
+			keep_N = np.clip( int( ( args.random_percent * len(Ts) )/100. + 0.5 ), 0, len( Ts ) )
+			## For some reason built-in numpy.random function produce worse results.
+			## This must be superstition!
+			# Ts = np.random.permutation( Ts )[:keep_N]
+			# np.random.shuffle( Ts )
+			# Ts = Ts[:keep_N]
+			import random
+			indices = np.arange( len( Ts ) )
+			random.shuffle( indices )
+			indices = indices[:keep_N]
+			Ts = Ts[indices]
+			
+			print( "Keeping %s out of %s points (before PCA)." % ( len( Ts ), len( all_Ts ) ) )
+		
+		Ts_mapper = SpaceMapper.Uncorrellated_Space( Ts, dimension = args.dimension )
+		uncorrelated = Ts_mapper.project( Ts )
+		print( "uncorrelated data shape" )
+		print( uncorrelated.shape )
+	# 	Ts_sets = divide_mesh_into_small_sets(meshes[0], uncorrelated, 2)
+	# 	N = len( uncorrelated )
+	# 	Ts_sets = [ uncorrelated[:N/4], uncorrelated[N/4:N/2], uncorrelated[N/2:N*3/4], uncorrelated[N*3/4:] ]
+	# 	print( "# small sets: ", len( Ts_sets ) )
+		
+		if args.random_percent is not None and args.random_after_PCA:
+			uncorrelated_all = uncorrelated
+			keep_N = np.clip( int( ( args.random_percent * len(uncorrelated) )/100. + 0.5 ), 0, len( uncorrelated ) )
+			uncorrelated = np.random.permutation( uncorrelated )[:keep_N]
+			print( "Keeping %s out of %s points (after PCA)." % ( len( uncorrelated ), len( uncorrelated_all ) ) )
+		
+	#	dirs = sys.argv[-1].split(os.path.sep)
+	#	assert( len(dirs) > 2 )
+	#	path = "benchmarks/" + dirs[-2] + "-" + dirs[-1] + ".csv"
+	#	print("path: ", path)
+	#	numpy.savetxt(path, uncorrelated, fmt="%1.6f", delimiter=",")
+	#	outpath = "benchmarks/" + dirs[-2] + "-" + dirs[-1] + ".mat"
+	#	import scipy.io
+	#	scipy.io.savemat( outpath, { 'X': uncorrelated } )
+		
+		## plot uncorrelated data
+	#	import matplotlib.pyplot as plt
+	#	from mpl_toolkits.mplot3d import Axes3D
+	#	
+	#	plt3d = plt.figure().gca(projection='3d')
+	#	plt3d.scatter(uncorrelated[:,0] , uncorrelated[:,1] , uncorrelated[:,2],  color='green')
+	#	plt.show()
+	 
+		## Compute minimum-volume enclosing simplex
+		solution, weights, iter_num = mves2.MVES( uncorrelated, method = args.method, linear_solver = args.linear_solver, max_iter = args.max_iter )
+		volume = abs( np.linalg.det( solution ) )
+		
+		'''
+		## Option 1: Run MVES on the union of convex hull vertices:
+		good_verts = []
+		for verts in Ts_sets:
+			mapper = SpaceMapper.Uncorrellated_Space( verts, False )
+			projected_verts = mapper.project( verts )
+			if len( projected_verts ) > mapper.stop_s+1:
+				hull = ConvexHull( projected_verts )
+				projected_hulls = numpy.take( hull.points, hull.vertices, axis=0 )
+				if good_verts == []: 
+					good_verts = mapper.unproject( projected_hulls )
+				else:
+					good_verts = numpy.concatenate( (good_verts, mapper.unproject( projected_hulls )), axis=0 )
 			else:
-				good_verts = numpy.concatenate( (good_verts, mapper.unproject( projected_hulls )), axis=0 )
-		else:
-			if good_verts == []:
-				good_verts = projected_verts
-			else:
-				good_verts = numpy.concatenate( (good_verts, mapper.unproject( projected_verts )), axis=0 )
-	print( "option 1: # vertices is ", len(good_verts) )
-	solution = mves2.MVES( good_verts )
-	'''
-	
-	## Option 2: Run MVES on the small sets
-# 	good_verts = []
-# 	for verts in Ts_sets:
-# 		mapper = SpaceMapper.Uncorrellated_Space( verts, False )
-# 		projected_verts = mapper.project( verts )
-# 		if len( projected_verts ) > mapper.stop_s+1:
-# 			hull = ConvexHull( projected_verts )
-# 			projected_hull = numpy.take( hull.points, hull.vertices, axis=0 )
-# 			restored_hull = mapper.unproject( mves2.MVES( projected_hull ).x[:-1].T )
-# 			if good_verts == []:
-# 				good_verts =  restored_hull
-# 			else:
-# 				good_verts = numpy.concatenate( (good_verts, restored_hull), axis=0 )
-# 		else:
-# 			restored_verts = mapper.unproject( mves2.MVES( projected_verts ).x[:-1].T )
-# 			if good_verts == []:
-# 				good_verts = mapper.unproject( restored_verts )
-# 			else:
-# 				good_verts = numpy.concatenate( (good_verts, restored_verts), axis=0 )
-# 	
-# 	solution = mves2.MVES( good_verts )
-	
-	print( "solution" )
-	print( solution )
-	
-	## Cheap robustness; discard the % of data which ended up with the smallest weights.
-	## Outliers will always have 
-	if args.robust_percentile is not None:
-		argsorted = weights.argsort(axis=0)
-		num_rows_to_discard = int( args.robust_percentile*len(weights) )
-		print( "Deleting", num_rows_to_discard, "rows with the smallest weights." )
-		rows_to_discard = argsorted[ :num_rows_to_discard ].ravel()
-		uncorrelated_robust = numpy.delete( uncorrelated, rows_to_discard, axis = 0 )
-		print( "Re-running MVES" )
-		solution, weights_robust, iter_num = mves2.MVES( uncorrelated_robust, method = args.method, linear_solver = args.linear_solver, max_iter = args.max_iter )
-		weights = numpy.dot( numpy.linalg.inv( solution ), numpy.concatenate( ( uncorrelated.T, numpy.ones((1,uncorrelated.shape[0])) ), axis=0 ) ).T
-		print( "robust solution" )
+				if good_verts == []:
+					good_verts = projected_verts
+				else:
+					good_verts = numpy.concatenate( (good_verts, mapper.unproject( projected_verts )), axis=0 )
+		print( "option 1: # vertices is ", len(good_verts) )
+		solution = mves2.MVES( good_verts )
+		'''
+		
+		## Option 2: Run MVES on the small sets
+	# 	good_verts = []
+	# 	for verts in Ts_sets:
+	# 		mapper = SpaceMapper.Uncorrellated_Space( verts, False )
+	# 		projected_verts = mapper.project( verts )
+	# 		if len( projected_verts ) > mapper.stop_s+1:
+	# 			hull = ConvexHull( projected_verts )
+	# 			projected_hull = numpy.take( hull.points, hull.vertices, axis=0 )
+	# 			restored_hull = mapper.unproject( mves2.MVES( projected_hull ).x[:-1].T )
+	# 			if good_verts == []:
+	# 				good_verts =  restored_hull
+	# 			else:
+	# 				good_verts = numpy.concatenate( (good_verts, restored_hull), axis=0 )
+	# 		else:
+	# 			restored_verts = mapper.unproject( mves2.MVES( projected_verts ).x[:-1].T )
+	# 			if good_verts == []:
+	# 				good_verts = mapper.unproject( restored_verts )
+	# 			else:
+	# 				good_verts = numpy.concatenate( (good_verts, restored_verts), axis=0 )
+	# 	
+	# 	solution = mves2.MVES( good_verts )
+		
+		print( "solution" )
 		print( solution )
+		
+		## Cheap robustness; discard the % of data which ended up with the smallest weights.
+		## Outliers will always have 
+		if args.robust_percentile is not None:
+			argsorted = weights.argsort(axis=0)
+			num_rows_to_discard = int( args.robust_percentile*len(weights) )
+			print( "Deleting", num_rows_to_discard, "rows with the smallest weights." )
+			rows_to_discard = argsorted[ :num_rows_to_discard ].ravel()
+			uncorrelated_robust = numpy.delete( uncorrelated, rows_to_discard, axis = 0 )
+			print( "Re-running MVES" )
+			solution, weights_robust, iter_num = mves2.MVES( uncorrelated_robust, method = args.method, linear_solver = args.linear_solver, max_iter = args.max_iter )
+			weights = numpy.dot( numpy.linalg.inv( solution ), numpy.concatenate( ( uncorrelated.T, numpy.ones((1,uncorrelated.shape[0])) ), axis=0 ) ).T
+			volume = abs( np.linalg.det( solution ) )
+			print( "robust solution" )
+			print( solution )
+		
+		results.append( ( volume, solution, iter_num, weights, Ts_mapper ) )
+	
+	volume, solution, iter_num, weights, Ts_mapper = min( results )
+	print( "=> Best simplex found with volume:", volume )
+	
+	## Did we randomly sample less than 100%?
+	if len( weights ) < len( all_Ts ):
+		assert args.random_percent is not None
+		weights = mves2.MVES_solution_weights_for_points( solution, Ts_mapper.project( all_Ts ) )
+		assert len( weights ) == len( all_Ts )
 	
 	running_time = time.time() - startTime
 	print("\nOptimization costs: %.2f seconds" %running_time)
@@ -303,7 +348,7 @@ if __name__ == '__main__':
 	if args.output is not None:
 		output_path = args.output
 	print( "Saving recovered results to:", output_path )
-	format_loader.write_result(output_path, recovered.round(6), weights.round(6), iter_num, running_time, col_major=True)
+	format_loader.write_result(output_path, recovered, weights, iter_num, running_time, col_major=True)
 	
 	def check_recovered( recovered, ground ):
 		flags = numpy.zeros( len(Tmat), dtype = bool )
