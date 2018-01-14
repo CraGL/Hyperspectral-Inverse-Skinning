@@ -116,6 +116,8 @@ if __name__ == '__main__':
 	
 	# np.random.seed(0)
 	
+	import mves2
+	
 	np.set_printoptions(precision=4, suppress=True)
 	startTime = time.time()
 	
@@ -154,6 +156,8 @@ if __name__ == '__main__':
 				def __init__( self, data, weights, dimension = None ):
 					assert dimension is not None
 					self.mapper = WPCA( n_components = dimension ).fit( data, weights = np.repeat( weights.reshape(-1,1), data.shape[1], axis = 1 ) )
+					print( "WPCA amount of variance explained by each of the selected components:", self.mapper.explained_variance_ )
+					print( "WPCA Percentage of variance explained by each of the selected components:", self.mapper.explained_variance_ratio_ )
 				def project( self, points ):
 					return self.mapper.transform( points )
 				def unproject( self, low_dim_points ):
@@ -179,7 +183,6 @@ if __name__ == '__main__':
 		# print( "Saved input points to MVES in MATLAB format as:", 'MVES_input.mat' )
 	 
 		## Compute minimum-volume enclosing simplex
-		import mves2
 		solution, weights, iter_num = mves2.MVES( uncorrelated, method=args.method, linear_solver = args.linear_solver, max_iter = args.max_iter )
 		volume = abs( np.linalg.det( solution ) )
 		
@@ -204,9 +207,9 @@ if __name__ == '__main__':
 			print( "robust solution" )
 			print( solution )
 		
-		results.append( ( volume, solution, iter_num ) )
+		results.append( ( volume, solution, iter_num, Ts_mapper ) )
 	
-	volume, solution, iter_num = min( results )
+	volume, solution, iter_num, Ts_mapper = min( results )
 	print( "=> Best simplex found with volume:", volume )
 	
 	running_time = time.time() - startTime

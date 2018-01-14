@@ -575,7 +575,7 @@ def MVES_solution_weights_for_points( solution, pts ):
 	'''
 	
 	pts = numpy.asarray( pts )
-	return numpy.dot( numpy.linalg.inv( solution ), numpy.concatenate( ( pts.T, numpy.ones((1,pts.shape[0])) ), axis=0 ) )
+	return numpy.dot( numpy.linalg.inv( solution ), numpy.concatenate( ( pts.T, numpy.ones((1,pts.shape[0])) ), axis=0 ) ).T
 
 def test():
 	pts = [ [ 0,1 ], [ 1,0 ], [ -2,0 ], [ 0, 0 ] ]
