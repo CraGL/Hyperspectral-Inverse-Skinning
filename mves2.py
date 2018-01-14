@@ -363,29 +363,33 @@ def MVES( pts, initial_guess_vertices = None, linear_solver = None ):
 		b[-1] = 1 
 		sparse_G = to_spmatrix(G)
 		sparse_A = to_spmatrix(A)
-		while True:		
-			Hc = numpy.dot( f_log_volume_hess_inv( x0 ), f_log_volume_grad( x0 ) )
-			c = f_log_volume_grad( x0 )
-			solution = cvxopt.solvers.lp( cvxopt.matrix(c), sparse_G, cvxopt.matrix(h), sparse_A, cvxopt.matrix(b), solver=linear_solver )
-# 			solution = cvxopt.solvers.lp( cvxopt.matrix(Hc*0.9+c*0.1), sparse_G, cvxopt.matrix(h), sparse_A, cvxopt.matrix(b), solver='mosek' )
-
-			x = solution['x']
-			fx = f_log_volume( numpy.array(x) )
-			print( "Current log volume: ", fx  )
-			all_x.append( ( fx, x ) )
-			iter_num += 1
-			if( numpy.allclose( numpy.array( x ), x0, rtol=1e-02, atol=1e-05 ) ):
-				print("all close!")
-				break
-			elif( iter_num>MAX_ITER/2 and abs( fx - f_log_volume(x0) ) <= 0.1 ):
-				print("log volume is close!")
-				break
-			elif iter_num >= MAX_ITER:
-				print("Exceed the maximum number of iterations!")
-				break
-
-			x0 += 0.9*(numpy.array(x) - x0)
-				
+		try:
+			while True:		
+				Hc = numpy.dot( f_log_volume_hess_inv( x0 ), f_log_volume_grad( x0 ) )
+				c = f_log_volume_grad( x0 )
+				solution = cvxopt.solvers.lp( cvxopt.matrix(c), sparse_G, cvxopt.matrix(h), sparse_A, cvxopt.matrix(b), solver=linear_solver )
+	# 			solution = cvxopt.solvers.lp( cvxopt.matrix(Hc*0.9+c*0.1), sparse_G, cvxopt.matrix(h), sparse_A, cvxopt.matrix(b), solver='mosek' )
+	
+				x = solution['x']
+				fx = f_log_volume( numpy.array(x) )
+				print( "Current log volume: ", fx  )
+				all_x.append( ( fx, x ) )
+				iter_num += 1
+				if( numpy.allclose( numpy.array( x ), x0, rtol=1e-02, atol=1e-05 ) ):
+					print("all close!")
+					break
+				elif( iter_num>MAX_ITER/2 and abs( fx - f_log_volume(x0) ) <= 0.1 ):
+					print("log volume is close!")
+					break
+				elif iter_num >= MAX_ITER:
+					print("Exceed the maximum number of iterations!")
+					break
+	
+				x0 += 0.9*(numpy.array(x) - x0)
+		
+		except KeyboardInterrupt:
+			print( "Terminated by KeyboardInterrupt." )
+		
 		print( "# LP Iteration: ", iter_num )
 		if iter_num >= MAX_ITER:
 			curr_volume = f_log_volume( x0 )
@@ -412,30 +416,34 @@ def MVES( pts, initial_guess_vertices = None, linear_solver = None ):
 		b[-1] = 1 
 		sparse_G = to_spmatrix(G)
 		sparse_A = to_spmatrix(A)
-			
-		while True:
-			## update solver parameters.
-			P = f_log_volume_hess( x0 )
-			q = f_log_volume_grad( x0 )			
-			## solve
-			solution = cvxopt.solvers.qp( cvxopt.matrix(P), cvxopt.matrix(q), sparse_G, cvxopt.matrix(h), sparse_A, cvxopt.matrix(b) )
-			# solution = cvxopt.solvers.qp( -cvxopt.matrix(P), cvxopt.matrix(q), sparse_G, cvxopt.matrix(h), sparse_A, cvxopt.matrix(b), kktsolver='ldl' )
-			x = solution['x']
-			fx = f_log_volume( numpy.array(x) )
-			print( "Current log volume: ", fx )
-			iter_num += 1
-			if( numpy.allclose( numpy.array( x ), x0, rtol=1e-02, atol=1e-05 ) ):
-				print("all close!")
-				break
-			elif( iter_num>MAX_ITER/2 and abs( fx - f_log_volume(x0) ) <= 0.1 ):
-				print("log volume is close!")
-				break
-			elif iter_num >= MAX_ITER:
-				print("Exceed the maximum number of iterations!")
-				break
-			all_x.append( ( fx, x ) )
-# 			x0 += 0.9*(numpy.array(x) - x0)
-			x0 = numpy.array(x)
+		
+		try:
+			while True:
+				## update solver parameters.
+				P = f_log_volume_hess( x0 )
+				q = f_log_volume_grad( x0 )			
+				## solve
+				solution = cvxopt.solvers.qp( cvxopt.matrix(P), cvxopt.matrix(q), sparse_G, cvxopt.matrix(h), sparse_A, cvxopt.matrix(b) )
+				# solution = cvxopt.solvers.qp( -cvxopt.matrix(P), cvxopt.matrix(q), sparse_G, cvxopt.matrix(h), sparse_A, cvxopt.matrix(b), kktsolver='ldl' )
+				x = solution['x']
+				fx = f_log_volume( numpy.array(x) )
+				print( "Current log volume: ", fx )
+				iter_num += 1
+				if( numpy.allclose( numpy.array( x ), x0, rtol=1e-02, atol=1e-05 ) ):
+					print("all close!")
+					break
+				elif( iter_num>MAX_ITER/2 and abs( fx - f_log_volume(x0) ) <= 0.1 ):
+					print("log volume is close!")
+					break
+				elif iter_num >= MAX_ITER:
+					print("Exceed the maximum number of iterations!")
+					break
+				all_x.append( ( fx, x ) )
+# 				x0 += 0.9*(numpy.array(x) - x0)
+				x0 = numpy.array(x)
+		except KeyboardInterrupt:
+			print( "Terminated by KeyboardInterrupt." )
+		
 		print( "# QP Iteration: ", iter_num )
 		if iter_num >= MAX_ITER:
 			curr_volume = f_log_volume( x0 )
