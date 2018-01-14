@@ -9,7 +9,7 @@ SSD_RESULT="${ROOT_DIR}"/SSD_res/cube4-1-output.txt
 
 INITIAL_GUESS_ARGS="--svd_threshold 1e-15 --transformation_threshold 1e-4 --version 0"
 FLAT_INTERSECTION_ARGS="--energy biquadratic -GT "${OTHER_POSE_DIR}" --error True --handles 4 --fancy-init "${OUTPUT_DIR}"/local_subspace_recover.txt"
-SIMPLEX_HULL_ARGS="-D 3"
+SIMPLEX_HULL_ARGS="-D 3 --method lp --output ./result.txt"
 
 # Generate
 mkdir -p "${OUTPUT_DIR}"

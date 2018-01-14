@@ -1,13 +1,13 @@
 ############################################
 Per-bone transformation Error: 
 ssd error:  8.63451117299e-05
-rev error:  0.0208633024877
+rev error:  3.18210951878e-05
 ############################################
 Weight Error: 
 ssd error:  0.000230244269235
-rev error:  0.180031439806
+rev error:  0.000235748396509
 ############################################
 Reconstruction Mesh Error: 
 ssd: max, mean and median per-vertex distance 0.000248280941753 6.9328455644e-05 5.98704186296e-05
-rev: max, mean and median per-vertex distance 0.170250793854 0.0160825848284 0.000781206899333
+rev: max, mean and median per-vertex distance 9.60736608777e-07 2.98210381565e-07 2.81946041904e-07
 ############################################
