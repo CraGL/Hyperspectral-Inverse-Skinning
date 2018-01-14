@@ -62,6 +62,9 @@ if __name__ == '__main__':
 	parser.add_argument('--ground-truth', '-GT', type=str, help='Ground truth data path.')
 	parser.add_argument('--robust-percentile', '-R', type=float, help='Fraction of outliers to discard. Default: 0.')
 	parser.add_argument('--dimension', '-D', type=int, help='Dimension (number of handles minus one). Default: automatic.')
+	parser.add_argument('--WPCA', type=bool, help='If True, uses weighted PCA instead of regular PCA. Requires')
+	parser.add_argument('--transformation-errors', type=str, help='Errors for data generated from local subspace intersection.')
+	parser.add_argument('--transformation-ssv', type=str, help='Smallest singular values for data generated from local subspace intersection.')
 	## Only if the solver is still slow for big examples:
 	# parser.add_argument('--random-percent', type=float, help='If specified, compute with a random % subset of the points. Default: off (equivalent to 100).')
 	# parser.add_argument('--random-after-PCA', type=bool, help='Whether to take the random subset after computing PCA. Default: False.')
@@ -102,7 +105,36 @@ if __name__ == '__main__':
 	
 	root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 	
-	Ts_mapper = SpaceMapper.Uncorrellated_Space( Ts, dimension = args.dimension )
+	if args.WPCA is not None:
+		## This code requires wpca (https://github.com/jakevdp/wpca):
+		### pip install wpca
+		### pip install scikit-learn
+		
+		## args.test changes the order of vertices.
+		## Someone would need to update this code to match whatever it is doing.
+		assert not args.test
+		
+		Ts_errors = np.loadtxt( args.transformation_errors )
+		Ts_ssv = np.loadtxt( args.transformation_ssv )
+		Ts_weights = 1./(1e-5 + Ts_errors)
+		Ts_weights[ Ts_ssv < 1e-8 ] = 0.
+		
+		# from wpca import EMPCA
+		from wpca import WPCA
+		class WeightedSpaceMapper( object ):
+			def __init__( self, data, weights, dimension = None ):
+				assert dimension is not None
+				self.mapper = WPCA( n_components = dimension ).fit( data, weights = np.repeat( weights.reshape(-1,1), data.shape[1], axis = 1 ) )
+			def project( self, points ):
+				return self.mapper.transform( points )
+			def unproject( self, low_dim_points ):
+				return self.mapper.inverse_transform( low_dim_points )
+		startTime = time.time()
+		Ts_mapper = WeightedSpaceMapper( Ts, Ts_weights, dimension = args.dimension )
+		running_time = time.time() - startTime
+		print("Weighted PCA took: %.2f seconds" % running_time)
+	else:
+		Ts_mapper = SpaceMapper.Uncorrellated_Space( Ts, dimension = args.dimension )
 	uncorrelated = Ts_mapper.project( Ts )
 	print( "uncorrelated data shape" )
 	print( uncorrelated.shape )
