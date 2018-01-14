@@ -89,7 +89,7 @@ def to_spmatrix( M ):
 	import cvxopt
 	return cvxopt.spmatrix( M.data, numpy.asarray( M.row, dtype = int ), numpy.asarray( M.col, dtype = int ) )
 
-def MVES( pts, initial_guess_vertices = None, linear_solver = None, strategy = None, max_iter = None ):
+def MVES( pts, initial_guess_vertices = None, method = None, linear_solver = None, max_iter = None ):
 	'''
 	Given:
 		pts: A sequence of n-dimensional points (e.g. points are rows)
@@ -100,7 +100,9 @@ def MVES( pts, initial_guess_vertices = None, linear_solver = None, strategy = N
 		matrix has the points as the columns. The last coordinate of each point will
 		always be 1.
 	'''
-	
+	if method is None:
+		method = 'lp'	
+		
 	if linear_solver is None:
 		linear_solver = 'glpk'
 	
@@ -127,6 +129,7 @@ def MVES( pts, initial_guess_vertices = None, linear_solver = None, strategy = N
 		## That's equivalent to swapping columns.
 		invvol = numpy.linalg.det( Vinv )
 		
+		if invvol > 0:	return invvol
 		return -invvol
 	
 	def f_volume_grad( x ):
@@ -169,7 +172,7 @@ def MVES( pts, initial_guess_vertices = None, linear_solver = None, strategy = N
 		
 		## We want to maximize this quantity, so return it negated.
 		# return -sign*logdet
-		return -logdet
+		return logdet
 	
 	def f_log_volume_grad( x ):
 		Vinv = unpack( x )
@@ -338,10 +341,6 @@ def MVES( pts, initial_guess_vertices = None, linear_solver = None, strategy = N
 		iteration[0] += 1
 		print("Iteration", iteration[0])
 	
-	solvers = ["IPOPT", "CVXOPT_IP", "SCIPY", "BINARY", "CVXOPT_QP"]
-	used_solver = strategy
-	if used_solver is None:
-		used_solver = "CVXOPT_IP"
 	MAX_ITER = max_iter
 	if MAX_ITER is None:
 		MAX_ITER = 1000
@@ -350,7 +349,8 @@ def MVES( pts, initial_guess_vertices = None, linear_solver = None, strategy = N
 	
 	## Solve.
 	solution = numpy.linalg.inv( unpack( x0 ) )
-	if used_solver == "IPOPT":		
+	if method == "IPOPT" or method == "ipopt":	
+		print( "Solve MEVS with pyipopt." )		
 		import pyipopt
 		pyipopt.set_loglevel( 2 ) # 1: moderate log level of PyIPOPT				
 		nvar = (n+1)*(n+1)
@@ -383,7 +383,8 @@ def MVES( pts, initial_guess_vertices = None, linear_solver = None, strategy = N
 		
 		x, zl, zu, constraint_multipliers, obj, status = nlp.solve( x0 )
 		solution = x
-	elif used_solver == "CVXOPT_IP":
+	elif method == "IP" or method == "lp":
+		print( "Solve MEVS with cvxopt ip solver." )	
 		## Linear test:
 		import cvxopt
 		x0 = x0[:,numpy.newaxis]
@@ -437,7 +438,8 @@ def MVES( pts, initial_guess_vertices = None, linear_solver = None, strategy = N
 		print( "Final log volume:", f_log_volume( numpy.array(x0) ) )
 		solution = numpy.linalg.inv( unpack( numpy.array(x0) ) )
 		
-	elif used_solver == "CVXOPT_QP":	
+	elif method == "QP" or method == "qp":
+		print( "Solve MEVS with cvxopt qp solver." )	
 		import cvxopt
 		x0 = x0[:,numpy.newaxis]
 		all_x = [ (f_log_volume( numpy.array(x0) ), x0) ]
@@ -491,7 +493,8 @@ def MVES( pts, initial_guess_vertices = None, linear_solver = None, strategy = N
 		print( "Final log volume:", f_log_volume( numpy.array(x0) ) )
 		solution = numpy.linalg.inv( unpack( numpy.array(x0) ) )
 		
-	elif used_solver == "BINARY":
+	elif method == "BINARY" or method == "binary":
+		print( "Solve MEVS with linear binary search." )	
 		## Binary search
 		G = -g_bary_jac( x0 )
 		h = numpy.zeros( G.shape[0] )
@@ -512,7 +515,8 @@ def MVES( pts, initial_guess_vertices = None, linear_solver = None, strategy = N
 		print( "Final x inverse:" )
 		print( numpy.linalg.inv( x0.reshape( n+1, n+1 ) ) )
 		solution = numpy.linalg.inv( unpack( x0 ) )
-	elif used_solver == 'SCIPY':			
+	elif method == "SCIPY" or method == "scipy":
+		print( "Solve MEVS with scipy.optimize.minimize." )			
 		if USE_OUR_GRADIENTS:
 			constraints.append( { 'type': 'ineq', 'fun': g_bary, 'jac': g_bary_jac_dense } )
 			constraints.append( { 'type': 'eq', 'fun': g_ones, 'jac': g_ones_jac_dense } )
@@ -531,7 +535,7 @@ def MVES( pts, initial_guess_vertices = None, linear_solver = None, strategy = N
 			solution = scipy.optimize.minimize( f_log_volume, x0, constraints = constraints, callback = show_progress, options = { 'maxiter': MAX_ITER } )
 		solution = numpy.linalg.inv( unpack( solution.x ) )
 	else:
-		raise RuntimeError( "Unknown solver strategy" )
+		raise RuntimeError( "Unknown MVES method" )
 	
 	## Return the solution in a better format.
 	

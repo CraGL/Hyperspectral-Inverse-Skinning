@@ -55,8 +55,9 @@ if __name__ == '__main__':
 	parser.add_argument( 'rest_pose', type=str, help='Rest pose (OBJ).')
 	parser.add_argument( 'pose_folder', type=str, help='Folder containing deformed poses.')
 	parser.add_argument('output', type=str, help='output path.')
+	parser.add_argument('--test', type=bool, default=False, help='testing mode.')
+	parser.add_argument('--method', type=str, help='linear or quadratic solver: "lp" (default), "qp", "ipopt", "binary" or "scipy".')
 	parser.add_argument('--linear-solver', '-L', type=str, help='Linear solver: "glpk" (default) or "mosek".')
-	parser.add_argument('--strategy', type=str, choices=['CVXOPT_IP', 'CVXOPT_QP', 'IPOPT', 'SCIPY'], help='CVXOPT_IP (default): Sequential linear programming. CVXOPT_QP: Sequential quadratic programming. IPOPT: Use the IPOPT solver. SCIPY: Use scipy.optimize.minimize().')
 	parser.add_argument('--max-iter', type=int, help='The maximum iterations for the solver.')
 	parser.add_argument('--ground-truth', '-GT', type=str, help='Ground truth data path.')
 	parser.add_argument('--robust-percentile', '-R', type=float, help='Fraction of outliers to discard. Default: 0.')
@@ -83,6 +84,11 @@ if __name__ == '__main__':
 	Ts = np.loadtxt(args.per_vertex_tranformation)
 	print( "# initial vertices: ", Ts.shape[0] )
 	
+	if( args.test ):
+		import random
+		random.shuffle( Ts )
+		Ts = Ts[:int(Ts.shape[0]*0.1)]
+	
 	if args.ground_truth is not None:
 		handle_trans = glob.glob(args.ground_truth + "/*.Tmat")
 		handle_trans.sort()
@@ -102,7 +108,7 @@ if __name__ == '__main__':
  
 	## Compute minimum-volume enclosing simplex
 	import mves2
-	solution, weights, iter_num = mves2.MVES( uncorrelated, linear_solver = args.linear_solver, strategy = args.strategy, max_iter = args.max_iter )
+	solution, weights, iter_num = mves2.MVES( uncorrelated, method=args.method, linear_solver = args.linear_solver, max_iter = args.max_iter )
 	
 	print( "solution" )
 	print( solution )
