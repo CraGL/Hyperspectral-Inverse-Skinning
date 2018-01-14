@@ -565,6 +565,18 @@ def MVES( pts, initial_guess_vertices = None, method = None, linear_solver = Non
 	
 	return solution, barycentric.T, iter_num
 
+def MVES_solution_weights_for_points( solution, pts ):
+	'''
+	Given:
+		solution: The solution matrix returns from MVES()
+		pts: A sequence of points in the same subspace as MVES was computed
+	Returns:
+		A sequence of barycentric weights for each point in points as a numpy.array.
+	'''
+	
+	pts = numpy.asarray( pts )
+	return numpy.dot( numpy.linalg.inv( solution ), numpy.concatenate( ( pts.T, numpy.ones((1,pts.shape[0])) ), axis=0 ) )
+
 def test():
 	pts = [ [ 0,1 ], [ 1,0 ], [ -2,0 ], [ 0, 0 ] ]
 	# pts = [ [ 0,.9 ], [.1,.9], [ 1,0 ], [ 0, 0 ] ]

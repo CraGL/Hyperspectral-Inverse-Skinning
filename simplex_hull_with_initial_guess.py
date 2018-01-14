@@ -55,19 +55,22 @@ if __name__ == '__main__':
 	parser.add_argument( 'rest_pose', type=str, help='Rest pose (OBJ).')
 	parser.add_argument( 'pose_folder', type=str, help='Folder containing deformed poses.')
 	parser.add_argument('output', type=str, help='output path.')
-	parser.add_argument('--test', type=bool, default=False, help='testing mode.')
+	## UPDATE: type=bool does not do what we think it does. bool("False") == True.
+	##         For more, see https://stackoverflow.com/questions/15008758/parsing-boolean-values-with-argparse
+	def str2bool(s): return {'true': True, 'false': False}[s.lower()]
+	parser.add_argument('--test', type=str2bool, default=False, help='testing mode.')
 	parser.add_argument('--method', type=str, help='linear or quadratic solver: "lp" (default), "qp", "ipopt", "binary" or "scipy".')
 	parser.add_argument('--linear-solver', '-L', type=str, help='Linear solver: "glpk" (default) or "mosek".')
 	parser.add_argument('--max-iter', type=int, help='The maximum iterations for the solver.')
 	parser.add_argument('--ground-truth', '-GT', type=str, help='Ground truth data path.')
 	parser.add_argument('--robust-percentile', '-R', type=float, help='Fraction of outliers to discard. Default: 0.')
 	parser.add_argument('--dimension', '-D', type=int, help='Dimension (number of handles minus one). Default: automatic.')
-	parser.add_argument('--WPCA', type=bool, help='If True, uses weighted PCA instead of regular PCA. Requires')
+	parser.add_argument('--WPCA', type=str2bool, help='If True, uses weighted PCA instead of regular PCA. Requires')
 	parser.add_argument('--transformation-errors', type=str, help='Errors for data generated from local subspace intersection.')
 	parser.add_argument('--transformation-ssv', type=str, help='Smallest singular values for data generated from local subspace intersection.')
 	## Only if the solver is still slow for big examples:
-	# parser.add_argument('--random-percent', type=float, help='If specified, compute with a random % subset of the points. Default: off (equivalent to 100).')
-	# parser.add_argument('--random-after-PCA', type=bool, help='Whether to take the random subset after computing PCA. Default: False.')
+	parser.add_argument('--random-percent', type=float, help='If specified, compute with a random % subset of the points. Default: off (equivalent to 100).')
+	parser.add_argument('--random-after-PCA', type=str2bool, default=False, help='Whether to take the random subset after computing PCA. Default: False.')
 	# parser.add_argument('--random-reps', type=int, help='How many times to repeat the random subsampling. Default: 1.')
 	args = parser.parse_args()
 
@@ -91,10 +94,22 @@ if __name__ == '__main__':
 	Ts = np.loadtxt(args.per_vertex_tranformation)
 	print( "# initial vertices: ", Ts.shape[0] )
 	
-	if( args.test ):
+	if args.test:
+		args.random_percent = 10
+	
+	# np.random.seed(0)
+	if args.random_percent is not None and not args.random_after_PCA:
+		Ts_all = Ts.copy()
+		keep_N = np.clip( int( ( args.random_percent * len(Ts) )/100. + 0.5 ), 0, len( Ts ) )
+		## For some reason built-in numpy.random function produce worse results.
+		## This must be superstition!
+		# Ts = np.random.permutation( Ts )[:keep_N]
+		# np.random.shuffle( Ts )
+		# Ts = Ts[:keep_N]
 		import random
 		random.shuffle( Ts )
-		Ts = Ts[:int(Ts.shape[0]*0.1)]
+		Ts = Ts[:keep_N]
+		print( "Keeping %s out of %s points (before PCA)." % ( len( Ts ), len( Ts_all ) ) )
 	
 	if args.ground_truth is not None:
 		handle_trans = glob.glob(args.ground_truth + "/*.Tmat")
@@ -109,10 +124,6 @@ if __name__ == '__main__':
 		## This code requires wpca (https://github.com/jakevdp/wpca):
 		### pip install wpca
 		### pip install scikit-learn
-		
-		## args.test changes the order of vertices.
-		## Someone would need to update this code to match whatever it is doing.
-		assert not args.test
 		
 		Ts_errors = np.loadtxt( args.transformation_errors )
 		Ts_ssv = np.loadtxt( args.transformation_ssv )
@@ -138,6 +149,12 @@ if __name__ == '__main__':
 	uncorrelated = Ts_mapper.project( Ts )
 	print( "uncorrelated data shape" )
 	print( uncorrelated.shape )
+
+	if args.random_percent is not None and args.random_after_PCA:
+		uncorrelated_all = uncorrelated
+		keep_N = np.clip( int( ( args.random_percent * len(uncorrelated) )/100. + 0.5 ), 0, len( uncorrelated ) )
+		uncorrelated = np.random.permutation( uncorrelated )[:keep_N]
+		print( "Keeping %s out of %s points (after PCA)." % ( len( uncorrelated ), len( uncorrelated_all ) ) )
 
 	startTime = time.time()
 	np.set_printoptions(precision=4, suppress=True)

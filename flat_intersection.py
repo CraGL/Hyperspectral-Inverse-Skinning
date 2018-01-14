@@ -1068,9 +1068,12 @@ if __name__ == '__main__':
 	parser.add_argument('--recovery', '-R', type=float, help='Recovery test epsilon (default no recovery test).')
 	parser.add_argument('--strategy', '-S', type=str, choices = ['function', 'gradient', 'hessian', 'mixed', 'grassmann', 'pinv', 'pinv+ssv:skip', 'pinv+ssv:weighted', 'ssv:skip', 'ssv:weighted'], help='Strategy: function, gradient (default), hessian, mixed, grassmann (for energy B only), pinv and ssv (for energy biquadratic only).')
 	parser.add_argument('--energy', '-E', type=str, default='B', choices = ['B', 'cayley', 'B+cayley', 'B+B', 'cayley+cayley', 'biquadratic', 'biquadratic+B', 'biquadratic+handles', 'laplacian'], help='Energy: B (default), cayley, B+cayley, B+B, cayley+cayley, biquadratic, biquadratic+B, biquadratic+handles, laplacian.')
-	parser.add_argument('--solve-for-rest-pose', type=bool, default=False, help='Whether to solve for the rest pose (only affects "biquadratic" energy (default: False).')
-	parser.add_argument('--error', type=bool, default=False, help='Whether to compute transformation error and vertex error compared with ground truth.')
-	parser.add_argument('--zero', type=bool, default=False, help='Given ground truth, zero test.')
+	## UPDATE: type=bool does not do what we think it does. bool("False") == True.
+	##         For more, see https://stackoverflow.com/questions/15008758/parsing-boolean-values-with-argparse
+	def str2bool(s): return {'true': True, 'false': False}[s.lower()]
+	parser.add_argument('--solve-for-rest-pose', type=str2bool, default=False, help='Whether to solve for the rest pose (only affects "biquadratic" energy (default: False).')
+	parser.add_argument('--error', type=str2bool, default=False, help='Whether to compute transformation error and vertex error compared with ground truth.')
+	parser.add_argument('--zero', type=str2bool, default=False, help='Given ground truth, zero test.')
 	parser.add_argument('--fancy-init', '-I', type=str, help='Valid points generated from local subspace intersection.')
 	parser.add_argument('--fancy-init-errors', type=str, help='Errors for data generated from local subspace intersection.')
 	parser.add_argument('--fancy-init-ssv', type=str, help='Smallest singular values for data generated from local subspace intersection.')

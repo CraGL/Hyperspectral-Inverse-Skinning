@@ -12,7 +12,7 @@ SIMPLEX_HULL_ARGS="-D 10 --method qp-major --WPCA True --transformation-errors $
 
 # Generate
 mkdir -p "${OUTPUT_DIR}"
-echo python -u "${ROOT_DIR}"/PerVertex/local_subspace_recover.py ${INITIAL_GUESS_ARGS} "${REST_POSE}" "${OTHER_POSE_DIR}"/*.obj --out "${OUTPUT_DIR}"/local_subspace_recover.txt --out-errors "${OUTPUT_DIR}"/local_subspace_recover_errors.txt --out-ssv "${OUTPUT_DIR}"/local_subspace_recover_ssv.txt 2>&1 | tee "${OUTPUT_DIR}"/local_subspace_recover.out
+python -u "${ROOT_DIR}"/PerVertex/local_subspace_recover.py ${INITIAL_GUESS_ARGS} "${REST_POSE}" "${OTHER_POSE_DIR}"/*.obj --out "${OUTPUT_DIR}"/local_subspace_recover.txt --out-errors "${OUTPUT_DIR}"/local_subspace_recover_errors.txt --out-ssv "${OUTPUT_DIR}"/local_subspace_recover_ssv.txt 2>&1 | tee "${OUTPUT_DIR}"/local_subspace_recover.out
 python3 -u "${ROOT_DIR}"/simplex_hull_with_initial_guess.py "${OUTPUT_DIR}"/local_subspace_recover.txt "${REST_POSE}" "${OTHER_POSE_DIR}" "${OUTPUT_DIR}"/result.txt ${SIMPLEX_HULL_ARGS} 2>&1 | tee -i "${OUTPUT_DIR}"/simplex_hull.out
 
 # Evaluate

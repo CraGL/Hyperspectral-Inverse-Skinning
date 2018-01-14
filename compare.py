@@ -118,9 +118,13 @@ if __name__ == '__main__':
 	parser.add_argument( 'pose_folder', type=str, help='Folder containing deformed poses.')
 	parser.add_argument( 'weights', type=str, help='ground truth skinning weights.')
 	parser.add_argument( 'our_result', type=str, help='our results(txt).')
-	parser.add_argument( '--write-OBJ', '-W', type=bool, default=False, help='whether to save recovered and SSD poses.')
+	## UPDATE: type=bool does not do what we think it does. bool("False") == True.
+	##         For more, see https://stackoverflow.com/questions/15008758/parsing-boolean-values-with-argparse
+	def str2bool(s): return {'true': True, 'false': False}[s.lower()]
+	# parser.add_argument( '--write-OBJ', '-W', type=bool, default=False, help='whether to save recovered and SSD poses.')
+	parser.add_argument( '--write-OBJ', '-W', type=str2bool, default=False, help='whether to save recovered and SSD poses.')
 	parser.add_argument( '--ssd_result', '--SSD', type=str, help='SSD results(txt).')
-	parser.add_argument( '--debug', '-D', type=bool, default=False, help='print out debug information.')
+	parser.add_argument( '--debug', '-D', type=str2bool, default=False, help='print out debug information.')
 	args = parser.parse_args()
 	
 	base_dir = args.pose_folder
