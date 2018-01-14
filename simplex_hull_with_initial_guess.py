@@ -119,7 +119,6 @@ if __name__ == '__main__':
 		Ts = all_Ts.copy()
 		
 		if args.random_percent is not None and not args.random_after_PCA:
-			Ts_all = Ts.copy()
 			keep_N = np.clip( int( ( args.random_percent * len(Ts) )/100. + 0.5 ), 0, len( Ts ) )
 			## For some reason built-in numpy.random function produce worse results.
 			## This must be superstition!
@@ -129,7 +128,7 @@ if __name__ == '__main__':
 			import random
 			random.shuffle( Ts )
 			Ts = Ts[:keep_N]
-			print( "Keeping %s out of %s points (before PCA)." % ( len( Ts ), len( Ts_all ) ) )
+			print( "Keeping %s out of %s points (before PCA)." % ( len( Ts ), len( all_Ts ) ) )
 		
 		if args.WPCA is not None:
 			## This code requires wpca (https://github.com/jakevdp/wpca):
