@@ -7,7 +7,7 @@ import scipy.sparse
 USE_OUR_GRADIENTS = True
 if USE_OUR_GRADIENTS:
 	print( "Using our gradient functions, not automatic finite differencing ones." )
-DEBUG = False	
+DEBUG = False
 
 def points_to_data( pts ):
 	## pts should be a sequence of n-dimensional points.
@@ -129,7 +129,7 @@ def MVES( pts, initial_guess_vertices = None, method = None, linear_solver = Non
 		## That's equivalent to swapping columns.
 		invvol = numpy.linalg.det( Vinv )
 		
-		if invvol > 0:	return invvol
+		# if invvol > 0:	return invvol
 		return -invvol
 	
 	def f_volume_grad( x ):
@@ -172,7 +172,7 @@ def MVES( pts, initial_guess_vertices = None, method = None, linear_solver = Non
 		
 		## We want to maximize this quantity, so return it negated.
 		# return -sign*logdet
-		return logdet
+		return -logdet
 	
 	def f_log_volume_grad( x ):
 		Vinv = unpack( x )
@@ -206,9 +206,8 @@ def MVES( pts, initial_guess_vertices = None, method = None, linear_solver = Non
 		bigdim = (n+1)*(n+1)
 		return result.T.reshape( bigdim, n+1, n+1 ).transpose((0,2,1)).reshape( bigdim, bigdim ).T
 	
-	'''
 	def test_hessian():
-		n = 3
+		# n = 3
 		numpy.random.seed(0)
 		R = numpy.random.random( ( n+1, n+1 ) ).ravel()
 		
@@ -222,11 +221,6 @@ def MVES( pts, initial_guess_vertices = None, method = None, linear_solver = Non
 		# Hfd = hessian.hessian( R, grad = f_log_volume_grad )
 		Hfd = hessian.hessian( R, f = f_log_volume, epsilon = 1e-5 )
 		print( numpy.average( numpy.abs( ( Hfd - hess ) ) ) )
-		
-		import sys
-		sys.exit(0)
-	test_hessian()
-	'''
 	
 	if DEBUG:
 		## Check the gradient.
@@ -241,6 +235,8 @@ def MVES( pts, initial_guess_vertices = None, method = None, linear_solver = Non
 		# print( 'slogdet:', numpy.linalg.slogdet( R.reshape(n+1,n+1) )[0]*numpy.exp(numpy.linalg.slogdet( R.reshape(n+1,n+1) )[1]) )
 		# print( scipy.optimize.approx_fprime( R, f_log_volume, numpy.sqrt(numpy.finfo(float).eps) ) )
 		# print( f_log_volume_grad( R ) )
+		
+		test_hessian()
 	
 	
 	## Set up the constraints.
@@ -262,7 +258,7 @@ def MVES( pts, initial_guess_vertices = None, method = None, linear_solver = Non
 	if DEBUG:
 		print( "Checking the positive barycentric coordinate constraint gradient." )
 		for i in range(n+1):
-			err = scipy.optimize.check_grad( lambda x: g_bary(x)[i], lambda x: g_bary_jac(x)[i], numpy.random.random( (n+1,n+1) ).ravel() )
+			err = scipy.optimize.check_grad( lambda x: g_bary(x)[i], lambda x: g_bary_jac_dense(x)[i], numpy.random.random( (n+1,n+1) ).ravel() )
 			print( 'g_bary gradient is right if this number is ~0:', err )
 	
 	## Constrain the bottom row of the inverse (aka the homogeneous coordinates) to be all ones.
@@ -280,7 +276,7 @@ def MVES( pts, initial_guess_vertices = None, method = None, linear_solver = Non
 	if DEBUG:
 		print( "Checking the homogeneous coordinate constraint gradient." )
 		for i in range(n+1):
-			err = scipy.optimize.check_grad( lambda x: g_ones(x)[i], lambda x: g_ones_jac(x)[i], numpy.random.random( (n+1,n+1) ).ravel() )
+			err = scipy.optimize.check_grad( lambda x: g_ones(x)[i], lambda x: g_ones_jac_dense(x)[i], numpy.random.random( (n+1,n+1) ).ravel() )
 			print( 'g_ones gradient is right if this number is ~0:', err )
 	
 	def valid_initial( pts ):
@@ -407,14 +403,16 @@ def MVES( pts, initial_guess_vertices = None, method = None, linear_solver = Non
 				# Hc = numpy.dot( f_log_volume_hess_inv( x0 ), f_log_volume_grad( x0 ) )
 				# solution = cvxopt.solvers.lp( cvxopt.matrix(Hc*0.9+c*0.1), sparse_G, cvxopt.matrix(h), sparse_A, cvxopt.matrix(b), solver=linear_solver )
 	
-				x = solution['x']
-				fx = f_log_volume( numpy.array(x) )
+				x = numpy.array( solution['x'] )
+				fx = f_log_volume( x )
 				print( "Current log volume: ", fx  )
 				all_x.append( ( fx, x ) )
 				iter_num += 1
-				if( numpy.allclose( numpy.array( x ), x0, rtol=1e-02, atol=1e-05 ) ):
+				if( numpy.allclose( x, x0, rtol=1e-02, atol=1e-05 ) ):
 					print("all close!")
 					break
+				## More generally, check if we are in a cycle:
+				# if [ x - 
 				elif( iter_num>MAX_ITER/2 and abs( fx - f_log_volume(x0) ) <= 0.1 ):
 					print("log volume is close!")
 					break
@@ -422,7 +420,7 @@ def MVES( pts, initial_guess_vertices = None, method = None, linear_solver = Non
 					print("Exceed the maximum number of iterations!")
 					break
 	
-				x0 += 0.95*(numpy.array(x) - x0)
+				x0 += 0.95*(x - x0)
 		
 		except KeyboardInterrupt:
 			print( "Terminated by KeyboardInterrupt." )
@@ -528,12 +526,12 @@ def MVES( pts, initial_guess_vertices = None, method = None, linear_solver = Non
 			## Volume:
 			# solution = scipy.optimize.minimize( f_volume_with_grad, x0, jac = True, constraints = constraints )
 			## Log volume:
-			solution = scipy.optimize.minimize( f_log_volume, x0, jac = f_log_volume_grad, hess = f_log_volume_hess, constraints = constraints, callback = show_progress, options = { 'maxiter': MAX_ITER } )
+			solution = scipy.optimize.minimize( f_log_volume, x0, jac = f_log_volume_grad, hess = f_log_volume_hess, constraints = constraints, callback = show_progress, options = { 'maxiter': MAX_ITER, 'disp': True, 'iprint': 2 } )
 		else:
 			## Volume:
 			# solution = scipy.optimize.minimize( f_volume, x0, constraints = constraints )
 			## Log volume:
-			solution = scipy.optimize.minimize( f_log_volume, x0, constraints = constraints, callback = show_progress, options = { 'maxiter': MAX_ITER } )
+			solution = scipy.optimize.minimize( f_log_volume, x0, constraints = constraints, callback = show_progress, options = { 'maxiter': MAX_ITER, 'disp': True, 'iprint': 2 } )
 		solution = numpy.linalg.inv( unpack( solution.x ) )
 	else:
 		raise RuntimeError( "Unknown MVES method" )
