@@ -94,6 +94,12 @@ if __name__ == '__main__':
 	Ts = np.loadtxt(args.per_vertex_tranformation)
 	print( "# initial vertices: ", Ts.shape[0] )
 	
+	if args.WPCA is not None:
+		Ts_errors = np.loadtxt( args.transformation_errors )
+		Ts_ssv = np.loadtxt( args.transformation_ssv )
+		Ts_weights = 1./(1e-5 + Ts_errors)
+		Ts_weights[ Ts_ssv < 1e-8 ] = 0.
+	
 	if args.ground_truth is not None:
 		handle_trans = glob.glob(args.ground_truth + "/*.Tmat")
 		handle_trans.sort()
@@ -113,10 +119,12 @@ if __name__ == '__main__':
 	np.set_printoptions(precision=4, suppress=True)
 	
 	all_Ts = Ts.copy()
+	if args.WPCA is not None: all_Ts_weights = Ts_weights.copy()
 	## results stores: volume, solution, iter_num
 	results = []
 	for random_rep in range( args.random_reps ):
 		Ts = all_Ts.copy()
+		if args.WPCA is not None: Ts_weights = all_Ts_weights.copy()
 		
 		if args.random_percent is not None and not args.random_after_PCA:
 			keep_N = np.clip( int( ( args.random_percent * len(Ts) )/100. + 0.5 ), 0, len( Ts ) )
@@ -126,19 +134,18 @@ if __name__ == '__main__':
 			# np.random.shuffle( Ts )
 			# Ts = Ts[:keep_N]
 			import random
-			random.shuffle( Ts )
-			Ts = Ts[:keep_N]
+			indices = np.arange( len( Ts ) )
+			random.shuffle( indices )
+			indices = indices[:keep_N]
+			Ts = Ts[indices]
+			Ts_weights = Ts_weights[indices]
+			
 			print( "Keeping %s out of %s points (before PCA)." % ( len( Ts ), len( all_Ts ) ) )
 		
 		if args.WPCA is not None:
 			## This code requires wpca (https://github.com/jakevdp/wpca):
 			### pip install wpca
 			### pip install scikit-learn
-			
-			Ts_errors = np.loadtxt( args.transformation_errors )
-			Ts_ssv = np.loadtxt( args.transformation_ssv )
-			Ts_weights = 1./(1e-5 + Ts_errors)
-			Ts_weights[ Ts_ssv < 1e-8 ] = 0.
 			
 			# from wpca import EMPCA
 			from wpca import WPCA
