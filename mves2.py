@@ -436,7 +436,7 @@ def MVES( pts, initial_guess_vertices = None, method = None, linear_solver = Non
 		print( "Final log volume:", f_log_volume( numpy.array(x0) ) )
 		solution = numpy.linalg.inv( unpack( numpy.array(x0) ) )
 		
-	elif method == "QP" or method == "qp":
+	elif method == "QP" or method == "qp" or method == "qp-major":
 		print( "Solve MEVS with cvxopt qp solver." )	
 		import cvxopt
 		x0 = x0[:,numpy.newaxis]
@@ -456,29 +456,48 @@ def MVES( pts, initial_guess_vertices = None, method = None, linear_solver = Non
 		try:
 			while True:
 				## update solver parameters.
-				P = make_positive_semidefinite( f_log_volume_hess( x0 ) )
+				P = f_log_volume_hess( x0 )
 				q = f_log_volume_grad( x0 )
+				if method == 'qp-major':
+					# Following: Robust Minimum Volume Simplex Analysis for Hyperspectral Unmixing (A. Agathos, J. Li, J. M. Bioucas-Dias, A. Plaza 2014 European Signal Processing Conference (EUSIPCO))
+					q = q-P.dot( x0 ).squeeze()
+					
+					## Turn P into a diagonal matrix.
+					P = numpy.diag( numpy.diag( P ) )
+				else:
+					P = make_positive_semidefinite( P )
 				## solve
 				## MOSEK is so much faster and better!
 				solution = cvxopt.solvers.qp( cvxopt.matrix(P), cvxopt.matrix(q), sparse_G, cvxopt.matrix(h), sparse_A, cvxopt.matrix(b), solver = 'mosek' )
 				# solution = cvxopt.solvers.qp( cvxopt.matrix(P), cvxopt.matrix(q), sparse_G, cvxopt.matrix(h), sparse_A, cvxopt.matrix(b) )
-				# solution = cvxopt.solvers.qp( -cvxopt.matrix(P), cvxopt.matrix(q), sparse_G, cvxopt.matrix(h), sparse_A, cvxopt.matrix(b), kktsolver='ldl' )
-				x = solution['x']
-				fx = f_log_volume( numpy.array(x) )
+				x = numpy.array( solution['x'] )
+				fx = f_log_volume( x )
 				print( "Current log volume: ", fx )
+				
 				iter_num += 1
-				if( numpy.allclose( numpy.array( x ), x0, rtol=1e-02, atol=1e-05 ) ):
+				
+				## Line search as mentioned in the Agathos paper.
+				## Was the last solution better?
+				while all_x[-1][0] < fx:
+					## Bisect the distance between the last solution and the current one.
+					x = 0.5*( x0 + x )
+					fx = f_log_volume( x )
+					
+					print( "Volume increased! Bisecting. New log volume:", fx )
+					
+					## Break this line search if we are too close.
+					if numpy.allclose( x, x0 ):
+						break
+				
+				## Have we converged?
+				if( numpy.allclose( x, x0, rtol=1e-02, atol=1e-05 ) ):
 					print("all close!")
-					break
-				elif( iter_num>MAX_ITER/2 and abs( fx - f_log_volume(x0) ) <= 0.1 ):
-					print("log volume is close!")
 					break
 				elif iter_num >= MAX_ITER:
 					print("Exceed the maximum number of iterations!")
 					break
 				all_x.append( ( fx, x ) )
-# 				x0 += 0.9*(numpy.array(x) - x0)
-				x0 = numpy.array(x)
+				x0 = x
 		except KeyboardInterrupt:
 			print( "Terminated by KeyboardInterrupt." )
 		

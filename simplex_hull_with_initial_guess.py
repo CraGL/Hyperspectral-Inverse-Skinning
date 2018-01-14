@@ -62,6 +62,10 @@ if __name__ == '__main__':
 	parser.add_argument('--ground-truth', '-GT', type=str, help='Ground truth data path.')
 	parser.add_argument('--robust-percentile', '-R', type=float, help='Fraction of outliers to discard. Default: 0.')
 	parser.add_argument('--dimension', '-D', type=int, help='Dimension (number of handles minus one). Default: automatic.')
+	## Only if the solver is still slow for big examples:
+	# parser.add_argument('--random-percent', type=float, help='If specified, compute with a random % subset of the points. Default: off (equivalent to 100).')
+	# parser.add_argument('--random-after-PCA', type=bool, help='Whether to take the random subset after computing PCA. Default: False.')
+	# parser.add_argument('--random-reps', type=int, help='How many times to repeat the random subsampling. Default: 1.')
 	args = parser.parse_args()
 
 	# Check that in_mesh exists
@@ -105,6 +109,10 @@ if __name__ == '__main__':
 
 	startTime = time.time()
 	np.set_printoptions(precision=4, suppress=True)
+	
+	# import scipy.io
+	# scipy.io.savemat( 'MVES_input.mat', mdict={'M': uncorrelated})
+	# print( "Saved input points to MVES in MATLAB format as:", 'MVES_input.mat' )
  
 	## Compute minimum-volume enclosing simplex
 	import mves2
