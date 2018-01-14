@@ -116,8 +116,8 @@ if __name__ == '__main__':
 	
 	# np.random.seed(0)
 	
-	startTime = time.time()
 	np.set_printoptions(precision=4, suppress=True)
+	startTime = time.time()
 	
 	all_Ts = Ts.copy()
 	if args.WPCA is not None: all_Ts_weights = Ts_weights.copy()
@@ -139,7 +139,7 @@ if __name__ == '__main__':
 			random.shuffle( indices )
 			indices = indices[:keep_N]
 			Ts = Ts[indices]
-			Ts_weights = Ts_weights[indices]
+			if args.WPCA is not None: Ts_weights = Ts_weights[indices]
 			
 			print( "Keeping %s out of %s points (before PCA)." % ( len( Ts ), len( all_Ts ) ) )
 		
