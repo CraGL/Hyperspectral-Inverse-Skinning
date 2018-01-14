@@ -59,12 +59,37 @@ def cull_interior_points( pts ):
 	
 	return numpy.concatenate( (pts[ ( bary < 0 ) ], bounded), axis=0 )
 
+def make_positive_semidefinite( M ):
+	'''
+	Given:
+		M: A square matrix as a numpy.array.
+	Returns:
+		P: M modified to be positive semi-definite.
+	'''
+	
+	## Clip the negative eigenvalues.
+	
+	## Fancier: https://stackoverflow.com/questions/43238173/python-convert-matrix-to-positive-semi-definite
+	## See also: https://stackoverflow.com/questions/10939213/how-can-i-calculate-the-nearest-positive-semi-definite-matrix
+	
+	## We assume the matrix is symmetric. If not, add it to its transpose and divide by 2.
+	# assert abs( M - M.T ).max() < 1e-10
+	
+	eigenvalues, Q = numpy.linalg.eigh( M )
+	
+	# assert abs( Q.dot( numpy.diag(eigenvalues).dot( Q.T ) ) - M ).max() < 1e-10
+	# assert abs( Q.dot( numpy.diag(eigenvalues).dot( Q.T ) ) - M ).max() < 1e-10
+	# assert abs( Q.dot( eigenvalues.reshape(-1,1) * Q.T ) - M ).max() < 1e-10
+	
+	P = numpy.dot( Q, numpy.maximum( eigenvalues, 0.0 ).reshape(-1,1) * Q.T )
+	return P
+
 def to_spmatrix( M ):
 	M = scipy.sparse.coo_matrix( M )
 	import cvxopt
 	return cvxopt.spmatrix( M.data, numpy.asarray( M.row, dtype = int ), numpy.asarray( M.col, dtype = int ) )
 
-def MVES( pts, initial_guess_vertices = None, linear_solver = None ):
+def MVES( pts, initial_guess_vertices = None, linear_solver = None, strategy = None, max_iter = None ):
 	'''
 	Given:
 		pts: A sequence of n-dimensional points (e.g. points are rows)
@@ -164,6 +189,8 @@ def MVES( pts, initial_guess_vertices = None, linear_solver = None ):
 		Vinvinv = numpy.linalg.inv(Vinv)
 		result = ( numpy.kron( Vinvinv.T, Vinvinv ) )
 		## WHY OH WHY DO WE HAVE TO DO THIS CRAZY RESHAPE AND TRANSPOSE THING?
+		## UPDATE: I believe it's because we do row-major vectorization when
+		##         the identities we looked up are for column-major vectorization.
 		bigdim = (n+1)*(n+1)
 		return result.reshape( bigdim, n+1, n+1 ).transpose((0,2,1)).reshape( bigdim, bigdim )
 	
@@ -171,6 +198,8 @@ def MVES( pts, initial_guess_vertices = None, linear_solver = None ):
 		Vinv = unpack( x )
 		result = ( numpy.kron( Vinv.T, Vinv ) )
 		## WHY OH WHY DO WE HAVE TO DO THIS CRAZY RESHAPE AND TRANSPOSE THING?
+		## UPDATE: I believe it's because we do row-major vectorization when
+		##         the identities we looked up are for column-major vectorization.
 		bigdim = (n+1)*(n+1)
 		return result.T.reshape( bigdim, n+1, n+1 ).transpose((0,2,1)).reshape( bigdim, bigdim ).T
 	
@@ -310,10 +339,15 @@ def MVES( pts, initial_guess_vertices = None, linear_solver = None ):
 		print("Iteration", iteration[0])
 	
 	solvers = ["IPOPT", "CVXOPT_IP", "SCIPY", "BINARY", "CVXOPT_QP"]
-	used_solver = "CVXOPT_IP"
+	used_solver = strategy
+	if used_solver is None:
+		used_solver = "CVXOPT_IP"
+	MAX_ITER = max_iter
+	if MAX_ITER is None:
+		MAX_ITER = 1000
+	
 	iter_num = 0
-	MAX_ITER = 1000
-
+	
 	## Solve.
 	solution = numpy.linalg.inv( unpack( x0 ) )
 	if used_solver == "IPOPT":		
@@ -365,10 +399,12 @@ def MVES( pts, initial_guess_vertices = None, linear_solver = None ):
 		sparse_A = to_spmatrix(A)
 		try:
 			while True:		
-				Hc = numpy.dot( f_log_volume_hess_inv( x0 ), f_log_volume_grad( x0 ) )
 				c = f_log_volume_grad( x0 )
 				solution = cvxopt.solvers.lp( cvxopt.matrix(c), sparse_G, cvxopt.matrix(h), sparse_A, cvxopt.matrix(b), solver=linear_solver )
-	# 			solution = cvxopt.solvers.lp( cvxopt.matrix(Hc*0.9+c*0.1), sparse_G, cvxopt.matrix(h), sparse_A, cvxopt.matrix(b), solver='mosek' )
+				# Hc = numpy.linalg.solve( make_positive_semidefinite( f_log_volume_hess( x0 ) ), f_log_volume_grad( x0 ) )
+				# solution = cvxopt.solvers.lp( cvxopt.matrix(Hc), sparse_G, cvxopt.matrix(h), sparse_A, cvxopt.matrix(b), solver=linear_solver )
+				# Hc = numpy.dot( f_log_volume_hess_inv( x0 ), f_log_volume_grad( x0 ) )
+				# solution = cvxopt.solvers.lp( cvxopt.matrix(Hc*0.9+c*0.1), sparse_G, cvxopt.matrix(h), sparse_A, cvxopt.matrix(b), solver=linear_solver )
 	
 				x = solution['x']
 				fx = f_log_volume( numpy.array(x) )
@@ -385,7 +421,7 @@ def MVES( pts, initial_guess_vertices = None, linear_solver = None ):
 					print("Exceed the maximum number of iterations!")
 					break
 	
-				x0 += 0.9*(numpy.array(x) - x0)
+				x0 += 0.95*(numpy.array(x) - x0)
 		
 		except KeyboardInterrupt:
 			print( "Terminated by KeyboardInterrupt." )
@@ -420,9 +456,10 @@ def MVES( pts, initial_guess_vertices = None, linear_solver = None ):
 		try:
 			while True:
 				## update solver parameters.
-				P = f_log_volume_hess( x0 )
-				q = f_log_volume_grad( x0 )			
+				P = make_positive_semidefinite( f_log_volume_hess( x0 ) )
+				q = f_log_volume_grad( x0 )
 				## solve
+				# solution = cvxopt.solvers.qp( cvxopt.matrix(P), cvxopt.matrix(q), sparse_G, cvxopt.matrix(h), sparse_A, cvxopt.matrix(b), solver = 'mosek' )
 				solution = cvxopt.solvers.qp( cvxopt.matrix(P), cvxopt.matrix(q), sparse_G, cvxopt.matrix(h), sparse_A, cvxopt.matrix(b) )
 				# solution = cvxopt.solvers.qp( -cvxopt.matrix(P), cvxopt.matrix(q), sparse_G, cvxopt.matrix(h), sparse_A, cvxopt.matrix(b), kktsolver='ldl' )
 				x = solution['x']
@@ -475,7 +512,7 @@ def MVES( pts, initial_guess_vertices = None, linear_solver = None ):
 		print( "Final x inverse:" )
 		print( numpy.linalg.inv( x0.reshape( n+1, n+1 ) ) )
 		solution = numpy.linalg.inv( unpack( x0 ) )
-	else:			
+	elif used_solver == 'SCIPY':			
 		if USE_OUR_GRADIENTS:
 			constraints.append( { 'type': 'ineq', 'fun': g_bary, 'jac': g_bary_jac_dense } )
 			constraints.append( { 'type': 'eq', 'fun': g_ones, 'jac': g_ones_jac_dense } )
@@ -486,13 +523,15 @@ def MVES( pts, initial_guess_vertices = None, linear_solver = None ):
 			## Volume:
 			# solution = scipy.optimize.minimize( f_volume_with_grad, x0, jac = True, constraints = constraints )
 			## Log volume:
-			solution = scipy.optimize.minimize( f_log_volume, x0, jac = f_log_volume_grad, constraints = constraints, callback = show_progress )
+			solution = scipy.optimize.minimize( f_log_volume, x0, jac = f_log_volume_grad, hess = f_log_volume_hess, constraints = constraints, callback = show_progress, options = { 'maxiter': MAX_ITER } )
 		else:
 			## Volume:
 			# solution = scipy.optimize.minimize( f_volume, x0, constraints = constraints )
 			## Log volume:
-			solution = scipy.optimize.minimize( f_log_volume, x0, constraints = constraints, callback = show_progress )
+			solution = scipy.optimize.minimize( f_log_volume, x0, constraints = constraints, callback = show_progress, options = { 'maxiter': MAX_ITER } )
 		solution = numpy.linalg.inv( unpack( solution.x ) )
+	else:
+		raise RuntimeError( "Unknown solver strategy" )
 	
 	## Return the solution in a better format.
 	

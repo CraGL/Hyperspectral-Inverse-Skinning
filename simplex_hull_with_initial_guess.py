@@ -55,6 +55,9 @@ if __name__ == '__main__':
 	parser.add_argument( 'rest_pose', type=str, help='Rest pose (OBJ).')
 	parser.add_argument( 'pose_folder', type=str, help='Folder containing deformed poses.')
 	parser.add_argument('output', type=str, help='output path.')
+	parser.add_argument('--linear-solver', '-L', type=str, help='Linear solver: "glpk" (default) or "mosek".')
+	parser.add_argument('--strategy', type=str, choices=['CVXOPT_IP', 'CVXOPT_QP', 'IPOPT', 'SCIPY'], help='CVXOPT_IP (default): Sequential linear programming. CVXOPT_QP: Sequential quadratic programming. IPOPT: Use the IPOPT solver. SCIPY: Use scipy.optimize.minimize().')
+	parser.add_argument('--max-iter', type=int, help='The maximum iterations for the solver.')
 	parser.add_argument('--ground-truth', '-GT', type=str, help='Ground truth data path.')
 	parser.add_argument('--robust-percentile', '-R', type=float, help='Fraction of outliers to discard. Default: 0.')
 	parser.add_argument('--dimension', '-D', type=int, help='Dimension (number of handles minus one). Default: automatic.')
@@ -99,7 +102,7 @@ if __name__ == '__main__':
  
 	## Compute minimum-volume enclosing simplex
 	import mves2
-	solution, weights, iter_num = mves2.MVES( uncorrelated )
+	solution, weights, iter_num = mves2.MVES( uncorrelated, linear_solver = args.linear_solver, strategy = args.strategy, max_iter = args.max_iter )
 	
 	print( "solution" )
 	print( solution )
@@ -116,7 +119,7 @@ if __name__ == '__main__':
 		rows_to_discard = argsorted[ :num_rows_to_discard ].ravel()
 		uncorrelated_robust = np.delete( uncorrelated, rows_to_discard, axis = 0 )
 		print( "Re-running MVES" )
-		solution, weights_robust, iter_num = mves2.MVES( uncorrelated_robust )
+		solution, weights_robust, iter_num = mves2.MVES( uncorrelated_robust, linear_solver = args.linear_solver, strategy = args.strategy, max_iter = args.max_iter )
 		weights = np.dot( np.linalg.inv( solution ), np.concatenate( ( uncorrelated.T, np.ones((1,uncorrelated.shape[0])) ), axis=0 ) ).T
 		print( "robust solution" )
 		print( solution )

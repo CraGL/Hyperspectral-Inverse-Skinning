@@ -153,6 +153,8 @@ if __name__ == '__main__':
 	parser = argparse.ArgumentParser(description = "From per-vertex transformations to per-bone transformations. ", usage="%(prog)s path/to/input_model_folder")
 	parser.add_argument("per_vertex_tranformation", type=str, help="Path to the folder containing input mesh files.")
 	parser.add_argument('--linear-solver', '-L', type=str, help='Linear solver: "glpk" (default) or "mosek".')
+	parser.add_argument('--strategy', type=str, choices=['CVXOPT_IP', 'CVXOPT_QP', 'IPOPT', 'SCIPY'], help='CVXOPT_IP (default): Sequential linear programming. CVXOPT_QP: Sequential quadratic programming. IPOPT: Use the IPOPT solver. SCIPY: Use scipy.optimize.minimize().')
+	parser.add_argument('--max-iter', type=int, help='The maximum iterations for the solver.')
 	parser.add_argument('--ground-truth', '-GT', type=str, help='Ground truth data path.')
 	parser.add_argument('--robust-percentile', '-R', type=float, help='Fraction of outliers to discard. Default: 0.')
 	parser.add_argument('--dimension', '-D', type=int, help='Dimension (number of handles minus one). Default: automatic.')
@@ -219,7 +221,7 @@ if __name__ == '__main__':
  
 	## Compute minimum-volume enclosing simplex
 	import mves2
-	solution, weights, iter_num = mves2.MVES( uncorrelated, linear_solver = args.linear_solver )
+	solution, weights, iter_num = mves2.MVES( uncorrelated, linear_solver = args.linear_solver, strategy = args.strategy, max_iter = args.max_iter )
 	
 	'''
 	## Option 1: Run MVES on the union of convex hull vertices:
@@ -277,7 +279,7 @@ if __name__ == '__main__':
 		rows_to_discard = argsorted[ :num_rows_to_discard ].ravel()
 		uncorrelated_robust = numpy.delete( uncorrelated, rows_to_discard, axis = 0 )
 		print( "Re-running MVES" )
-		solution, weights_robust, iter_num = mves2.MVES( uncorrelated_robust, linear_solver = args.linear_solver )
+		solution, weights_robust, iter_num = mves2.MVES( uncorrelated_robust, linear_solver = args.linear_solver, strategy = args.strategy, max_iter = args.max_iter )
 		weights = numpy.dot( numpy.linalg.inv( solution ), numpy.concatenate( ( uncorrelated.T, numpy.ones((1,uncorrelated.shape[0])) ), axis=0 ) ).T
 		print( "robust solution" )
 		print( solution )
