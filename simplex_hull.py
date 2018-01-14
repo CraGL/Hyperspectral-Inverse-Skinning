@@ -152,10 +152,12 @@ if __name__ == '__main__':
 		
 	parser = argparse.ArgumentParser(description = "From per-vertex transformations to per-bone transformations. ", usage="%(prog)s path/to/input_model_folder")
 	parser.add_argument("per_vertex_tranformation", type=str, help="Path to the folder containing input mesh files.")
+	parser.add_argument('--method', type=str, help='linear or quadratic solver: "lp" (default), "qp", "ipopt", "binary" or "scipy".')
 	parser.add_argument('--linear-solver', '-L', type=str, help='Linear solver: "glpk" (default) or "mosek".')
 	parser.add_argument('--ground-truth', '-GT', type=str, help='Ground truth data path.')
 	parser.add_argument('--robust-percentile', '-R', type=float, help='Fraction of outliers to discard. Default: 0.')
 	parser.add_argument('--dimension', '-D', type=int, help='Dimension (number of handles minus one). Default: automatic.')
+	parser.add_argument('--output', '-O', type=str, help="output path")
 	args = parser.parse_args()
 
 	# Check that in_mesh exists
@@ -219,7 +221,7 @@ if __name__ == '__main__':
  
 	## Compute minimum-volume enclosing simplex
 	import mves2
-	solution, weights, iter_num = mves2.MVES( uncorrelated, linear_solver = args.linear_solver )
+	solution, weights, iter_num = mves2.MVES( uncorrelated, method = args.method, linear_solver = args.linear_solver )
 	
 	'''
 	## Option 1: Run MVES on the union of convex hull vertices:
@@ -277,7 +279,7 @@ if __name__ == '__main__':
 		rows_to_discard = argsorted[ :num_rows_to_discard ].ravel()
 		uncorrelated_robust = numpy.delete( uncorrelated, rows_to_discard, axis = 0 )
 		print( "Re-running MVES" )
-		solution, weights_robust, iter_num = mves2.MVES( uncorrelated_robust, linear_solver = args.linear_solver )
+		solution, weights_robust, iter_num = mves2.MVES( uncorrelated_robust, method = args.method, linear_solver = args.linear_solver )
 		weights = numpy.dot( numpy.linalg.inv( solution ), numpy.concatenate( ( uncorrelated.T, numpy.ones((1,uncorrelated.shape[0])) ), axis=0 ) ).T
 		print( "robust solution" )
 		print( solution )
@@ -292,6 +294,8 @@ if __name__ == '__main__':
 	
 	
 	output_path = os.path.join(per_vertex_folder, "result.txt")
+	if args.output is not None:
+		output_path = args.output
 	print( "Saving recovered results to:", output_path )
 	format_loader.write_result(output_path, recovered.round(6), weights.round(6), iter_num, running_time, col_major=True)
 	

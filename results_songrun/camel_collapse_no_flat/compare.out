@@ -1,6 +1,0 @@
-Traceback (most recent call last):
-  File "../../recover_poses.py", line 63, in <module>
-    rev_vs = np.array([lbs_all(rest_vs, rev_bones_per_pose, rev_w.T) for rev_bones_per_pose in rev_bones ])	
-  File "../../recover_poses.py", line 29, in lbs_all
-    assert( W.shape[0] == rest.shape[0] )
-AssertionError

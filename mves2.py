@@ -64,7 +64,7 @@ def to_spmatrix( M ):
 	import cvxopt
 	return cvxopt.spmatrix( M.data, numpy.asarray( M.row, dtype = int ), numpy.asarray( M.col, dtype = int ) )
 
-def MVES( pts, initial_guess_vertices = None, linear_solver = None ):
+def MVES( pts, initial_guess_vertices = None, method = None, linear_solver = None ):
 	'''
 	Given:
 		pts: A sequence of n-dimensional points (e.g. points are rows)
@@ -75,7 +75,9 @@ def MVES( pts, initial_guess_vertices = None, linear_solver = None ):
 		matrix has the points as the columns. The last coordinate of each point will
 		always be 1.
 	'''
-	
+	if method is None:
+		method = 'lp'	
+		
 	if linear_solver is None:
 		linear_solver = 'glpk'
 	
@@ -102,6 +104,7 @@ def MVES( pts, initial_guess_vertices = None, linear_solver = None ):
 		## That's equivalent to swapping columns.
 		invvol = numpy.linalg.det( Vinv )
 		
+		if invvol > 0:	return invvol
 		return -invvol
 	
 	def f_volume_grad( x ):
@@ -144,7 +147,7 @@ def MVES( pts, initial_guess_vertices = None, linear_solver = None ):
 		
 		## We want to maximize this quantity, so return it negated.
 		# return -sign*logdet
-		return -logdet
+		return logdet
 	
 	def f_log_volume_grad( x ):
 		Vinv = unpack( x )
@@ -309,14 +312,13 @@ def MVES( pts, initial_guess_vertices = None, linear_solver = None ):
 		iteration[0] += 1
 		print("Iteration", iteration[0])
 	
-	solvers = ["IPOPT", "CVXOPT_IP", "SCIPY", "BINARY", "CVXOPT_QP"]
-	used_solver = "CVXOPT_IP"
 	iter_num = 0
 	MAX_ITER = 1000
 
 	## Solve.
 	solution = numpy.linalg.inv( unpack( x0 ) )
-	if used_solver == "IPOPT":		
+	if method == "IPOPT" or method == "ipopt":	
+		print( "Solve MEVS with pyipopt." )		
 		import pyipopt
 		pyipopt.set_loglevel( 2 ) # 1: moderate log level of PyIPOPT				
 		nvar = (n+1)*(n+1)
@@ -349,7 +351,8 @@ def MVES( pts, initial_guess_vertices = None, linear_solver = None ):
 		
 		x, zl, zu, constraint_multipliers, obj, status = nlp.solve( x0 )
 		solution = x
-	elif used_solver == "CVXOPT_IP":
+	elif method == "IP" or method == "lp":
+		print( "Solve MEVS with cvxopt ip solver." )	
 		## Linear test:
 		import cvxopt
 		x0 = x0[:,numpy.newaxis]
@@ -367,7 +370,7 @@ def MVES( pts, initial_guess_vertices = None, linear_solver = None ):
 			Hc = numpy.dot( f_log_volume_hess_inv( x0 ), f_log_volume_grad( x0 ) )
 			c = f_log_volume_grad( x0 )
 			solution = cvxopt.solvers.lp( cvxopt.matrix(c), sparse_G, cvxopt.matrix(h), sparse_A, cvxopt.matrix(b), solver=linear_solver )
-# 			solution = cvxopt.solvers.lp( cvxopt.matrix(Hc*0.9+c*0.1), sparse_G, cvxopt.matrix(h), sparse_A, cvxopt.matrix(b), solver='mosek' )
+# 			solution = cvxopt.solvers.lp( cvxopt.matrix(Hc*0.9+c*0.1), sparse_G, cvxopt.matrix(h), sparse_A, cvxopt.matrix(b), solver=linear_solver )
 
 			x = solution['x']
 			fx = f_log_volume( numpy.array(x) )
@@ -397,7 +400,8 @@ def MVES( pts, initial_guess_vertices = None, linear_solver = None ):
 		print( "Final log volume:", f_log_volume( numpy.array(x0) ) )
 		solution = numpy.linalg.inv( unpack( numpy.array(x0) ) )
 		
-	elif used_solver == "CVXOPT_QP":	
+	elif method == "QP" or method == "qp":
+		print( "Solve MEVS with cvxopt qp solver." )	
 		import cvxopt
 		x0 = x0[:,numpy.newaxis]
 		all_x = [ (f_log_volume( numpy.array(x0) ), x0) ]
@@ -419,7 +423,7 @@ def MVES( pts, initial_guess_vertices = None, linear_solver = None ):
 			q = f_log_volume_grad( x0 )			
 			## solve
 			solution = cvxopt.solvers.qp( cvxopt.matrix(P), cvxopt.matrix(q), sparse_G, cvxopt.matrix(h), sparse_A, cvxopt.matrix(b) )
-			# solution = cvxopt.solvers.qp( -cvxopt.matrix(P), cvxopt.matrix(q), sparse_G, cvxopt.matrix(h), sparse_A, cvxopt.matrix(b), kktsolver='ldl' )
+# 			solution = cvxopt.solvers.qp( -cvxopt.matrix(P), cvxopt.matrix(q), sparse_G, cvxopt.matrix(h), sparse_A, cvxopt.matrix(b), kktsolver='ldl' )
 			x = solution['x']
 			fx = f_log_volume( numpy.array(x) )
 			print( "Current log volume: ", fx )
@@ -446,7 +450,8 @@ def MVES( pts, initial_guess_vertices = None, linear_solver = None ):
 		print( "Final log volume:", f_log_volume( numpy.array(x0) ) )
 		solution = numpy.linalg.inv( unpack( numpy.array(x0) ) )
 		
-	elif used_solver == "BINARY":
+	elif method == "BINARY" or method == "binary":
+		print( "Solve MEVS with linear binary search." )	
 		## Binary search
 		G = -g_bary_jac( x0 )
 		h = numpy.zeros( G.shape[0] )
@@ -467,7 +472,8 @@ def MVES( pts, initial_guess_vertices = None, linear_solver = None ):
 		print( "Final x inverse:" )
 		print( numpy.linalg.inv( x0.reshape( n+1, n+1 ) ) )
 		solution = numpy.linalg.inv( unpack( x0 ) )
-	else:			
+	elif method == "SCIPY" or method == "scipy":
+		print( "Solve MEVS with scipy.optimize.minimize." )			
 		if USE_OUR_GRADIENTS:
 			constraints.append( { 'type': 'ineq', 'fun': g_bary, 'jac': g_bary_jac_dense } )
 			constraints.append( { 'type': 'eq', 'fun': g_ones, 'jac': g_ones_jac_dense } )
@@ -485,6 +491,9 @@ def MVES( pts, initial_guess_vertices = None, linear_solver = None ):
 			## Log volume:
 			solution = scipy.optimize.minimize( f_log_volume, x0, constraints = constraints, callback = show_progress )
 		solution = numpy.linalg.inv( unpack( solution.x ) )
+	else:
+		print( "Unknown MVES method" )
+		exit(-1)
 	
 	## Return the solution in a better format.
 	
