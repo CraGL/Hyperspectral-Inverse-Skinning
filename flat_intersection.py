@@ -1075,6 +1075,7 @@ if __name__ == '__main__':
 	parser.add_argument('--fancy-init-errors', type=str, help='Errors for data generated from local subspace intersection.')
 	parser.add_argument('--fancy-init-ssv', type=str, help='Smallest singular values for data generated from local subspace intersection.')
 	parser.add_argument('--output', '-O', type=str, default="", help='output path.')
+	parser.add_argument('--max-iter', type=int, help='Maximum number of iterations.')
 	parser.add_argument('--f-eps', type=float, help='Function change epsilon (biquadratic).')
 	parser.add_argument('--x-eps', type=float, help='Variable change epsilon (biquadratic).')
 	parser.add_argument('--W-projection', type=str, choices = ['normalize', 'regularize_translation', 'regularize_identity', 'constrain_magnitude'], help='How to project W (biquadratic): normalize, regularize_translation, regularize_identity, constrain_magnitude.')
@@ -1192,7 +1193,7 @@ if __name__ == '__main__':
 		
 		if args.energy == 'B':
 			# converged, x = optimize(P, H, all_R_mats, deformed_vs, x0)
-			converged, x = optimize_nullspace_directly(P, H, all_R_mats, deformed_vs, x0, strategy = args.strategy)
+			converged, x = optimize_nullspace_directly(P, H, all_R_mats, deformed_vs, x0, strategy = args.strategy, max_iter = args.max_iter )
 		elif args.energy == 'cayley':
 			converged, x = optimize_nullspace_cayley( P, H, all_R_mats, deformed_vs, x0, strategy = args.strategy )
 		elif args.energy == 'B+cayley':
@@ -1203,7 +1204,7 @@ if __name__ == '__main__':
 			## This second one continues to improve.
 			converged, x = optimize_nullspace_cayley( P, H, all_R_mats, deformed_vs, x, strategy = args.strategy )
 		elif args.energy == 'B+B':
-			converged, x = optimize_nullspace_directly(P, H, all_R_mats, deformed_vs, x0, strategy = args.strategy)
+			converged, x = optimize_nullspace_directly(P, H, all_R_mats, deformed_vs, x0, strategy = args.strategy, max_iter = args.max_iter )
 			## Without the following projection in and out of Grassmann space,
 			## the next optimize_nullspace_directly() doesn't do anything.
 			## (It terminates immediately.)
@@ -1212,31 +1213,31 @@ if __name__ == '__main__':
 			A = grassmann.A_from_non_Cayley_B( B )
 			B = grassmann.B_from_Cayley_A( A, H )
 			x = pack( p, B )
-			converged, x = optimize_nullspace_directly(P, H, all_R_mats, deformed_vs, x, strategy = args.strategy)
+			converged, x = optimize_nullspace_directly(P, H, all_R_mats, deformed_vs, x, strategy = args.strategy, max_iter = args.max_iter )
 		elif args.energy == 'biquadratic':
 			if args.solve_for_rest_pose:
-				converged, x, new_all_R_mats = optimize_biquadratic( P, H, all_R_mats, deformed_vs, x0, strategy = args.strategy, solve_for_rest_pose = args.solve_for_rest_pose, f_eps = args.f_eps, x_eps = args.x_eps, W_projection = args.W_projection, z_strategy = args.z_strategy )
+				converged, x, new_all_R_mats = optimize_biquadratic( P, H, all_R_mats, deformed_vs, x0, strategy = args.strategy, solve_for_rest_pose = args.solve_for_rest_pose, max_iter = args.max_iter, f_eps = args.f_eps, x_eps = args.x_eps, W_projection = args.W_projection, z_strategy = args.z_strategy )
 			else:
-				converged, x = optimize_biquadratic( P, H, all_R_mats, deformed_vs, x0, strategy = args.strategy, f_eps = args.f_eps, x_eps = args.x_eps, W_projection = args.W_projection, z_strategy = args.z_strategy )
+				converged, x = optimize_biquadratic( P, H, all_R_mats, deformed_vs, x0, strategy = args.strategy, max_iter = args.max_iter, f_eps = args.f_eps, x_eps = args.x_eps, W_projection = args.W_projection, z_strategy = args.z_strategy )
 		elif args.energy == 'biquadratic+handles':
-			converged, x = optimize_biquadratic( P, H, all_R_mats, deformed_vs, x0, strategy = args.strategy, f_eps = args.f_eps, x_eps = args.x_eps, W_projection = args.W_projection, z_strategy = args.z_strategy )
+			converged, x = optimize_biquadratic( P, H, all_R_mats, deformed_vs, x0, strategy = args.strategy, max_iter = args.max_iter, f_eps = args.f_eps, x_eps = args.x_eps, W_projection = args.W_projection, z_strategy = args.z_strategy )
 			p, B = unpack( x, P )
 			B = B[:,:-1]
 			x = pack( p, B )
-			converged, x = optimize_biquadratic( P, H-1, all_R_mats, deformed_vs, x, strategy = args.strategy, f_eps = args.f_eps, x_eps = args.x_eps, W_projection = args.W_projection, z_strategy = args.z_strategy )
+			converged, x = optimize_biquadratic( P, H-1, all_R_mats, deformed_vs, x, strategy = args.strategy, max_iter = args.max_iter, f_eps = args.f_eps, x_eps = args.x_eps, W_projection = args.W_projection, z_strategy = args.z_strategy )
 		elif args.energy == 'biquadratic+B':
-			converged, x = optimize_biquadratic( P, H, all_R_mats, deformed_vs, x0, strategy = args.strategy, f_eps = args.f_eps, x_eps = args.x_eps, W_projection = args.W_projection, z_strategy = args.z_strategy )
+			converged, x = optimize_biquadratic( P, H, all_R_mats, deformed_vs, x0, strategy = args.strategy, max_iter = args.max_iter, f_eps = args.f_eps, x_eps = args.x_eps, W_projection = args.W_projection, z_strategy = args.z_strategy )
 			for i in range(10):
 				print( "Now trying B for one iteration." )
 				converged, x = optimize_nullspace_directly(P, H, all_R_mats, deformed_vs, x, max_iter = 1)
 				print( "Now biquadratic again." )
-				converged, x = optimize_biquadratic( P, H, all_R_mats, deformed_vs, x, strategy = args.strategy, f_eps = args.f_eps, x_eps = args.x_eps, W_projection = args.W_projection, z_strategy = args.z_strategy )
+				converged, x = optimize_biquadratic( P, H, all_R_mats, deformed_vs, x, strategy = args.strategy, max_iter = args.max_iter, f_eps = args.f_eps, x_eps = args.x_eps, W_projection = args.W_projection, z_strategy = args.z_strategy )
 		elif args.energy == 'laplacian':
 			qs_errors = None
 			if args.fancy_init_errors is not None: qs_errors = np.loadtxt(args.fancy_init_errors)
 			qs_ssv = None
 			if args.fancy_init_ssv is not None: qs_ssv = np.loadtxt(args.fancy_init_ssv)
-			converged, x = optimize_laplacian( P, H, rest_mesh, deformed_vs, qs_data, qs_errors, qs_ssv, f_eps = args.f_eps, x_eps = args.x_eps, z_strategy = args.z_strategy )
+			converged, x = optimize_laplacian( P, H, rest_mesh, deformed_vs, qs_data, qs_errors, qs_ssv, max_iter = args.max_iter, f_eps = args.f_eps, x_eps = args.x_eps, z_strategy = args.z_strategy )
 		else:
 			raise RuntimeError( "Unknown energy parameter: " + str(parser.energy) )
 		
