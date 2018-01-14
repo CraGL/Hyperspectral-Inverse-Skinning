@@ -69,7 +69,8 @@ if __name__ == '__main__':
 	parser.add_argument('--transformation-errors', type=str, help='Errors for data generated from local subspace intersection.')
 	parser.add_argument('--transformation-ssv', type=str, help='Smallest singular values for data generated from local subspace intersection.')
 	## Only if the solver is still slow for big examples:
-	parser.add_argument('--random-percent', type=float, help='If specified, compute with a random % subset of the points. Default: off (equivalent to 100).')
+	parser.add_argument('--random-percent', type=float, help='If specified, compute with a random %% subset of the points. Default: off (equivalent to 100).')
+	## This option is not recommended.
 	parser.add_argument('--random-after-PCA', type=str2bool, default=False, help='Whether to take the random subset after computing PCA. Default: False.')
 	parser.add_argument('--random-reps', type=int, default=1, help='How many times to repeat the random subsampling. Default: 1.')
 	args = parser.parse_args()
