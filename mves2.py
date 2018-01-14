@@ -461,8 +461,9 @@ def MVES( pts, initial_guess_vertices = None, method = None, linear_solver = Non
 				P = make_positive_semidefinite( f_log_volume_hess( x0 ) )
 				q = f_log_volume_grad( x0 )
 				## solve
-				# solution = cvxopt.solvers.qp( cvxopt.matrix(P), cvxopt.matrix(q), sparse_G, cvxopt.matrix(h), sparse_A, cvxopt.matrix(b), solver = 'mosek' )
-				solution = cvxopt.solvers.qp( cvxopt.matrix(P), cvxopt.matrix(q), sparse_G, cvxopt.matrix(h), sparse_A, cvxopt.matrix(b) )
+				## MOSEK is so much faster and better!
+				solution = cvxopt.solvers.qp( cvxopt.matrix(P), cvxopt.matrix(q), sparse_G, cvxopt.matrix(h), sparse_A, cvxopt.matrix(b), solver = 'mosek' )
+				# solution = cvxopt.solvers.qp( cvxopt.matrix(P), cvxopt.matrix(q), sparse_G, cvxopt.matrix(h), sparse_A, cvxopt.matrix(b) )
 				# solution = cvxopt.solvers.qp( -cvxopt.matrix(P), cvxopt.matrix(q), sparse_G, cvxopt.matrix(h), sparse_A, cvxopt.matrix(b), kktsolver='ldl' )
 				x = solution['x']
 				fx = f_log_volume( numpy.array(x) )
