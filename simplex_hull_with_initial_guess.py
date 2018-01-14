@@ -71,7 +71,7 @@ if __name__ == '__main__':
 	## Only if the solver is still slow for big examples:
 	parser.add_argument('--random-percent', type=float, help='If specified, compute with a random % subset of the points. Default: off (equivalent to 100).')
 	parser.add_argument('--random-after-PCA', type=str2bool, default=False, help='Whether to take the random subset after computing PCA. Default: False.')
-	# parser.add_argument('--random-reps', type=int, help='How many times to repeat the random subsampling. Default: 1.')
+	parser.add_argument('--random-reps', type=int, default=1, help='How many times to repeat the random subsampling. Default: 1.')
 	args = parser.parse_args()
 
 	# Check that in_mesh exists
@@ -94,23 +94,6 @@ if __name__ == '__main__':
 	Ts = np.loadtxt(args.per_vertex_tranformation)
 	print( "# initial vertices: ", Ts.shape[0] )
 	
-	if args.test:
-		args.random_percent = 10
-	
-	# np.random.seed(0)
-	if args.random_percent is not None and not args.random_after_PCA:
-		Ts_all = Ts.copy()
-		keep_N = np.clip( int( ( args.random_percent * len(Ts) )/100. + 0.5 ), 0, len( Ts ) )
-		## For some reason built-in numpy.random function produce worse results.
-		## This must be superstition!
-		# Ts = np.random.permutation( Ts )[:keep_N]
-		# np.random.shuffle( Ts )
-		# Ts = Ts[:keep_N]
-		import random
-		random.shuffle( Ts )
-		Ts = Ts[:keep_N]
-		print( "Keeping %s out of %s points (before PCA)." % ( len( Ts ), len( Ts_all ) ) )
-	
 	if args.ground_truth is not None:
 		handle_trans = glob.glob(args.ground_truth + "/*.Tmat")
 		handle_trans.sort()
@@ -120,72 +103,104 @@ if __name__ == '__main__':
 	
 	root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 	
-	if args.WPCA is not None:
-		## This code requires wpca (https://github.com/jakevdp/wpca):
-		### pip install wpca
-		### pip install scikit-learn
-		
-		Ts_errors = np.loadtxt( args.transformation_errors )
-		Ts_ssv = np.loadtxt( args.transformation_ssv )
-		Ts_weights = 1./(1e-5 + Ts_errors)
-		Ts_weights[ Ts_ssv < 1e-8 ] = 0.
-		
-		# from wpca import EMPCA
-		from wpca import WPCA
-		class WeightedSpaceMapper( object ):
-			def __init__( self, data, weights, dimension = None ):
-				assert dimension is not None
-				self.mapper = WPCA( n_components = dimension ).fit( data, weights = np.repeat( weights.reshape(-1,1), data.shape[1], axis = 1 ) )
-			def project( self, points ):
-				return self.mapper.transform( points )
-			def unproject( self, low_dim_points ):
-				return self.mapper.inverse_transform( low_dim_points )
-		startTime = time.time()
-		Ts_mapper = WeightedSpaceMapper( Ts, Ts_weights, dimension = args.dimension )
-		running_time = time.time() - startTime
-		print("Weighted PCA took: %.2f seconds" % running_time)
-	else:
-		Ts_mapper = SpaceMapper.Uncorrellated_Space( Ts, dimension = args.dimension )
-	uncorrelated = Ts_mapper.project( Ts )
-	print( "uncorrelated data shape" )
-	print( uncorrelated.shape )
-
-	if args.random_percent is not None and args.random_after_PCA:
-		uncorrelated_all = uncorrelated
-		keep_N = np.clip( int( ( args.random_percent * len(uncorrelated) )/100. + 0.5 ), 0, len( uncorrelated ) )
-		uncorrelated = np.random.permutation( uncorrelated )[:keep_N]
-		print( "Keeping %s out of %s points (after PCA)." % ( len( uncorrelated ), len( uncorrelated_all ) ) )
-
+	## For backwards compatibility with args.test:
+	if args.test:
+		args.random_percent = 10
+	
+	# np.random.seed(0)
+	
 	startTime = time.time()
 	np.set_printoptions(precision=4, suppress=True)
 	
-	# import scipy.io
-	# scipy.io.savemat( 'MVES_input.mat', mdict={'M': uncorrelated})
-	# print( "Saved input points to MVES in MATLAB format as:", 'MVES_input.mat' )
- 
-	## Compute minimum-volume enclosing simplex
-	import mves2
-	solution, weights, iter_num = mves2.MVES( uncorrelated, method=args.method, linear_solver = args.linear_solver, max_iter = args.max_iter )
-	
-	print( "solution" )
-	print( solution )
-
+	all_Ts = Ts.copy()
+	## results stores: volume, solution, iter_num
+	results = []
+	for random_rep in range( args.random_reps ):
+		Ts = all_Ts.copy()
 		
-	print( "solve weights from initial guess finished" )
+		if args.random_percent is not None and not args.random_after_PCA:
+			Ts_all = Ts.copy()
+			keep_N = np.clip( int( ( args.random_percent * len(Ts) )/100. + 0.5 ), 0, len( Ts ) )
+			## For some reason built-in numpy.random function produce worse results.
+			## This must be superstition!
+			# Ts = np.random.permutation( Ts )[:keep_N]
+			# np.random.shuffle( Ts )
+			# Ts = Ts[:keep_N]
+			import random
+			random.shuffle( Ts )
+			Ts = Ts[:keep_N]
+			print( "Keeping %s out of %s points (before PCA)." % ( len( Ts ), len( Ts_all ) ) )
+		
+		if args.WPCA is not None:
+			## This code requires wpca (https://github.com/jakevdp/wpca):
+			### pip install wpca
+			### pip install scikit-learn
+			
+			Ts_errors = np.loadtxt( args.transformation_errors )
+			Ts_ssv = np.loadtxt( args.transformation_ssv )
+			Ts_weights = 1./(1e-5 + Ts_errors)
+			Ts_weights[ Ts_ssv < 1e-8 ] = 0.
+			
+			# from wpca import EMPCA
+			from wpca import WPCA
+			class WeightedSpaceMapper( object ):
+				def __init__( self, data, weights, dimension = None ):
+					assert dimension is not None
+					self.mapper = WPCA( n_components = dimension ).fit( data, weights = np.repeat( weights.reshape(-1,1), data.shape[1], axis = 1 ) )
+				def project( self, points ):
+					return self.mapper.transform( points )
+				def unproject( self, low_dim_points ):
+					return self.mapper.inverse_transform( low_dim_points )
+			startTime = time.time()
+			Ts_mapper = WeightedSpaceMapper( Ts, Ts_weights, dimension = args.dimension )
+			running_time = time.time() - startTime
+			print("Weighted PCA took: %.2f seconds" % running_time)
+		else:
+			Ts_mapper = SpaceMapper.Uncorrellated_Space( Ts, dimension = args.dimension )
+		uncorrelated = Ts_mapper.project( Ts )
+		print( "uncorrelated data shape" )
+		print( uncorrelated.shape )
 	
-	## Cheap robustness; discard the % of data which ended up with the smallest weights.
-	## Outliers will always have 
-	if args.robust_percentile is not None:
-		argsorted = weights.argsort(axis=0)
-		num_rows_to_discard = int( args.robust_percentile*len(weights) )
-		print( "Deleting", num_rows_to_discard, "rows with the smallest weights." )
-		rows_to_discard = argsorted[ :num_rows_to_discard ].ravel()
-		uncorrelated_robust = np.delete( uncorrelated, rows_to_discard, axis = 0 )
-		print( "Re-running MVES" )
-		solution, weights_robust, iter_num = mves2.MVES( uncorrelated_robust, linear_solver = args.linear_solver, strategy = args.strategy, max_iter = args.max_iter )
-		weights = np.dot( np.linalg.inv( solution ), np.concatenate( ( uncorrelated.T, np.ones((1,uncorrelated.shape[0])) ), axis=0 ) ).T
-		print( "robust solution" )
+		if args.random_percent is not None and args.random_after_PCA:
+			uncorrelated_all = uncorrelated
+			keep_N = np.clip( int( ( args.random_percent * len(uncorrelated) )/100. + 0.5 ), 0, len( uncorrelated ) )
+			uncorrelated = np.random.permutation( uncorrelated )[:keep_N]
+			print( "Keeping %s out of %s points (after PCA)." % ( len( uncorrelated ), len( uncorrelated_all ) ) )
+	
+		# import scipy.io
+		# scipy.io.savemat( 'MVES_input.mat', mdict={'M': uncorrelated})
+		# print( "Saved input points to MVES in MATLAB format as:", 'MVES_input.mat' )
+	 
+		## Compute minimum-volume enclosing simplex
+		import mves2
+		solution, weights, iter_num = mves2.MVES( uncorrelated, method=args.method, linear_solver = args.linear_solver, max_iter = args.max_iter )
+		volume = abs( np.linalg.det( solution ) )
+		
+		print( "solution" )
 		print( solution )
+	
+		
+		print( "solve weights from initial guess finished" )
+		
+		## Cheap robustness; discard the % of data which ended up with the smallest weights.
+		## Outliers will always have 
+		if args.robust_percentile is not None:
+			argsorted = weights.argsort(axis=0)
+			num_rows_to_discard = int( args.robust_percentile*len(weights) )
+			print( "Deleting", num_rows_to_discard, "rows with the smallest weights." )
+			rows_to_discard = argsorted[ :num_rows_to_discard ].ravel()
+			uncorrelated_robust = np.delete( uncorrelated, rows_to_discard, axis = 0 )
+			print( "Re-running MVES" )
+			solution, weights_robust, iter_num = mves2.MVES( uncorrelated_robust, linear_solver = args.linear_solver, strategy = args.strategy, max_iter = args.max_iter )
+			weights = weights_robust
+			volume = abs( np.linalg.det( solution ) )
+			print( "robust solution" )
+			print( solution )
+		
+		results.append( ( volume, solution, iter_num ) )
+	
+	volume, solution, iter_num = min( results )
+	print( "=> Best simplex found with volume:", volume )
 	
 	running_time = time.time() - startTime
 	print("\nOptimization costs: %.2f seconds" %running_time)
@@ -195,6 +210,10 @@ if __name__ == '__main__':
 	print( 'recovered', recovered.shape )
 	print( recovered.round(3) )
 
+	## Because we load a potentially incomplete initial guess, we need to recover
+	## the weights for all points manually. We could do this with PCA projection
+	## and multiplying the inverse of solution. Or we could re-use code from
+	## one of our solvers.
 	import flat_intersection_biquadratic_gradients as biquadratic
 	N,B = rest_vs.shape[0], recovered.shape[0]
 	P = int(recovered.shape[1]//12)
@@ -231,7 +250,7 @@ if __name__ == '__main__':
 	
 	output_path = args.output
 	print( "Saving recovered results to:", output_path )
-	format_loader.write_result(output_path, recovered.round(6), weights.round(6), iter_num, running_time, col_major=False)
+	format_loader.write_result(output_path, recovered, weights, iter_num, running_time, col_major=False)
 	
 	def check_recovered( recovered, ground ):
 		flags = np.zeros( len(Tmat), dtype = bool )

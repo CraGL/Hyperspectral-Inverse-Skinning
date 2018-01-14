@@ -10,7 +10,7 @@ SSD_RESULT="${ROOT_DIR}"/SSD_res/cheb11-2-output.txt
 INITIAL_GUESS_ARGS="--svd_threshold 1e-15 --transformation_threshold 1e-4 --version 0"
 FLAT_INTERSECTION_ARGS="--energy biquadratic -GT "${OTHER_POSE_DIR}" --error True --handles 11 --fancy-init "${OUTPUT_DIR}"/local_subspace_recover.txt"
 # SIMPLEX_HULL_ARGS="-D 10 --method qp-major --test True"
-SIMPLEX_HULL_ARGS="-D 10 --method qp-major --random-percent 10"
+SIMPLEX_HULL_ARGS="-D 10 --method qp-major --random-percent 10 --random-reps 10"
 
 # Generate
 mkdir -p "${OUTPUT_DIR}"
