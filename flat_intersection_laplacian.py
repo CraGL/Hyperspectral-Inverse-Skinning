@@ -78,7 +78,8 @@ def solve_for_w( t_i, T_js, return_energy = False, strategy = None ):
     if smallest_singular_value < 1e-5:
         print( "Vertex has small singular values (will use pseudoinverse):", np.linalg.svd( Q, compute_uv = False ) )
         # return ( None, 0.0 ) if return_energy else None
-        use_pseudoinverse = True
+        # use_pseudoinverse = True
+        strategy = 'uniform'
     
     ## We also need the constraint that w.sum() == 1
     handles = len(L)
@@ -95,7 +96,7 @@ def solve_for_w( t_i, T_js, return_energy = False, strategy = None ):
     rhs[:-1] = -0.5*L
     rhs[-1] = 1
     
-    if strategy not in (None, 'positive'):
+    if strategy not in (None, 'positive', 'uniform'):
         raise RuntimeError( "Unknown strategy: " + repr(strategy) )
     
     if strategy == 'positive':
@@ -111,6 +112,8 @@ def solve_for_w( t_i, T_js, return_energy = False, strategy = None ):
             options = {'show_progress': False}
             )['x'] ).squeeze()
         # print( 'z:', z )
+    elif strategy == 'uniform':
+        w = (1./handles)*np.ones(handles)
     elif use_pseudoinverse:
         w = np.dot( np.linalg.pinv(Qbig), rhs )[:-1]
     else:
@@ -299,7 +302,7 @@ def solve_for_T( E_data_quadratic, E_local_quadratic, poses, E_data_weight = 1.0
     
     return T
 
-def generateRandomData( poses = None, num_vertices = None ):
+def generateRandomData( poses = None, num_vertices = None, simple = False ):
     np.random.seed(0)
     
     vs = np.random.random( ( num_vertices, 3 ) )
@@ -314,12 +317,18 @@ def generateRandomData( poses = None, num_vertices = None ):
     
     neighbors = [ shuffled( list( set( np.arange( num_vertices ) ) - set([i]) ) )[:5] for i in range(num_vertices) ]
     
+    if simple:
+        Ts = np.outer( np.arange(num_vertices), np.linspace( 0,11,12 ) )
+        neighbors = [ np.array([ j for j in (i-1,i+1) if j >= 0 and j < len(Ts)]) for i in range(len(Ts)) ]
+    
     return vs, vprimes, Ts, neighbors, poses, num_vertices
 
 if __name__ == '__main__':
     np.set_printoptions( linewidth = 2000 )
     
-    vs, vprimes, Ts, neighbors, poses, num_vertices = generateRandomData( poses = 1, num_vertices = 4 )
+    simple = True
+    
+    vs, vprimes, Ts, neighbors, poses, num_vertices = generateRandomData( poses = 1, num_vertices = 4, simple = simple )
     assert len( Ts ) == num_vertices
     
     E_data = quadratic_for_E_data( vs, vprimes )
@@ -329,6 +338,7 @@ if __name__ == '__main__':
         
         ws_ssv_energy = [ solve_for_w( Ts[i], Ts[ neighbors[i] ].T, return_energy = True ) for i in range( num_vertices ) ]
         ws = [ w for w, ssv, energy in ws_ssv_energy ]
+        if simple: ws = [ (1./len(neighs))*np.ones(len(neighs)) for neighs in neighbors ]
         print( "E_local from ws point of view:", np.sum([ energy for w, ssv, energy in ws_ssv_energy ]) )
         
         E_local = quadratic_for_E_local( neighbors, ws, poses )

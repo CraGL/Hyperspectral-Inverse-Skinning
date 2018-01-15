@@ -310,12 +310,14 @@ if __name__ == '__main__':
 		print( solution )
 		
 		## Cheap robustness; discard the % of data which ended up with the smallest weights.
-		## Outliers will always have 
+		## Outliers will always be on faces, so they will have a 0 weight for some vertex.
+		## Discard some of them.
 		if args.robust_percentile is not None:
-			argsorted = weights.argsort(axis=0)
-			num_rows_to_discard = int( args.robust_percentile*len(weights) )
+			# argsorted = weights.argsort(axis=0).ravel()
+			argsorted = np.argsort((weights < 1e-8).sum(1))[::-1]
+			num_rows_to_discard = int( (args.robust_percentile*len(weights))/100. + 0.5 )
 			print( "Deleting", num_rows_to_discard, "rows with the smallest weights." )
-			rows_to_discard = argsorted[ :num_rows_to_discard ].ravel()
+			rows_to_discard = argsorted[ :num_rows_to_discard ]
 			uncorrelated_robust = numpy.delete( uncorrelated, rows_to_discard, axis = 0 )
 			print( "Re-running MVES" )
 			solution, weights_robust, iter_num = mves2.MVES( uncorrelated_robust, method = args.method, linear_solver = args.linear_solver, max_iter = args.max_iter )
@@ -343,6 +345,11 @@ if __name__ == '__main__':
 	print( 'recovered', recovered.shape )
 	print( recovered.round(3) )
 	
+	print( "Minimum weight:", weights.min() )
+	print( "Number of points with negative weights (< -1e-5):", ( weights < -1e-5 ).any(axis=1).sum() )
+	print( "Number of points with negative weights (< -0.1):", ( weights < -0.1 ).any(axis=1).sum() )
+	print( "Number of points with negative weights (< -0.5):", ( weights < -0.5 ).any(axis=1).sum() )
+	print( "Number of points with negative weights (< -1):", ( weights < -1 ).any(axis=1).sum() )
 	
 	output_path = os.path.join(per_vertex_folder, "result.txt")
 	if args.output is not None:

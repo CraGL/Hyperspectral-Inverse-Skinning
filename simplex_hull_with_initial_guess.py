@@ -162,10 +162,10 @@ if __name__ == '__main__':
 					return self.mapper.transform( points )
 				def unproject( self, low_dim_points ):
 					return self.mapper.inverse_transform( low_dim_points )
-			startTime = time.time()
+			WPCA_startTime = time.time()
 			Ts_mapper = WeightedSpaceMapper( Ts, Ts_weights, dimension = args.dimension )
-			running_time = time.time() - startTime
-			print("Weighted PCA took: %.2f seconds" % running_time)
+			WPCA_running_time = time.time() - WPCA_startTime
+			print("Weighted PCA took: %.2f seconds" % WPCA_running_time)
 		else:
 			Ts_mapper = SpaceMapper.Uncorrellated_Space( Ts, dimension = args.dimension )
 		uncorrelated = Ts_mapper.project( Ts )
@@ -193,15 +193,17 @@ if __name__ == '__main__':
 		print( "solve weights from initial guess finished" )
 		
 		## Cheap robustness; discard the % of data which ended up with the smallest weights.
-		## Outliers will always have 
+		## Outliers will always be on faces, so they will have a 0 weight for some vertex.
+		## Discard some of them.
 		if args.robust_percentile is not None:
-			argsorted = weights.argsort(axis=0)
-			num_rows_to_discard = int( args.robust_percentile*len(weights) )
+			# argsorted = weights.argsort(axis=0).ravel()
+			argsorted = np.argsort((weights < 1e-8).sum(1))[::-1]
+			num_rows_to_discard = int( (args.robust_percentile*len(weights))/100. + 0.5 )
 			print( "Deleting", num_rows_to_discard, "rows with the smallest weights." )
-			rows_to_discard = argsorted[ :num_rows_to_discard ].ravel()
+			rows_to_discard = argsorted[ :num_rows_to_discard ]
 			uncorrelated_robust = np.delete( uncorrelated, rows_to_discard, axis = 0 )
 			print( "Re-running MVES" )
-			solution, weights_robust, iter_num = mves2.MVES( uncorrelated_robust, linear_solver = args.linear_solver, strategy = args.strategy, max_iter = args.max_iter )
+			solution, weights_robust, iter_num = mves2.MVES( uncorrelated_robust, method = args.method, linear_solver = args.linear_solver, max_iter = args.max_iter )
 			weights = weights_robust
 			volume = abs( np.linalg.det( solution ) )
 			print( "robust solution" )
@@ -236,6 +238,12 @@ if __name__ == '__main__':
 			return_energy = False, use_pseudoinverse = True
 			)
 		# transformation = np.dot( recovered.T, weights )
+	
+	print( "Minimum weight:", weights.min() )
+	print( "Number of points with negative weights (< -1e-5):", ( weights < -1e-5 ).any(axis=1).sum() )
+	print( "Number of points with negative weights (< -0.1):", ( weights < -0.1 ).any(axis=1).sum() )
+	print( "Number of points with negative weights (< -0.5):", ( weights < -0.5 ).any(axis=1).sum() )
+	print( "Number of points with negative weights (< -1):", ( weights < -1 ).any(axis=1).sum() )
 	
 	'''
 	N,B = rest_vs.shape[0], recovered.shape[0]
