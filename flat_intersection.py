@@ -622,7 +622,7 @@ def optimize_approximated_quadratic(P, H, row_mats, deformed_vs, x0, f_eps = Non
 	
 	return converged, x
 
-def optimize_biquadratic( P, H, row_mats, deformed_vs, x0, solve_for_rest_pose = False, f_eps = None, x_eps = None, max_iter = None, f_zero_threshold = None, strategy = None, W_projection = None, z_strategy = None ):
+def optimize_biquadratic( P, H, row_mats, deformed_vs, x0, solve_for_rest_pose = False, f_eps = None, x_eps = None, max_iter = None, f_zero_threshold = None, strategy = None, W_projection = None, z_strategy = None, **kwargs ):
 	'''
 	If solve_for_rest_pose is False (the default), returns ( converged, final x ).
 	If solve_for_rest_pose is True, returns ( converged, final x, and updated row_mats ).
@@ -684,6 +684,26 @@ def optimize_biquadratic( P, H, row_mats, deformed_vs, x0, solve_for_rest_pose =
 	print( "optimize_biquadratic() with strategy:", strategy, "f_eps:", f_eps, "x_eps:", x_eps, "max_iter:", max_iter, "f_zero_threshold:", f_zero_threshold, "W_projection:", W_projection, "z_strategy:", z_strategy )
 	
 	import flat_intersection_biquadratic_gradients as biquadratic
+	
+	first_column = None
+	if W_projection == 'first':
+		def estimate_point_on_subspace( guess_data, guess_errors, guess_ssv ):
+			## Use the inverse of the error as the weight.
+			weights = 1./(1e-5 + guess_errors)
+			## Ignore points with bad smallest singular values.
+			weights[ guess_ssv < 1e-8 ] = 0.
+			## If those points are reliable, then the weighted average of them must also
+			## lie on the simplex.
+			first_column = np.average( guess_data, axis = 0, weights = weights )
+			return first_column
+		def replace_x0_with_better_p( x0, poses, first_column ):
+			W = unpack_W( x0.copy(), poses )
+			W[:,0] = first_column
+			x0 = pack_W( W )
+			return x0
+		
+		first_column = estimate_point_on_subspace( kwargs['guess_data'], kwargs['guess_errors'], kwargs['guess_ssv'] )
+		x0 = replace_x0_with_better_p( x0, P, first_column )
 	
 	f_prev = None
 	W_prev = unpack_W( x0.copy(), P )
@@ -756,7 +776,7 @@ def optimize_biquadratic( P, H, row_mats, deformed_vs, x0, solve_for_rest_pose =
 				weights += ssz
 			
 			## 4
-			W = biquadratic.solve_for_W( As, Bs, Ys, use_pseudoinverse = use_pseudoinverse, projection = W_projection )
+			W = biquadratic.solve_for_W( As, Bs, Ys, use_pseudoinverse = use_pseudoinverse, projection = W_projection, first_column = first_column )
 			f *= normalization / weights
 			print( "Function value:", f )
 			print( "Max sub-function value:", fis.max() )
@@ -774,11 +794,13 @@ def optimize_biquadratic( P, H, row_mats, deformed_vs, x0, solve_for_rest_pose =
 				print( "Function change too small, terminating:", f_prev - f )
 				converged = True
 				break
-			# x_change = abs( W_prev - W ).max()
 			## To make xtol approximately match scipy's default gradient tolerance (gtol) for BFGS,
 			## use norm() instead of the max change.
-			x_change = np.linalg.norm( W_prev - W )
-			print( "x change:", x_change )
+			x_change_norm = np.linalg.norm( W_prev - W )
+			x_change_max = abs( W_prev - W ).max()
+			print( "x change (norm):", x_change_norm )
+			print( "x change (max):", x_change_max )
+			x_change = x_change_norm
 			if x_change < x_eps:
 				print( "Variables change too small, terminating:", x_change )
 				converged = True
@@ -808,7 +830,7 @@ def optimize_laplacian( P, H, rest_mesh, deformed_vs, qs_data, qs_errors, qs_ssv
 	
 	vs = np.asfarray( rest_mesh.vs )
 	## To make function values comparable, we need to normalize.
-	E_data_weight = 100.*normalization_factor_from_xyzs( vs )/P
+	E_data_weight = 1.*normalization_factor_from_xyzs( vs )/P
 	E_local_weight = 1./(len(vs)*P)
 	E_input_weight = 1.0 ## See strategy = 'lsq' below.
 	print( "E_data_weight:", E_data_weight )
@@ -825,7 +847,9 @@ def optimize_laplacian( P, H, rest_mesh, deformed_vs, qs_data, qs_errors, qs_ssv
 	if f_zero_threshold is None:
 		f_zero_threshold = 0.0
 	
-	graph_laplacian = True
+	graph_laplacian = 'once'
+	# graph_laplacian = 'always'
+	# graph_laplacian = 'never'
 	
 	strategy = None
 	# strategy = 'lsq'
@@ -905,8 +929,8 @@ def optimize_laplacian( P, H, rest_mesh, deformed_vs, qs_data, qs_errors, qs_ssv
 			## 2 Solve for Ts.
 			
 			## 1
-			if graph_laplacian:
-				ws = [ 1./np.ones(len(neighs)) for neighs in neighbors ]
+			if graph_laplacian == 'always' or ( graph_laplacian == 'once' and iterations == 1 ):
+				ws = [ (1./len(neighs))*np.ones(len(neighs)) for neighs in neighbors ]
 			else:
 				ws_ssv_energy = [ laplacian.solve_for_w( Ts[i], Ts[ neighbors[i] ].T, return_energy = True ) for i in range( num_vertices ) ]
 				ws = [ w for w, ssv, energy in ws_ssv_energy ]
@@ -1081,7 +1105,7 @@ if __name__ == '__main__':
 	parser.add_argument('--max-iter', type=int, help='Maximum number of iterations.')
 	parser.add_argument('--f-eps', type=float, help='Function change epsilon (biquadratic).')
 	parser.add_argument('--x-eps', type=float, help='Variable change epsilon (biquadratic).')
-	parser.add_argument('--W-projection', type=str, choices = ['normalize', 'regularize_translation', 'regularize_identity', 'constrain_magnitude'], help='How to project W (biquadratic): normalize, regularize_translation, regularize_identity, constrain_magnitude.')
+	parser.add_argument('--W-projection', type=str, choices = ['normalize', 'first', 'regularize_translation', 'regularize_identity', 'constrain_magnitude'], help='How to project W (biquadratic): normalize, first, regularize_translation, regularize_identity, constrain_magnitude.')
 	parser.add_argument('--z-strategy', type=str, choices = ['positive'], help='How to solve for z (biquadratic): positive.')
 	
 	args = parser.parse_args()
@@ -1220,6 +1244,14 @@ if __name__ == '__main__':
 		elif args.energy == 'biquadratic':
 			if args.solve_for_rest_pose:
 				converged, x, new_all_R_mats = optimize_biquadratic( P, H, all_R_mats, deformed_vs, x0, strategy = args.strategy, solve_for_rest_pose = args.solve_for_rest_pose, max_iter = args.max_iter, f_eps = args.f_eps, x_eps = args.x_eps, W_projection = args.W_projection, z_strategy = args.z_strategy )
+			elif args.W_projection == 'first':
+				assert args.fancy_init is not None
+				assert args.fancy_init_errors is not None
+				assert args.fancy_init_ssv is not None
+				guess_data = np.loadtxt( args.fancy_init )
+				guess_errors = np.loadtxt( args.fancy_init_errors )
+				guess_ssv = np.loadtxt( args.fancy_init_ssv )
+				converged, x = optimize_biquadratic( P, H, all_R_mats, deformed_vs, x0, strategy = args.strategy, max_iter = args.max_iter, f_eps = args.f_eps, x_eps = args.x_eps, W_projection = args.W_projection, z_strategy = args.z_strategy, guess_data = guess_data, guess_errors = guess_errors, guess_ssv = guess_ssv )
 			else:
 				converged, x = optimize_biquadratic( P, H, all_R_mats, deformed_vs, x0, strategy = args.strategy, max_iter = args.max_iter, f_eps = args.f_eps, x_eps = args.x_eps, W_projection = args.W_projection, z_strategy = args.z_strategy )
 		elif args.energy == 'biquadratic+handles':

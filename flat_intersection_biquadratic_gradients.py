@@ -213,11 +213,13 @@ def linear_matrix_equation_for_W( V, vprime, z ):
     v = V[0,:4].reshape(1,-1)
     A = np.outer( v.T, v ) #, np.dot( V.T, V )
     B = np.dot( z, z.T )
-    Y = np.dot( np.dot( V.T, -vprime ), z.T )
+    ## We can also get simplify the block diagonal V multiplication.
+    # Y = np.dot( np.dot( V.T, -vprime ), z.T )
+    Y = np.dot( np.dot( (-v).T, vprime.T ).T.reshape(-1,1), z.T )
     
     return A, B, Y
 
-def solve_for_W( As, Bs, Ys, use_pseudoinverse = True, projection = None ):
+def solve_for_W( As, Bs, Ys, use_pseudoinverse = True, projection = None, **kwargs ):
     assert len( As ) == len( Bs )
     assert len( As ) == len( Ys )
     assert len( As ) > 0
@@ -225,8 +227,8 @@ def solve_for_W( As, Bs, Ys, use_pseudoinverse = True, projection = None ):
     assert Ys[0].shape[0] % 12 == 0
     poses = Ys[0].shape[0]//12
     system = np.zeros( ( Bs[0].shape[1]*As[0].shape[0], Bs[0].shape[0]*As[0].shape[1] ) )
-    ## Our kronecker product formula assumes column-major vectorization.
-    ## In that case, the identity is: vec( A*X*B ) = kron( A, B.T ) * vec(X)
+    ## Our kronecker product formula is the one for row-major vectorization:
+    ##     vec( A*X*B ) = kron( A, B.T ) * vec(X)
     ## Since the system matrix is a repeated block diagonal, we can just store
     ## the block and solve against the right-hand-side reshaped with each N entries as
     ## a column.
@@ -262,6 +264,32 @@ def solve_for_W( As, Bs, Ys, use_pseudoinverse = True, projection = None ):
     # import scipy.linalg
     # system_big = scipy.linalg.block_diag( *( [system]*(3*poses) ) )
     
+    if projection == 'first':
+        assert rhs.shape == ( 12*poses, B.shape[1] )
+        ## Add a least squares term setting the first column of the output
+        ## to kwargs['first_column'].
+        ## For the full system matrix, that would be (using a pre-vectorized rhs):
+        ##     system += w_lsq * diag([ 1, 0 repeated h-1 times, 1, 0 repeated h-1 times, ... ])
+        ##     rhs[:,0] += w_lsq * first_column
+        ## where h is the number of handles, aka B.shape[0] or B.shape[1].
+        ## For the small system matrix, we just need the first 4 repetitions.
+        
+        ## For debugging, keep the old system and rhs around.
+        system_orig = system.copy()
+        rhs_orig = rhs.copy()
+        
+        first_column = kwargs['first_column']
+        w_lsq = 1e4
+        rhs[:,0] += w_lsq * first_column
+        ## Modify diagonal of system
+        h = B.shape[0]
+        system[0*h,0*h] += w_lsq
+        system[1*h,1*h] += w_lsq
+        system[2*h,2*h] += w_lsq
+        system[3*h,3*h] += w_lsq
+        
+        ## Now we will fall through to the system solving.
+    
     if projection == 'constrain_magnitude':
         assert not use_pseudoinverse
         import cvxopt.solvers
@@ -276,7 +304,15 @@ def solve_for_W( As, Bs, Ys, use_pseudoinverse = True, projection = None ):
         # print( "pinv block difference:", abs( W - W1 ).max() )
     else:
         # W1 = np.linalg.solve( system_big, rhs.ravel() ).reshape( 12*poses, B.shape[1] )
-        W = np.linalg.solve( system, rhs.reshape( -1, system.shape[0] ).T ).T.reshape( 12*poses, B.shape[1] )
+        ## With our numpy solver:
+        # W = np.linalg.solve( system, rhs.reshape( -1, system.shape[0] ).T ).T.reshape( 12*poses, B.shape[1] )
+        ## We know that the system is symmetric positive definite because it is the
+        ## sum of the kronecker product of the outer product of vectors.
+        ## Outer products of vectors are positive definite, and sum and kronecker products
+        ## preserve positive semidefiniteness.
+        ## So we can use scipy.linalg.solve() which can take advantage of that fact.
+        import scipy.linalg
+        W = scipy.linalg.solve( system, rhs.reshape( -1, system.shape[0] ).T, sym_pos = True ).T.reshape( 12*poses, B.shape[1] )
         # print( "solve block difference:", abs( W - W1 ).max() )
     
     ## Normalize the columns of W.
@@ -285,14 +321,31 @@ def solve_for_W( As, Bs, Ys, use_pseudoinverse = True, projection = None ):
     # assert columns_norm2.min() > 1e-10
     # W /= np.sqrt( columns_norm2 ).reshape( 1, -1 )
     
-    ## We could normalize the difference from the average, but it's always large:
+    ## We could normalize the difference from the average:
     print( "W column norm:", ( ( W - np.average( W, axis = 1 ).reshape(-1,1) )**2 ).sum(axis=0) )
     ## Actually, it grows. Let's stop that.
     if projection == 'normalize':
         avg = np.average( W, axis = 1 ).reshape(-1,1)
         B = W - avg
+        
+        ## Simple: normalize the magnitude.
         B /= np.sqrt( ( B*B ).sum( axis = 0 ) ).reshape(1,-1)
+        ## Fancy: Grassmann projection
+        ## UPDATE: This doesn't work because it is unstable, so x never falls below its threshold.
+        # import flat_intersection_cayley_grassmann_gradients as grassmann
+        # grassmann_params = grassmann.A_from_non_Cayley_B( B )
+        # B = grassmann.B_from_Cayley_A( grassmann_params )
+        
         W = avg + B
+    elif projection == 'first' and False: # This causes things to go crazy.
+        ## First make the first column of W exact.
+        W[:,0] = first_column
+        ## Then normalize against the first column.
+        B = W[:,1:] - W[:,:1]
+        ## Normalize the magnitude.
+        B /= np.sqrt( ( B*B ).sum( axis = 0 ) ).reshape(1,-1)
+        ## Put it back.
+        W[:,1:] = B
     elif projection in ( 'regularize_translation', 'regularize_identity', 'constrain_magnitude' ):
         ## We handled this above.
         pass
