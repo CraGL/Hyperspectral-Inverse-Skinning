@@ -68,6 +68,7 @@ if __name__ == '__main__':
 	parser.add_argument( 'result', type=str, help='our results(txt).')
 	parser.add_argument( '--ssd_result', '--SSD', type=str, help='SSD results(txt).')
 	parser.add_argument( '--output', '-O', type=str, help='path to save recovered poses.')
+	parser.add_argument( '--showAll', '--all', type=bool, default=False, help='print the error for each pose')
 	args = parser.parse_args()
 		
 	rest_mesh = TriMesh.FromOBJ_FileName(args.rest_pose)
@@ -112,17 +113,25 @@ if __name__ == '__main__':
 		error = []
 		for pose_gt, pose_data in zip(gt, data):
 			error.append( np.array([np.linalg.norm(pt_gt - pt_data) for pt_gt, pt_data in zip(pose_gt, pose_data)]) )
-			
-		return np.array(error)
+		
+		## Divide this by the bounding sphere radius (or 1/2 the bounding box diagonal?)
+		## to get the error metric E_RMS from Kavan 2010.
+		E_RMS_kavan2010 = 1000*np.linalg.norm( gt.ravel() - data.ravel() )/np.sqrt(3*gt.shape[0]*gt.shape[1])
+		
+		return np.array(error), E_RMS_kavan2010
 		
 	print( "############################################" )
 	print( "Reconstruction Mesh Error: " )
 	# print( "rev error: ", np.linalg.norm(gt_vs - rev_vs)/(diag*N) )
-	rev_error = compute_error(gt_vs, rev_vs)/diag
+	rev_error, rev_erms = compute_error(gt_vs, rev_vs)
+	rev_error = rev_error / diag
+	rev_erms = rev_erms *2 / diag
 	print( "rev: max, mean and median per-vertex distance", np.max(rev_error), np.mean(rev_error), np.median(rev_error) )
-	print( "rev per pose max, mean and median error:")
-	for i in range( len(rev_error) ):
-		print( gt_names[i], np.max(rev_error[i]), np.mean(rev_error[i]), np.median(rev_error[i]) )
+	print( "Our E_RMS_kavan2010: ", rev_erms )
+	if args.showAll:
+		print( "rev per pose max, mean and median error:")
+		for i in range( len(rev_error) ):
+			print( gt_names[i], np.max(rev_error[i]), np.mean(rev_error[i]), np.median(rev_error[i]) )
 	if args.ssd_result is not None:
 		ssd_bones, ssd_w = format_loader.load_result(args.ssd_result)
 		ssd_bones = np.swapaxes(ssd_bones, 0, 1)
@@ -133,11 +142,15 @@ if __name__ == '__main__':
 		ssd_vs = np.array([ ssd_vs[i] for i in ordering ])
 		
 		# print( "ssd error: ", np.linalg.norm(gt_vs - ssd_vs)/(diag*N) )
-		ssd_error = compute_error(gt_vs, ssd_vs)/diag
+		ssd_error, ssd_erms = compute_error(gt_vs, ssd_vs)
+		ssd_error = ssd_error / diag
+		ssd_erms = ssd_erms *2 / diag
 		print( "ssd: max, mean and median per-vertex distance", np.max(ssd_error), np.mean(ssd_error), np.median(ssd_error) )
-		print( "ssd per pose max, mean and median error:")
-		for i in range( len(ssd_error) ):
-			print( gt_names[i], np.max(ssd_error[i]), np.mean(ssd_error[i]), np.median(ssd_error[i]) )
+		print( "SSD E_RMS_kavan2010: ", ssd_erms )
+		if args.showAll:
+			print( "ssd per pose max, mean and median error:")
+			for i in range( len(ssd_error) ):
+				print( gt_names[i], np.max(ssd_error[i]), np.mean(ssd_error[i]), np.median(ssd_error[i]) )
 
 		ssd_folder = output_folder + "/ssd_recovered"
 		if not os.path.exists(ssd_folder):

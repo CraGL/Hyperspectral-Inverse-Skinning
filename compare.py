@@ -119,7 +119,7 @@ if __name__ == '__main__':
 	parser.add_argument( 'weights', type=str, help='ground truth skinning weights.')
 	parser.add_argument( 'our_result', type=str, help='our results(txt).')
 	## UPDATE: type=bool does not do what we think it does. bool("False") == True.
-	##         For more, see https://stackoverflow.com/questions/15008758/parsing-boolean-values-with-argparse
+	##		   For more, see https://stackoverflow.com/questions/15008758/parsing-boolean-values-with-argparse
 	def str2bool(s): return {'true': True, 'false': False}[s.lower()]
 	# parser.add_argument( '--write-OBJ', '-W', type=bool, default=False, help='whether to save recovered and SSD poses.')
 	parser.add_argument( '--write-OBJ', '-W', type=str2bool, default=False, help='whether to save recovered and SSD poses.')
@@ -182,26 +182,40 @@ if __name__ == '__main__':
 	gt_bones = np.swapaxes(gt_bones, 0, 1) 
 	rev_bones = np.swapaxes(rev_bones, 0, 1)
 	rev_vs = np.array([recover_poses.lbs_all(rest_vs, rev_bones_per_pose, rev_w.T) for rev_bones_per_pose in rev_bones ])
+
+	ordering = match_data( gt_vs, rev_vs )
+	print( "match order of our recovery: ", ordering )
+	rev_vs = np.array([ rev_vs[i] for i in ordering ])
+	
 	ssd_vs = np.zeros(rev_vs.shape)
 	if args.ssd_result is not None:
 		ssd_bones = np.swapaxes(ssd_bones, 0, 1)
 		ssd_vs = np.array([recover_poses.lbs_all(rest_vs, ssd_bones_per_pose, ssd_w.T) for ssd_bones_per_pose in ssd_bones ])
-	
-# 	if args.debug:
-# 		np.set_printoptions(threshold=np.nan)
-# 		print( "############################################" )
-# 		print( "Per-bone transformation P-by-B-by-12:" )
-# 		print( rev_bones )
-# 		print( "############################################" )
-# 		print( "weights N-by-B:" )
-# 		print( rev_w.T )
+
+		ordering = match_data( gt_vs, ssd_vs )
+		print( "match order of ssd recovery: ", ordering )
+		ssd_vs = np.array([ ssd_vs[i] for i in ordering ])
+		
+#	if args.debug:
+#		np.set_printoptions(threshold=np.nan)
+#		print( "############################################" )
+#		print( "Per-bone transformation P-by-B-by-12:" )
+#		print( rev_bones )
+#		print( "############################################" )
+#		print( "weights N-by-B:" )
+#		print( rev_w.T )
 	
 	def compute_error( gt, data ):
 		error = []
 		for pose_gt, pose_data in zip(gt, data):
 			error.append( np.array([np.linalg.norm(pt_gt - pt_data) for pt_gt, pt_data in zip(pose_gt, pose_data)]) )
-			
-		return np.array(error)
+		
+		## Divide this by the bounding sphere radius (or 1/2 the bounding box diagonal?)
+		## to get the error metric E_RMS from Kavan 2010.
+		E_RMS_kavan2010 = 1000*np.linalg.norm( gt.ravel() - data.ravel() )/np.sqrt(3*gt.shape[0]*gt.shape[1])
+		
+		return np.array(error), E_RMS_kavan2010
+	
 	
 	N = len( rest_vs )
 	print( "############################################" )
@@ -217,15 +231,21 @@ if __name__ == '__main__':
 	print( "############################################" )
 	print( "Reconstruction Mesh Error: " )
 	if args.ssd_result is not None:
-# 		print( "ssd error: ", np.linalg.norm(gt_vs - ssd_vs)/(diag*N) )
-		ssd_error = compute_error(gt_vs, ssd_vs)/diag
+#		print( "ssd error: ", np.linalg.norm(gt_vs - ssd_vs)/(diag*N) )
+		ssd_error, ssd_erms = compute_error(gt_vs, ssd_vs)
+		ssd_error = ssd_error / diag
+		ssd_erms = ssd_erms *2 / diag
 		print( "ssd: max, mean and median per-vertex distance", np.max(ssd_error), np.mean(ssd_error), np.median(ssd_error) )
-# 	print( "rev error: ", np.linalg.norm(gt_vs - rev_vs)/(diag*N) )
-	rev_error = compute_error(gt_vs, rev_vs)/diag
+		print( "SSD E_RMS_kavan2010: ", ssd_erms )
+#	print( "rev error: ", np.linalg.norm(gt_vs - rev_vs)/(diag*N) )
+	rev_error, rev_erms = compute_error(gt_vs, rev_vs)
+	rev_error = rev_error / diag
+	rev_erms = rev_erms *2 / diag
 	print( "rev: max, mean and median per-vertex distance", np.max(rev_error), np.mean(rev_error), np.median(rev_error) )
+	print( "Our E_RMS_kavan2010: ", rev_erms )
 	print( "############################################" )
 	
-# 	import pdb; pdb.set_trace()
+#	import pdb; pdb.set_trace()
 	if args.write_OBJ:
 		output_folder = os.path.split(args.our_result)[0]
 		our_folder = output_folder + "/our_recovered"
@@ -245,7 +265,7 @@ if __name__ == '__main__':
 				output_path = os.path.join(ssd_folder, gt_names[i])
 				format_loader.write_OBJ( output_path, vs.round(6), rest_fs )
 			
-# 	plot(gt_bones, ssd_bones, rev_bones )	
+#	plot(gt_bones, ssd_bones, rev_bones )	
  
 	
 	
