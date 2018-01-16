@@ -328,7 +328,9 @@ if __name__ == '__main__':
 		
 		results.append( ( volume, solution, iter_num, weights, Ts_mapper ) )
 	
-	volume, solution, iter_num, weights, Ts_mapper = min( results )
+	## TODO Q: min() or max()? min() is good for outliers. max() is better if we want
+	##         to avoid losing parts (larger error when restricted to positive weights).
+	volume, solution, iter_num, weights, Ts_mapper = max( results )
 	print( "=> Best simplex found with volume:", volume )
 	
 	## Did we randomly sample less than 100%?

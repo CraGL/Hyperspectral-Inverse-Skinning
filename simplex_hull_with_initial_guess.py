@@ -65,6 +65,7 @@ if __name__ == '__main__':
 	parser.add_argument('--ground-truth', '-GT', type=str, help='Ground truth data path.')
 	parser.add_argument('--robust-percentile', '-R', type=float, help='Fraction of outliers to discard. Default: 0.')
 	parser.add_argument('--dimension', '-D', type=int, help='Dimension (number of handles minus one). Default: automatic.')
+	parser.add_argument('--positive-weights', type=str2bool, default=False, help='If True, recovered weights must all be positive. If False, weights can be negative to better match vertices.')
 	parser.add_argument('--WPCA', type=str2bool, help='If True, uses weighted PCA instead of regular PCA. Requires')
 	parser.add_argument('--transformation-errors', type=str, help='Errors for data generated from local subspace intersection.')
 	parser.add_argument('--transformation-ssv', type=str, help='Smallest singular values for data generated from local subspace intersection.')
@@ -211,7 +212,9 @@ if __name__ == '__main__':
 		
 		results.append( ( volume, solution, iter_num, Ts_mapper ) )
 	
-	volume, solution, iter_num, Ts_mapper = min( results )
+	## TODO Q: min() or max()? min() is good for outliers. max() is better if we want
+	##         to avoid losing parts (larger error when restricted to positive weights).
+	volume, solution, iter_num, Ts_mapper = max( results )
 	print( "=> Best simplex found with volume:", volume )
 	
 	running_time = time.time() - startTime
@@ -230,12 +233,16 @@ if __name__ == '__main__':
 	N,B = rest_vs.shape[0], recovered.shape[0]
 	P = int(recovered.shape[1]//12)
 	weights = np.zeros((N,B))
+	if args.positive_weights:
+		solve_for_z_kwargs = {'return_energy': False, 'use_pseudoinverse': False, 'strategy': 'positive'}
+	else:
+		solve_for_z_kwargs = {'return_energy': False, 'use_pseudoinverse': True}
 	for i in range(N):
 		weights[i], ssv = biquadratic.solve_for_z(
 			recovered.T,
 			np.kron( np.identity(P*3), np.append( rest_vs[i], [1] ).reshape(1,-1) ),
 			deformed_vs[i].ravel(),
-			return_energy = False, use_pseudoinverse = True
+			**solve_for_z_kwargs
 			)
 		# transformation = np.dot( recovered.T, weights )
 	

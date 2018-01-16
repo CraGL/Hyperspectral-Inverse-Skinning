@@ -7,10 +7,9 @@ REST_POSE="${ROOT_DIR}"/models/cheburashka/cheburashka.obj
 OTHER_POSE_DIR="${ROOT_DIR}"/models/cheburashka/poses-2
 
 INITIAL_GUESS_ARGS="--svd_threshold 1e-15 --transformation_threshold 1e-4 --version 0"
-# FLAT_INTERSECTION_ARGS="--energy biquadratic --W-projection normalize --x-eps 0.01 --f-eps 0 -GT ${OTHER_POSE_DIR} --error True --handles 11 --fancy-init ${OUTPUT_DIR}/local_subspace_recover.txt"
-FLAT_INTERSECTION_ARGS="--energy biquadratic --W-projection normalize --x-eps 0.1 --f-eps 0 -GT ${OTHER_POSE_DIR} --error True --handles 11 --fancy-init ${OUTPUT_DIR}/local_subspace_recover.txt"
+FLAT_INTERSECTION_ARGS="--energy biquadratic --W-projection normalize --max-iter 2 -GT ${OTHER_POSE_DIR} --error True --handles 11 --fancy-init ${OUTPUT_DIR}/local_subspace_recover.txt"
 # SIMPLEX_HULL_ARGS="-R 0.01"
-SIMPLEX_HULL_ARGS="--method qp-major"
+SIMPLEX_HULL_ARGS="--method scipy --random-percent 10 --random-reps 10"
 
 # Generate
 mkdir -p "${OUTPUT_DIR}"
