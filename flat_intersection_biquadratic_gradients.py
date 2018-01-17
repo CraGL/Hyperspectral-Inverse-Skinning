@@ -52,21 +52,32 @@ def unpack( x, poses, handles ):
 def pack( W, poses, handles ):
     return W.ravel()
 
-def quadratic_for_z( W, V, vprime ):
+def quadratic_for_z( W, v, vprime ):
     '''
+    Given:
+    	W: The 12*P-by-handles array
+    	v: an array [ x y z 1 ]
+    	vprime: a 3*P array of all deformed poses
+    
     Returns a quadratic expression ( Q, L, C ) for the energy in terms of `z`:
         energy = np.dot( np.dot( z, Q ), z ) + np.dot( L, z ) + C
     '''
     
+    v = v.squeeze()
     vprime = vprime.squeeze()
     
     assert len( W.shape ) == 2
-    assert len( V.shape ) == 2
+    assert v.shape == (4,)
     assert len( vprime.shape ) == 1
-    assert W.shape[0] == V.shape[1]
-    assert V.shape[0] == vprime.shape[0]
+    assert W.shape[0] % 12 == 0
+    assert vprime.shape[0] % 3 == 0
+    assert vprime.shape[0]*4 == W.shape[0]
     
-    VW = np.dot( V, W )
+    # V = np.kron( np.identity(vprime.shape[0]), v.reshape(1,-1) )
+    # VW = np.dot( V, W )
+    # abs( np.dot( v, W.T.reshape( -1, 4 ).T ).reshape( W.shape[1], -1 ).T - V.dot(W) ).max()
+    
+    VW = np.dot( v, W.T.reshape( -1, 4 ).T ).reshape( W.shape[1], -1 ).T
     
     Q = np.dot( VW.T, VW )
     L = -2.0*np.dot( vprime, VW )
@@ -74,8 +85,8 @@ def quadratic_for_z( W, V, vprime ):
     
     return Q, L, C
 
-def solve_for_z( W, V, vprime, return_energy = False, use_pseudoinverse = True, strategy = None ):
-    Q, L, C = quadratic_for_z( W, V, vprime )
+def solve_for_z( W, v, vprime, return_energy = False, use_pseudoinverse = True, strategy = None ):
+    Q, L, C = quadratic_for_z( W, v, vprime )
     
     # sv = np.linalg.svd( Q, compute_uv = False )
     # smallest_singular_value = sv[-1]
@@ -131,16 +142,16 @@ def solve_for_z( W, V, vprime, return_energy = False, use_pseudoinverse = True, 
     else:
         return z, smallest_singular_value
 
-def quadratic_for_V( W, z, vprime ):
+def quadratic_for_v( W, z, vprime ):
     '''
     Returns a quadratic expression ( Q, L, C ) for the energy in terms of the 3-vector
-    `v`, the rest pose position which are converted to V via:
+    `v`, the rest pose position which can be converted to V bar via:
         kron( identity(poses), kron( identity(3), append( v, [1] ).reshape(1,-1) ) )
         =
         kron( identity(poses*3), append( v, [1] ).reshape(1,-1) )
     
     The quadratic expression returned is:
-        energy = np.dot( np.dot( v, Q ), v ) + np.dot( L, v ) + C
+        energy = np.dot( np.dot( v[:3], Q ), v[:3] ) + np.dot( L, v[:3] ) + C
     '''
     
     z = z.squeeze()
@@ -167,8 +178,8 @@ def quadratic_for_V( W, z, vprime ):
     
     return Q, L, C
 
-def solve_for_V( W, z, vprime, return_energy = False, use_pseudoinverse = False ):
-    Q, L, C = quadratic_for_V( W, z, vprime )
+def solve_for_v( W, z, vprime, return_energy = False, use_pseudoinverse = False ):
+    Q, L, C = quadratic_for_v( W, z, vprime )
     
     if use_pseudoinverse:
         v = np.dot( np.linalg.pinv(Q), -0.5*L )
@@ -179,7 +190,8 @@ def solve_for_V( W, z, vprime, return_energy = False, use_pseudoinverse = False 
     assert len(vprime) % 3 == 0
     poses = len(vprime)//3
     # V = np.kron( np.identity(poses), np.kron( np.identity(3), np.append( v, [1] ).reshape(1,-1) ) )
-    V = np.kron( np.identity(poses*3), np.append( v, [1] ).reshape(1,-1) )
+    # V = np.kron( np.identity(poses*3), np.append( v, [1] ).reshape(1,-1) )
+    result_v = np.append( v, [1] )
     
     if return_energy:
         E = np.dot( np.dot( v, Q ), v ) + np.dot( L, v ) + C
@@ -188,20 +200,20 @@ def solve_for_V( W, z, vprime, return_energy = False, use_pseudoinverse = False 
     else:
         return V
 
-def linear_matrix_equation_for_W( V, vprime, z ):
+def linear_matrix_equation_for_W( v, vprime, z ):
     '''
     Returns (A, B, Y) to compute the gradient of the energy in terms of W
     in the following linear matrix equation:
         0.5 * dE/dW = np.dot( A, np.dot( W, B ) ) + Y
     '''
     
+    v = v.squeeze()
     vprime = vprime.squeeze()
     z = z.squeeze()
     
-    assert len( V.shape ) == 2
+    assert v.shape == (4,)
     assert len( vprime.shape ) == 1
     assert len( z.shape ) == 1
-    assert V.shape[0] == vprime.shape[0]
     
     ## Reshape the vectors into column matrices.
     vprime = vprime.reshape(-1,1)
@@ -210,7 +222,7 @@ def linear_matrix_equation_for_W( V, vprime, z ):
     # A = V'*V = ( I_3poses kron [v 1] )'*( I_3poses kron [v 1] ) = ( I_3poses kron [v 1]' )*( I_3poses kron [v 1] ) = I_3poses kron ( [v 1]'*[v 1] )
     # B' = B = z*z' = z kron z' = z kron z'
     # A kron B' = ( I_3poses kron ( [v 1]'*[v 1] ) ) kron ( z kron z' ) = I_3poses kron( ( [v 1]'*[v 1] ) kron ( z*z' ) )
-    v = V[0,:4].reshape(1,-1)
+    v = v.reshape(1,-1)
     A = np.outer( v.T, v ) #, np.dot( V.T, V )
     B = np.dot( z, z.T )
     ## We can also get simplify the block diagonal V multiplication.
@@ -218,6 +230,16 @@ def linear_matrix_equation_for_W( V, vprime, z ):
     Y = np.dot( np.dot( (-v).T, vprime.T ).T.reshape(-1,1), z.T )
     
     return A, B, Y
+
+def zero_system_for_W( A, B, Y ):
+    system = np.zeros( ( B.shape[1]*A.shape[0], B.shape[0]*A.shape[1] ) )
+    rhs = np.zeros( Y.shape )
+    
+    return system, rhs
+    
+def accumulate_system_for_W( system, rhs, A, B, Y, weight ):
+    system += np.kron( weight*A, B.T )
+    rhs -= weight*Y
 
 def solve_for_W( As, Bs, Ys, use_pseudoinverse = True, projection = None, **kwargs ):
     assert len( As ) == len( Bs )
@@ -242,22 +264,30 @@ def solve_for_W( As, Bs, Ys, use_pseudoinverse = True, projection = None, **kwar
         # system += np.kron( A[1], B.T )
         rhs -= Y
     
+    return solve_for_W_with_system_rhs( system, rhs, use_pseudoinverse = use_pseudoinverse, projection = projection, **kwargs )
+
+def solve_for_W_with_system( system, rhs, use_pseudoinverse = True, projection = None, **kwargs ):
+    assert rhs.shape[0] % 12 == 0
+    poses = rhs.shape[0]//12
+    assert system.shape[0] % 4 == 0
+    handles = system.shape[0] // 4
+    
     if projection == 'regularize_translation':
         ## Let's add a small weight penalizing non-zero values for the elements
         ## of W corresponding to translations.
-        assert system.shape[0] == 4*B.shape[0]
+        assert system.shape[0] == 4*handles
         reg = np.zeros( system.shape[0] )
-        reg[ 3*B.shape[0] : 4*B.shape[0] ] = 1e-3 # 1.0
+        reg[ 3*handles : 4*handles ] = 1e-3 # 1.0
         system[ np.diag_indices_from(system) ] += reg
     elif projection == 'regularize_identity':
         ## Let's add a small weight penalizing non-zero values for the elements
         ## of W corresponding to translations.
-        assert system.shape[0] == 4*B.shape[0]
+        assert system.shape[0] == 4*handles
         w = 1e-3
         reg = w*np.ones( system.shape[0] )
         system[ np.diag_indices_from(system) ] += reg
         assert rhs.shape[0] == 12*poses
-        assert rhs.shape[1] == B.shape[0]
+        assert rhs.shape[1] == handles
         identity = np.tile( w*np.eye(4)[:3].ravel(), poses ).reshape(-1,1)
         rhs += identity
     
@@ -265,7 +295,7 @@ def solve_for_W( As, Bs, Ys, use_pseudoinverse = True, projection = None, **kwar
     # system_big = scipy.linalg.block_diag( *( [system]*(3*poses) ) )
     
     if projection == 'first':
-        assert rhs.shape == ( 12*poses, B.shape[1] )
+        assert rhs.shape == ( 12*poses, handles )
         ## Add a least squares term setting the first column of the output
         ## to kwargs['first_column'].
         ## For the full system matrix, that would be (using a pre-vectorized rhs):
@@ -282,7 +312,7 @@ def solve_for_W( As, Bs, Ys, use_pseudoinverse = True, projection = None, **kwar
         w_lsq = 1e4
         rhs[:,0] += w_lsq * first_column
         ## Modify diagonal of system
-        h = B.shape[0]
+        h = handles
         system[0*h,0*h] += w_lsq
         system[1*h,1*h] += w_lsq
         system[2*h,2*h] += w_lsq
@@ -294,25 +324,25 @@ def solve_for_W( As, Bs, Ys, use_pseudoinverse = True, projection = None, **kwar
         assert not use_pseudoinverse
         import cvxopt.solvers
         n = system.shape[0]
-        bounds_system = cvxopt.matrix( np.vstack( [ np.eye(n)[:3*B.shape[0]], -np.eye(n)[:3*B.shape[0]] ] ) )
-        bounds_rhs = cvxopt.matrix( np.ones( ( 2*3*B.shape[0], 1 ) ) )
+        bounds_system = cvxopt.matrix( np.vstack( [ np.eye(n)[:3*handles], -np.eye(n)[:3*handles] ] ) )
+        bounds_rhs = cvxopt.matrix( np.ones( ( 2*3*handles, 1 ) ) )
         W = [ np.array( cvxopt.solvers.qp( cvxopt.matrix( system ), cvxopt.matrix( col.reshape(-1,1) ), bounds_system, bounds_rhs )['x'] ) for col in rhs.reshape( -1, n ) ]
-        W = np.hstack(W).T.reshape( 12*poses, B.shape[1] )
+        W = np.hstack(W).T.reshape( 12*poses, handles )
     elif use_pseudoinverse:
-        # W1 = np.dot( np.linalg.pinv(system_big), rhs.ravel() ).reshape( 12*poses, B.shape[1] )
-        W = np.dot( np.linalg.pinv(system), rhs.reshape( -1, system.shape[0] ).T ).T.reshape( 12*poses, B.shape[1] )
+        # W1 = np.dot( np.linalg.pinv(system_big), rhs.ravel() ).reshape( 12*poses, handles )
+        W = np.dot( np.linalg.pinv(system), rhs.reshape( -1, system.shape[0] ).T ).T.reshape( 12*poses, handles )
         # print( "pinv block difference:", abs( W - W1 ).max() )
     else:
-        # W1 = np.linalg.solve( system_big, rhs.ravel() ).reshape( 12*poses, B.shape[1] )
+        # W1 = np.linalg.solve( system_big, rhs.ravel() ).reshape( 12*poses, handles )
         ## With our numpy solver:
-        # W = np.linalg.solve( system, rhs.reshape( -1, system.shape[0] ).T ).T.reshape( 12*poses, B.shape[1] )
+        # W = np.linalg.solve( system, rhs.reshape( -1, system.shape[0] ).T ).T.reshape( 12*poses, handles )
         ## We know that the system is symmetric positive definite because it is the
         ## sum of the kronecker product of the outer product of vectors.
         ## Outer products of vectors are positive definite, and sum and kronecker products
         ## preserve positive semidefiniteness.
         ## So we can use scipy.linalg.solve() which can take advantage of that fact.
         import scipy.linalg
-        W = scipy.linalg.solve( system, rhs.reshape( -1, system.shape[0] ).T, sym_pos = True ).T.reshape( 12*poses, B.shape[1] )
+        W = scipy.linalg.solve( system, rhs.reshape( -1, system.shape[0] ).T, sym_pos = True ).T.reshape( 12*poses, handles )
         # print( "solve block difference:", abs( W - W1 ).max() )
     
     ## Normalize the columns of W.

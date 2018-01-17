@@ -622,21 +622,24 @@ def optimize_approximated_quadratic(P, H, row_mats, deformed_vs, x0, f_eps = Non
 	
 	return converged, x
 
-def optimize_biquadratic( P, H, row_mats, deformed_vs, x0, solve_for_rest_pose = False, csv_path = None, f_eps = None, x_eps = None, max_iter = None, f_zero_threshold = None, strategy = None, W_projection = None, z_strategy = None, **kwargs ):
+def optimize_biquadratic( P, H, rest_vs, deformed_vs, x0, solve_for_rest_pose = False, csv_path = None, f_eps = None, x_eps = None, max_iter = None, f_zero_threshold = None, strategy = None, W_projection = None, z_strategy = None, **kwargs ):
 	'''
+	Given:
+		P: Number of poses
+		H: Number of handles
+		rest_vs: an array where each row is [ x y z 1 ]
+		deformed_vs: an array vertices-by-poses-by-3
+		x0: initial guess
+	
 	If solve_for_rest_pose is False (the default), returns ( converged, final x ).
-	If solve_for_rest_pose is True, returns ( converged, final x, and updated row_mats ).
+	If solve_for_rest_pose is True, returns ( converged, final x, and updated rest_vs ).
 	'''
 	
 	## To make function values comparable, we need to normalize.
-	xyzs = np.asarray([ row_mat[0,:3] for row_mat in row_mats ])
-	diag = xyzs.max( axis = 0 ) - xyzs.min( axis = 0 )
-	diag = np.linalg.norm(diag)
-	# normalization = 1./( len(row_mats) * diag )
-	normalization = normalization_factor_from_row_mats( row_mats )
+	normalization = normalization_factor_from_xyzs( rest_vs[:,:3] )
 	## We don't want this uniform per-vertex normalization because
 	## we may do special weight handling.
-	normalization *= len( row_mats )
+	normalization *= len( rest_vs )
 	print( "Normalization:", normalization )
 	
 	if strategy is None:
@@ -728,21 +731,20 @@ def optimize_biquadratic( P, H, row_mats, deformed_vs, x0, solve_for_rest_pose =
 			weights = 0
 			
 			fis = np.zeros( len( deformed_vs ) )
-			As = []
-			Bs = []
-			Ys = []
+			W_system = None
+			W_rhs = None
 			
-			## If we are solving for the rest pose, make a copy of row_mats, because
+			## If we are solving for the rest pose, make a copy of rest_vs, because
 			## we will modify it.
 			if solve_for_rest_pose:
-				row_mats = row_mats.copy()
+				rest_vs = rest_vs.copy()
 			
-			for i, vs in enumerate(deformed_vs):
-				vprime = vs.reshape((3*P,1))
-				vbar = row_mats[i]
+			for i, deformed_v in enumerate(deformed_vs):
+				vprime = deformed_v.reshape((3*P,1))
+				v = rest_vs[i]
 				
 				## 1
-				z, ssz, fi = biquadratic.solve_for_z( W_prev, vbar, vprime, return_energy = True, use_pseudoinverse = use_pseudoinverse, strategy = z_strategy )
+				z, ssz, fi = biquadratic.solve_for_z( W_prev, v, vprime, return_energy = True, use_pseudoinverse = use_pseudoinverse, strategy = z_strategy )
 				fis[i] = fi
 				
 				if 'ssv:skip' in strategy:
@@ -758,26 +760,26 @@ def optimize_biquadratic( P, H, row_mats, deformed_vs, x0, solve_for_rest_pose =
 				
 				## 2
 				if solve_for_rest_pose:
-					Q,L,C = biquadratic.quadratic_for_V( W_prev, z, vprime )
-					v = vbar[:3,0]
-					old_fi = np.dot( np.dot( v, Q ), v ) + np.dot( L, v ) + C
+					Q,L,C = biquadratic.quadratic_for_v( W_prev, z, vprime )
+					v3 = v[:3]
+					old_fi = np.dot( np.dot( v3, Q ), v3 ) + np.dot( L, v3 ) + C
 					
-					vbar, fi = biquadratic.solve_for_V( W_prev, z, vprime, return_energy = True, use_pseudoinverse = use_pseudoinverse )
+					new_v, fi = biquadratic.solve_for_v( W_prev, z, vprime, return_energy = True, use_pseudoinverse = use_pseudoinverse )
 					## Store the new vbar.
-					row_mats[i] = vbar
+					rest_vs[i] = new_v
 					fis[i] = fi
 				
 				## 3
-				A, B, Y = biquadratic.linear_matrix_equation_for_W( vbar, vprime, z )
-				As.append( ssz*A )
-				Bs.append( B )
-				Ys.append( ssz*Y )
+				A, B, Y = biquadratic.linear_matrix_equation_for_W( v, vprime, z )
+				if W_system is None:
+					W_system, W_rhs = biquadratic.zero_system_for_W( A, B, Y )
+				biquadratic.accumulate_system_for_W( W_system, W_rhs, A, B, Y, ssz )
 				
 				f += fi * ssz
 				weights += ssz
 			
 			## 4
-			W = biquadratic.solve_for_W( As, Bs, Ys, use_pseudoinverse = use_pseudoinverse, projection = W_projection, first_column = first_column )
+			W = biquadratic.solve_for_W_with_system( W_system, W_rhs, use_pseudoinverse = use_pseudoinverse, projection = W_projection, first_column = first_column )
 			f *= normalization / weights
 			print( "Function value:", f )
 			func_values.append(f)
@@ -825,7 +827,7 @@ def optimize_biquadratic( P, H, row_mats, deformed_vs, x0, solve_for_rest_pose =
 		np.savetxt(csv_path, func_values, delimiter=",")
 	
 	if solve_for_rest_pose:
-		return converged, pack_W( W ), row_mats
+		return converged, pack_W( W ), rest_vs
 	else:
 		return converged, pack_W( W )
 
@@ -1052,7 +1054,7 @@ def optimize(P, H, all_R_mats, deformed_vs, x0):
 	return converged, x
 	
 
-def per_vertex_transformation(x, P, row_mats, deformed_vs):
+def per_vertex_transformation(x, P, rest_vs, deformed_vs):
 	
 	import flat_intersection_biquadratic_gradients as biquadratic
 	
@@ -1062,7 +1064,9 @@ def per_vertex_transformation(x, P, row_mats, deformed_vs):
 	pt, B = unpack(x,P)
 	num_underconstrained = 0
 	for j, vs in enumerate(deformed_vs):
-		vprime = vs.reshape((3*P,1))	
+		vprime = vs.reshape((3*P,1))
+		
+		'''
 		vbar = row_mats[j]
 		vB = np.dot( vbar, B )
 		lh = np.dot( vB.T, vB )
@@ -1076,13 +1080,19 @@ def per_vertex_transformation(x, P, row_mats, deformed_vs):
 			print( "Vertex", j, "has small singular values:", sv )
 		
 		transformation = pt + np.dot(B,z)
-		rev_vertex_transformations.append( transformation )
-		vertex_dists.append( np.linalg.norm( np.dot( vbar, transformation ) - vprime ) )
+		'''
 		
-		z2, ssv = biquadratic.solve_for_z( np.hstack([ pt.reshape(-1,1), pt+B ]), vbar, vprime, return_energy = False, use_pseudoinverse = True )
+		v = np.append( rest_vs[j], [1] )
+		
+		z2, ssv = biquadratic.solve_for_z( np.hstack([ pt.reshape(-1,1), pt+B ]), v, vprime, return_energy = False, use_pseudoinverse = True )
 		if ssv < 1e-5: continue
-		transformation2 = np.dot( np.hstack([ pt.reshape(-1,1), pt+B ]), z2 )
+		transformation = np.dot( np.hstack([ pt.reshape(-1,1), pt+B ]), z2 )
 # 		assert abs( transformation.squeeze() - transformation2.squeeze() ).max() < 1e-7
+		
+		rev_vertex_transformations.append( transformation )
+		# vertex_dists.append( np.linalg.norm( np.dot( vbar, transformation ) - vprime ) )
+		v_transformed = np.dot( v, transformation.reshape( 4, -1 ) ).reshape( vprime.shape )
+		vertex_dists.append( np.linalg.norm( v_transformed - vprime ) )
 	
 	return np.array( rev_vertex_transformations ).squeeze(), np.array( vertex_dists )
 	
@@ -1125,43 +1135,47 @@ if __name__ == '__main__':
 	if zero_test:	assert( ground_truth_path is not None and "Zero energy test or zero test need ground truth path." )
 	
 	fancy_init_path = args.fancy_init
-	rest_mesh = TriMesh.FromOBJ_FileName( args.rest_pose )
 	OBJ_name = os.path.splitext(os.path.basename(args.rest_pose))[0]
 	print( "The name for the OBJ is:", OBJ_name )
+	rest_mesh = TriMesh.FromOBJ_FileName( args.rest_pose )
 	
 	pose_paths = glob.glob(args.pose_folder + "/*.obj")
 	pose_paths.sort()
-	deformed_vs = np.array( [TriMesh.FromOBJ_FileName( path ).vs for path in pose_paths] )
 	pose_name = os.path.basename( args.pose_folder )
 	print( "The name for pose folder is:", pose_name )
+	deformed_vs = np.array( [TriMesh.FromOBJ_FileName( path ).vs for path in pose_paths] )
 	
 	## build flats
+	print( "Building flats" )
 	assert( len(deformed_vs.shape) == 3 )
 	P, N = deformed_vs.shape[0], deformed_vs.shape[1]
 	deformed_vs = np.swapaxes(deformed_vs, 0, 1).reshape(N, P, 3)
 	all_rights = deformed_vs.copy()
 	
-	all_flats = []
-	all_R_mats = []
-	for i, pos in enumerate(rest_mesh.vs):
-		left_m = np.zeros((3*P, 12*P))
-		unit_left_m = left_m.copy()
-		pos_h = np.ones(4)
-		pos_h[:3] = pos
-		nm = np.linalg.norm( pos_h )
-		for j in range(P):
-			for k in range(3):
-				unit_left_m[j*3+k, j*12+k*4:j*12+k*4+4] = pos_h/nm
-				left_m	   [j*3+k, j*12+k*4:j*12+k*4+4] = pos_h
+	if args.energy != 'biquadratic':
+		all_flats = []
+		all_R_mats = []
+		for i, pos in enumerate(rest_mesh.vs):
+			left_m = np.zeros((3*P, 12*P))
+			unit_left_m = left_m.copy()
+			pos_h = np.ones(4)
+			pos_h[:3] = pos
+			nm = np.linalg.norm( pos_h )
+			for j in range(P):
+				for k in range(3):
+					unit_left_m[j*3+k, j*12+k*4:j*12+k*4+4] = pos_h/nm
+					left_m	   [j*3+k, j*12+k*4:j*12+k*4+4] = pos_h
 				
-		all_rights[i] /= nm
-		assert( np.allclose( np.dot(unit_left_m, unit_left_m.T), np.eye(3*P) ) )
-		all_flats.append(unit_left_m)
-		all_R_mats.append(left_m)
-	all_flats = np.array( all_flats )
-	all_R_mats = np.array( all_R_mats )
-	
-	print( "The rank of the stack of all pose row matrices is: ", np.linalg.matrix_rank( np.vstack( all_flats ) ) )
+			all_rights[i] /= nm
+			assert( np.allclose( np.dot(unit_left_m, unit_left_m.T), np.eye(3*P) ) )
+			all_flats.append(unit_left_m)
+			all_R_mats.append(left_m)
+		all_flats = np.array( all_flats )
+		all_R_mats = np.array( all_R_mats )
+		
+		print( "The rank of the stack of all pose row matrices is: ", np.linalg.matrix_rank( np.vstack( all_flats ) ) )
+	else:
+		all_R_mats = np.append( rest_mesh.vs, np.ones( ( len( rest_mesh.vs ), 1 ) ), axis = 1 )
 	
 	start_time = time.time()
 	if H is None:
@@ -1291,7 +1305,7 @@ if __name__ == '__main__':
 	if ground_truth_path is not None and converged == False:
 		print("Exceed Maximum #handles ", MAX_H)
 	
-	rev_vertex_trans, vertex_dists = per_vertex_transformation(x, P, all_R_mats, deformed_vs)	
+	rev_vertex_trans, vertex_dists = per_vertex_transformation(x, P, rest_mesh.vs, deformed_vs)	
 	if error_test:
 		transformation_error = abs( rev_vertex_trans - gt_vertices )
 		print( "Largest, average and median transformation errors are: ", transformation_error.max(), transformation_error.mean(), np.median(transformation_error.ravel()) )
