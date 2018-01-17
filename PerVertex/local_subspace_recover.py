@@ -198,7 +198,7 @@ def find_subspace_intersections( rest_pose_name, other_poses_name, version, meth
     
     #### read obj file into mesh
     
-    mesh0=TriMesh.FromOBJ_FileName(rest_pose_name[0])
+    mesh0=TriMesh.FromOBJ_FileName(rest_pose_name)
     mesh1_list=[]
     pose_num=len(other_poses_name)
 
@@ -267,7 +267,7 @@ if __name__ == '__main__':
     import argparse
     
     parser = argparse.ArgumentParser( description='Generate a set of transformations from a set of poses by finding local subspace intersections. Saves data as text where each line is ( 3-by-4-by-num_poses ).ravel()' )
-    parser.add_argument( 'rest_pose', type=str, nargs=1, help='Path to rest pose (OBJ)' )
+    parser.add_argument( 'rest_pose', type=str, help='Path to rest pose (OBJ)' )
     parser.add_argument( 'other_poses', type=str, nargs='+', help='Paths to other poses (OBJ)')
     parser.add_argument( '--svd_threshold', '-s', type=float, help='Threshold for determining a singular vertex neighborhood (flat).' )
     parser.add_argument( '--transformation_threshold', '-t', type=float, help='Threshold for determining whether the subspaces intersect.' )
