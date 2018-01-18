@@ -19,52 +19,95 @@ def null_space_matrix(A):
     null_space=vh[3*pose_num:,:]
     return null_space
 
+def null_space_projection_matrix(v):
+    v = v.squeeze()
+    assert v.shape == (4,)
+    
+    # vnorm = np.sqrt( np.dot( v,v ) )
+    # row = v / vnorm
+    # np.outer( row, row )
+    
+    ## The projection matrix onto the null space is:
+    # P_row = np.outer( row, row )
+    ## We can write the outer product a little more efficiently:
+    P = np.outer( v, v / np.dot( v, v ) )
+    
+    ## The projection matrix onto the row space is (I-P_null)
+    # P = np.outer( -row, row )
+    # P[ np.diag_indices_from(P) ] += 1
+    
+    return P
+
+def v_to_vbar( v, pose_num ):
+    '''
+    Given:
+        v: a 4-vector
+        pose_num: an integer
+    
+    Returns
+        The kronecker product of the identity matrix of size 3*pose_num with v as a row matrix:
+        np.kron( np.eye( 3*pose_num ), v.reshape(1,-1) )
+    
+    This is the Vbar and v_expand used in the code.
+    '''
+    result = np.zeros((3*pose_num,12*pose_num))
+    for j in range(pose_num):
+        for k in range(3):
+            result[j*3+k, (j*3+k)*4:(j*3+k)*4+4]=v
+    return result
 
 def func(q, V0, V1):
-    pose_num=V0.shape[1]//4
+    pose_num=V1.shape[1]//3
     obj=np.zeros(0)
     for i in range(len(V0)):
         v0=V0[i]
         v1=V1[i]
-        v0_expand=np.zeros((3*pose_num,12*pose_num))
-        for j in range(pose_num):
-            for k in range(3):
-                v0_expand[j*3+k, (j*3+k)*4:(j*3+k)*4+4]=v0[4*j:4*j+4]
+        v0_expand=v_to_vbar( v0, pose_num )
 
 ##### version 1
         Null_matrix=null_space_matrix(v0_expand)
         T=np.zeros(12*pose_num).reshape((pose_num,3,4))
         for j in range(pose_num):
             T[j,:,:-1]=np.identity(3)
-            T[j,:,-1]=v1[3*j:3*j+3]-v0[4*j:4*j+3]
+            T[j,:,-1]=v1[3*j:3*j+3]-v0[:3]
         T=T.ravel()
         obj=np.concatenate((obj,(q-(T + Null_matrix.T.dot(np.dot(Null_matrix,q-T)))).ravel()))
-    
+        
 #### version 2
 #         obj=np.concatenate((obj, (np.dot(v0_expand, q)-v1).ravel()))
         
     return obj
 
 
-        
-def compute_I_Projection_matrix(V0):
-    pose_num=V0.shape[1]//4
+'''
+def compute_I_Projection_matrix(V0,pose_num):
+    assert V0.shape[1] == 4
     sum_I_P=np.zeros((12*pose_num,12*pose_num))
     Identity=np.identity(12*pose_num)
     for i in range(len(V0)):
         v0=V0[i]
-        v0_expand=np.zeros((3*pose_num,12*pose_num))
-        for j in range(pose_num):
-            for k in range(3):
-                v0_expand[j*3+k, (j*3+k)*4:(j*3+k)*4+4]=v0[4*j:4*j+4]
+        v0_expand=v_to_vbar( v0, pose_num )
                 
         Null_matrix=null_space_matrix(v0_expand)
         
         P=Null_matrix.T.dot(Null_matrix)
         sum_I_P+=(Identity-P)
     s= scipy.linalg.svd(sum_I_P, compute_uv=False)
+    s2 = compute_I_Projection_matrix_smallest_singular_value(V0,pose_num)
+    sum_I_P2 = np.sum( [null_space_projection_matrix(v) for v in V0], axis = 0 )
     return s
-        
+'''
+
+def compute_I_Projection_matrix_smallest_singular_value(V0,pose_num):
+    ## We want to compute the sum of 
+    P = np.zeros( ( 4,4 ) )
+    for v in V0: P += null_space_projection_matrix(v)
+    ## Get the smallest singular value of P
+    ssv = np.linalg.norm( P, ord = -2 )
+    return ssv
+
+compute_I_Projection_matrix = compute_I_Projection_matrix_smallest_singular_value
+
         
 def solve(q0, V0, V1):
     res=scipy.optimize.least_squares(func, q0, args=(V0, V1),jac='3-point', method='trf')
@@ -75,86 +118,51 @@ def solve(q0, V0, V1):
 
 def solve_directly(V0, V1, method, version=0, use_pseudoinverse = None):
     if use_pseudoinverse is None: use_pseudoinverse = False
-    pose_num=V0.shape[1]//4
-    left=np.zeros((12*pose_num, 12*pose_num))
-    right=np.zeros((12*pose_num))
+    pose_num=V1.shape[1]//3
+    left=np.zeros((4,4))
+    right=np.zeros((4,3*pose_num))
     constant=0.0
-    v_expand_center=None
-    v1_center=None
-    for i in range(len(V0)):
-        v0=V0[i]
-        v1=V1[i]
-        
-        v0_expand=np.zeros((3*pose_num,12*pose_num))
+    
+    if method == "nullspace":
+        ## Allocate the translation matrices and fill in the upper-left portion with
+        ## the identity matrix.
+        Tidentity=np.zeros(12*pose_num).reshape((pose_num,3,4))
         for j in range(pose_num):
-            for k in range(3):
-                v0_expand[j*3+k, (j*3+k)*4:(j*3+k)*4+4]=v0[4*j:4*j+4]
+            Tidentity[j,:,:-1]=np.identity(3)
+    
+    for i in range(len(V0)):
+        v0=V0[i].reshape(-1,1)
+        v1=V1[i].reshape(-1,1)
         
-        if i==0:
-            v_expand_center=v0_expand.copy()
-            v1_center=v1.copy()
-
         if method == "nullspace":
             #### version 1
-            Identity=np.identity(12*pose_num)
-            Null_matrix=null_space_matrix(v0_expand)
-            P=Null_matrix.T.dot(Null_matrix)
-            T=np.zeros(12*pose_num).reshape((pose_num,3,4))
             for j in range(pose_num):
-                T[j,:,:-1]=np.identity(3)
-                T[j,:,-1]=v1[3*j:3*j+3]-v0[4*j:4*j+3]
-            T=T.ravel()
+                Tidentity[j,:,-1]=( v1[3*j:3*j+3]-v0[:3] ).squeeze()
+            T=Tidentity.ravel()
 
-            A = (Identity-P).T.dot((Identity-P))
+            I_P = null_space_projection_matrix(v0)
+            # A = (I_P).T.dot((I_P))
+            ## A projection matrix times itself is the same.
+            A = I_P
             left+=A
-            right+=A.dot(T)
-            constant+=T.dot(A).dot(T)
+            
+            # import scipy.linalg
+            # AT = scipy.linalg.block_diag( *( [A]*(3*pose_num) ) ).dot( T )
+            # assert abs(np.dot( A, T.reshape( ( 4,-1 ), order = 'F' ) ).ravel( order = 'F' ) - AT).max() < 1e-15
+            AT = np.dot( A, T.reshape( ( 4,-1 ), order = 'F' ) )
+            
+            right+=AT
+            constant+=T.dot(AT.ravel( order = 'F' ))
 
             
         elif method == "vertex":
             ##### version 2
-            left+=v0_expand.T.dot(v0_expand)
-            right+=v0_expand.T.dot(v1)
-            constant+=v1.T.dot(v1)
+            left     += v0.dot( v0.T )
+            right    += v0.dot( v1.T )
+            constant += v1.T.dot(v1).squeeze()
         
         else:
             raise RuntimeError
-    
-    if version==0:
-        if use_pseudoinverse:
-            x=np.linalg.pinv(left).dot(right)
-        else:
-            x=scipy.linalg.solve(left,right)
-    elif version==1:
-        new_left=np.hstack((left, v_expand_center.T))
-        temp=np.hstack((v_expand_center, np.zeros((3*pose_num, 3*pose_num))))
-        new_left=np.vstack((new_left, temp))
-        new_right=np.concatenate((right, v1_center))
-        if use_pseudoinverse:
-            x_full=np.linalg.pinv(new_left).dot(new_right)
-        else:
-            x_full=scipy.linalg.solve(new_left,new_right)
-        x=x_full[:12*pose_num]
-
-    return x, (x.T.dot(left).dot(x)-2*right.T.dot(x)+constant).squeeze()
-
-def solve_directly_vertex(V0, V1, version=0, use_pseudoinverse = None):
-    if use_pseudoinverse is None: use_pseudoinverse = False
-    pose_num=V0.shape[1]//4
-    ## left is block diagonal with the same block along the diagonal. Just store the block.
-    left=np.zeros((4,4))
-    right=np.zeros((4,3*pose_num))
-    constant=0.0
-    v0_center=V0[0,:4].reshape(-1,1)
-    v1_center=V1[0].copy().reshape(-1,1)
-    for i in range(len(V0)):
-        v0=V0[i,:4].reshape(-1,1)
-        v1=V1[i].reshape(-1,1)
-        
-        ##### version 2
-        left     += v0.dot( v0.T )
-        right    += v0.dot( v1.T )
-        constant += v1.T.dot(v1).squeeze()
     
     ssv = np.linalg.norm( left, ord = -2 )
     if ssv < 1e-10: use_pseudoinverse = True
@@ -191,26 +199,21 @@ def find_scale(Vertices):
     return scale
 
 
-def find_subspace_intersections( rest_pose_name, other_poses_name, version, method = None, use_pseudoinverse = None ):
+def find_subspace_intersections( rest_pose, other_poses, version, method = None, use_pseudoinverse = None, propagate = None ):
+    
+    if propagate is None: propagate = False
     
     if method is None:
         method = "vertex"
     
-    #### read obj file into mesh
+    mesh0=rest_pose
     
-    mesh0=TriMesh.FromOBJ_FileName(rest_pose_name[0])
-    mesh1_list=[]
-    pose_num=len(other_poses_name)
-
-    for i in range(pose_num):
-        mesh1_list.append(TriMesh.FromOBJ_FileName(other_poses_name[i]))
-
-
-    vertices0=vertices0_temp=np.hstack((np.asarray(mesh0.vs),np.ones((len(mesh0.vs),1))))
-    vertices1=vertices1_temp=np.asarray(mesh1_list[0].vs)
-    for i in range(1,len(mesh1_list)):
-        vertices0=np.hstack((vertices0, vertices0_temp))
-        vertices1=np.hstack((vertices1, np.asarray(mesh1_list[i].vs)))
+    mesh1_list=other_poses
+    pose_num=len(mesh1_list)
+    
+    vertices0=np.hstack((np.asarray(mesh0.vs),np.ones((len(mesh0.vs),1))))
+    ## Stack all poses horizontally.
+    vertices1 = np.hstack( [ mesh.vs for mesh in mesh1_list ] )
     
     scale=find_scale(vertices0[:,:3])
     q_space=[]
@@ -232,16 +235,8 @@ def find_subspace_intersections( rest_pose_name, other_poses_name, version, meth
         V1=np.vstack((v1, v1_neighbor))
 
         #### solve directly
-        if method == 'vertex':
-            q,cost,ssv=solve_directly_vertex(V0, V1, version = version, use_pseudoinverse = use_pseudoinverse)
-            smallest_singular_values.append( ssv )
-        else:
-            s=compute_I_Projection_matrix(V0)
-            smallest_singular_values.append( s[-1] )
-            #if s[-1] < svd_threshold:
-            #    continue
-            
-            q,cost=solve_directly(V0, V1, method = method, version = version, use_pseudoinverse = use_pseudoinverse or s[-1] < 1e-10)
+        q,cost,ssv=solve_directly(V0, V1, method = method, version = version, use_pseudoinverse = use_pseudoinverse)
+        smallest_singular_values.append( ssv )
 
         assert q is not None
         # if q is not None:
@@ -252,7 +247,49 @@ def find_subspace_intersections( rest_pose_name, other_poses_name, version, meth
     q_space=np.asarray(q_space)
     errors=np.asarray(errors)
     smallest_singular_values=np.asarray(smallest_singular_values)
-
+    
+    
+    if propagate:
+        something_changed = False
+        ## We are going to assume triangles.
+        assert mesh0.faces.shape[1] == 3
+        def mag( x ): return np.dot( x,x )
+        while True:
+            print( "Propagating..." )
+            something_changed = False
+            for face in mesh0.faces:
+                face_qs = q_space[ face ]
+                
+                for i in range(3):
+                    # v = np.append( mesh.vs[ face[i] ], [1] )
+                    v = vertices0[ face[i] ]
+                    vprime = vertices1[ face[i] ]
+                    
+                    qs = [ q_space[i], q_space[(i+1)%3], q_space[(i+2)%3] ]
+                    qvs = [
+                        np.dot( v, q.reshape( 4, -1 ) ).reshape( vprime.shape ) for q in qs
+                        ]
+                    ## TODO Q: Should we add a little epsilon to qv_costs[1,2] so that
+                    ## if the error is the same, it keeps the old one?
+                    qv_costs = [
+                        mag( qv - vertices1[ face[i] ] ) for qv in qvs
+                        ]
+                    
+                    best_q_index = np.argmin( qv_costs )
+                    if best_q_index != 0:
+                        print( "Wow! Our neighbor had a better q. Changing." )
+                        print( "Old diff:", qv_costs[0] )
+                        print( "New diff:", qv_costs[best_q_index] )
+                        print( "Old error:", errors[i] )
+                        print( "New error:", errors[(i+best_q_index)%3] )
+                        q_space[i] = qs[best_q_index]
+                        ## Copy the error, too, even through that's not quite right.
+                        ## TODO: Recompute that actual error for i and its neighbors.
+                        errors[i] = errors[(i+best_q_index)%3]
+                        something_changed = True
+            
+            if not something_changed: break
+    
     # print (len(q_space))
     # print (max(errors))
     # print (len(q_space[errors<transformation_threshold]))
@@ -267,12 +304,13 @@ if __name__ == '__main__':
     import argparse
     
     parser = argparse.ArgumentParser( description='Generate a set of transformations from a set of poses by finding local subspace intersections. Saves data as text where each line is ( 3-by-4-by-num_poses ).ravel()' )
-    parser.add_argument( 'rest_pose', type=str, nargs=1, help='Path to rest pose (OBJ)' )
+    parser.add_argument( 'rest_pose', type=str, help='Path to rest pose (OBJ)' )
     parser.add_argument( 'other_poses', type=str, nargs='+', help='Paths to other poses (OBJ)')
     parser.add_argument( '--svd_threshold', '-s', type=float, help='Threshold for determining a singular vertex neighborhood (flat).' )
     parser.add_argument( '--transformation_threshold', '-t', type=float, help='Threshold for determining whether the subspaces intersect.' )
     parser.add_argument( '--version', '-v', type=int, help='0 means basic least square linear solver. 1 means constrained least square' )
     parser.add_argument( '--method', '-m', type=str, choices=["vertex","nullspace"], help='vertex: minimize transformed vertex error (default). nullspace: minimize distance to 3p-dimensional flats.' )
+    parser.add_argument( '--propagate', action='store_true', help="If this flag is passed, then transformations will be propagated to neighbors if it helps." )
     parser.add_argument( '--pinv', type=bool, help='If True, use the pseudoinverse to solve the systems.' )
     parser.add_argument( '--print-all', type=bool, help='If True, prints all transformations, all costs, and all smallest singular values. Ignored if --out is specified.' )
     parser.add_argument( '--out', '-o', type=str, help='Path to store the result (prints to stdout if not specified).' )
@@ -281,11 +319,26 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
+    #### read obj files
+    print( "Loading rest pose mesh:", args.rest_pose )
+    rest_pose=TriMesh.FromOBJ_FileName(args.rest_pose)
+    ## Make sure the mesh is storing arrays.
+    rest_pose.vs = np.asarray( rest_pose.vs )
+    rest_pose.faces = np.asarray( rest_pose.faces, dtype = int )
+
+    print( "Loading", len( args.other_poses ), "other mesh poses..." )
+    other_poses = [ TriMesh.FromOBJ_FileName( path ) for path in args.other_poses ]
+    for mesh in other_poses:
+        mesh.vs = np.asarray( mesh.vs )
+        mesh.faces = np.asarray( mesh.faces, dtype = int )
+    print( "...done." )
+
     print( "Generating transformations..." )
     start_time = time.time()
-    qs, errors, smallest_singular_values = find_subspace_intersections( args.rest_pose, args.other_poses, args.version, method = args.method, use_pseudoinverse = args.pinv )
+    qs, errors, smallest_singular_values = find_subspace_intersections( rest_pose, other_poses, args.version, method = args.method, use_pseudoinverse = args.pinv, propagate = args.propagate )
+    end_time = time.time()
     print( "... Finished generating transformations." )
-    print( "Finding subspace intersection duration (seconds): ", time.time()-start_time )
+    print( "Finding subspace intersection duration (seconds): ", end_time-start_time )
 
     if args.out is None:
         np.set_printoptions( precision = 24, linewidth = 2000 )
