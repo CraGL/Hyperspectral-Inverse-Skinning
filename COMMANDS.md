@@ -96,4 +96,4 @@ Cube4 Pose1
 	parallel python flat_intersection_apply_output.py models/cube4/cube.obj '{}' '{.}.obj' ::: results_yotam/cube4/pose1/*.DMAT
 
 ### SSD command on windows
-	SSD -UW 2 -UH 2 -RI 1 -REP 20 -DBG
+	SSD -UW 2 -UH 0 -RI 1 -REP 20 -DBG

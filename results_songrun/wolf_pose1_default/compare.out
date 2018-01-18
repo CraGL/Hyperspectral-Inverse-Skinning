@@ -3,15 +3,15 @@ match order of ssd recovery:  [0 1 2 3 4 5]
 ############################################
 Per-bone transformation Error: 
 ssd error:  0.00357727194532
-rev error:  2.14098156842
+rev error:  2.21368327596
 ############################################
 Weight Error: 
 ssd error:  0.000351516332307
-rev error:  0.000558631681007
+rev error:  0.000553353191078
 ############################################
 Reconstruction Mesh Error: 
 ssd: max, mean and median per-vertex distance 0.011143941413 0.000371313491378 0.000143126278464
 SSD E_RMS_kavan2010:  0.831864323315
-rev: max, mean and median per-vertex distance 2.62158735426e-08 2.73593561884e-09 2.85332486987e-09
-Our E_RMS_kavan2010:  3.35427799102e-06
+rev: max, mean and median per-vertex distance 4.00834684783e-08 2.6117343872e-10 1.29610779828e-10
+Our E_RMS_kavan2010:  1.12326691767e-06
 ############################################

@@ -240,7 +240,7 @@ if __name__ == '__main__':
 	for i in range(N):
 		weights[i], ssv = biquadratic.solve_for_z(
 			recovered.T,
-			np.kron( np.identity(P*3), np.append( rest_vs[i], [1] ).reshape(1,-1) ),
+			np.append( rest_vs[i], [1] ).reshape(1,-1),
 			deformed_vs[i].ravel(),
 			**solve_for_z_kwargs
 			)

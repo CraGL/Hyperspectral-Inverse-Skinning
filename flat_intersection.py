@@ -1085,7 +1085,8 @@ def per_vertex_transformation(x, P, rest_vs, deformed_vs):
 		v = np.append( rest_vs[j], [1] )
 		
 		z2, ssv = biquadratic.solve_for_z( np.hstack([ pt.reshape(-1,1), pt+B ]), v, vprime, return_energy = False, use_pseudoinverse = True )
-		if ssv < 1e-5: continue
+		if ssv < 1e-5: 
+			print( "Vertex", j, "has small singular values:", ssv )
 		transformation = np.dot( np.hstack([ pt.reshape(-1,1), pt+B ]), z2 )
 # 		assert abs( transformation.squeeze() - transformation2.squeeze() ).max() < 1e-7
 		

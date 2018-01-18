@@ -213,6 +213,9 @@ if __name__ == '__main__':
 		## Divide this by the bounding sphere radius (or 1/2 the bounding box diagonal?)
 		## to get the error metric E_RMS from Kavan 2010.
 		E_RMS_kavan2010 = 1000*np.linalg.norm( gt.ravel() - data.ravel() )/np.sqrt(3*gt.shape[0]*gt.shape[1])
+		## We are assuming that `gt` is poses-by-#vertices-by-3.
+		assert len( gt.shape ) == 3
+		assert gt.shape[2] == 3
 		
 		return np.array(error), E_RMS_kavan2010
 	
