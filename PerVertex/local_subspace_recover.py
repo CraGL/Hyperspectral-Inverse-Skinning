@@ -21,7 +21,7 @@ def null_space_matrix(A):
 
 
 def func(q, V0, V1):
-    pose_num=V0.shape[1]//4
+    pose_num=V1.shape[1]//3
     obj=np.zeros(0)
     for i in range(len(V0)):
         v0=V0[i]
@@ -29,14 +29,14 @@ def func(q, V0, V1):
         v0_expand=np.zeros((3*pose_num,12*pose_num))
         for j in range(pose_num):
             for k in range(3):
-                v0_expand[j*3+k, (j*3+k)*4:(j*3+k)*4+4]=v0[4*j:4*j+4]
+                v0_expand[j*3+k, (j*3+k)*4:(j*3+k)*4+4]=v0
 
 ##### version 1
         Null_matrix=null_space_matrix(v0_expand)
         T=np.zeros(12*pose_num).reshape((pose_num,3,4))
         for j in range(pose_num):
             T[j,:,:-1]=np.identity(3)
-            T[j,:,-1]=v1[3*j:3*j+3]-v0[4*j:4*j+3]
+            T[j,:,-1]=v1[3*j:3*j+3]-v0[:3]
         T=T.ravel()
         obj=np.concatenate((obj,(q-(T + Null_matrix.T.dot(np.dot(Null_matrix,q-T)))).ravel()))
     
@@ -47,8 +47,8 @@ def func(q, V0, V1):
 
 
         
-def compute_I_Projection_matrix(V0):
-    pose_num=V0.shape[1]//4
+def compute_I_Projection_matrix(V0,pose_num):
+    assert V0.shape[1] == 4
     sum_I_P=np.zeros((12*pose_num,12*pose_num))
     Identity=np.identity(12*pose_num)
     for i in range(len(V0)):
@@ -56,7 +56,7 @@ def compute_I_Projection_matrix(V0):
         v0_expand=np.zeros((3*pose_num,12*pose_num))
         for j in range(pose_num):
             for k in range(3):
-                v0_expand[j*3+k, (j*3+k)*4:(j*3+k)*4+4]=v0[4*j:4*j+4]
+                v0_expand[j*3+k, (j*3+k)*4:(j*3+k)*4+4]=v0
                 
         Null_matrix=null_space_matrix(v0_expand)
         
@@ -75,7 +75,7 @@ def solve(q0, V0, V1):
 
 def solve_directly(V0, V1, method, version=0, use_pseudoinverse = None):
     if use_pseudoinverse is None: use_pseudoinverse = False
-    pose_num=V0.shape[1]//4
+    pose_num=V1.shape[1]//3
     left=np.zeros((12*pose_num, 12*pose_num))
     right=np.zeros((12*pose_num))
     constant=0.0
@@ -88,7 +88,7 @@ def solve_directly(V0, V1, method, version=0, use_pseudoinverse = None):
         v0_expand=np.zeros((3*pose_num,12*pose_num))
         for j in range(pose_num):
             for k in range(3):
-                v0_expand[j*3+k, (j*3+k)*4:(j*3+k)*4+4]=v0[4*j:4*j+4]
+                v0_expand[j*3+k, (j*3+k)*4:(j*3+k)*4+4]=v0
         
         if i==0:
             v_expand_center=v0_expand.copy()
@@ -102,7 +102,7 @@ def solve_directly(V0, V1, method, version=0, use_pseudoinverse = None):
             T=np.zeros(12*pose_num).reshape((pose_num,3,4))
             for j in range(pose_num):
                 T[j,:,:-1]=np.identity(3)
-                T[j,:,-1]=v1[3*j:3*j+3]-v0[4*j:4*j+3]
+                T[j,:,-1]=v1[3*j:3*j+3]-v0[:3]
             T=T.ravel()
 
             A = (Identity-P).T.dot((Identity-P))
@@ -140,15 +140,15 @@ def solve_directly(V0, V1, method, version=0, use_pseudoinverse = None):
 
 def solve_directly_vertex(V0, V1, version=0, use_pseudoinverse = None):
     if use_pseudoinverse is None: use_pseudoinverse = False
-    pose_num=V0.shape[1]//4
+    pose_num=V1.shape[1]//3
     ## left is block diagonal with the same block along the diagonal. Just store the block.
     left=np.zeros((4,4))
     right=np.zeros((4,3*pose_num))
     constant=0.0
-    v0_center=V0[0,:4].reshape(-1,1)
+    v0_center=V0[0].reshape(-1,1)
     v1_center=V1[0].copy().reshape(-1,1)
     for i in range(len(V0)):
-        v0=V0[i,:4].reshape(-1,1)
+        v0=V0[i].reshape(-1,1)
         v1=V1[i].reshape(-1,1)
         
         ##### version 2
@@ -191,26 +191,21 @@ def find_scale(Vertices):
     return scale
 
 
-def find_subspace_intersections( rest_pose_name, other_poses_name, version, method = None, use_pseudoinverse = None ):
+def find_subspace_intersections( rest_pose, other_poses, version, method = None, use_pseudoinverse = None, propagate = None ):
+    
+    if propagate is None: propagate = False
     
     if method is None:
         method = "vertex"
     
-    #### read obj file into mesh
+    mesh0=rest_pose
     
-    mesh0=TriMesh.FromOBJ_FileName(rest_pose_name)
-    mesh1_list=[]
-    pose_num=len(other_poses_name)
-
-    for i in range(pose_num):
-        mesh1_list.append(TriMesh.FromOBJ_FileName(other_poses_name[i]))
-
-
-    vertices0=vertices0_temp=np.hstack((np.asarray(mesh0.vs),np.ones((len(mesh0.vs),1))))
-    vertices1=vertices1_temp=np.asarray(mesh1_list[0].vs)
-    for i in range(1,len(mesh1_list)):
-        vertices0=np.hstack((vertices0, vertices0_temp))
-        vertices1=np.hstack((vertices1, np.asarray(mesh1_list[i].vs)))
+    mesh1_list=other_poses
+    pose_num=len(mesh1_list)
+    
+    vertices0=np.hstack((np.asarray(mesh0.vs),np.ones((len(mesh0.vs),1))))
+    ## Stack all poses horizontally.
+    vertices1 = np.hstack( [ mesh.vs for mesh in mesh1_list ] )
     
     scale=find_scale(vertices0[:,:3])
     q_space=[]
@@ -236,7 +231,7 @@ def find_subspace_intersections( rest_pose_name, other_poses_name, version, meth
             q,cost,ssv=solve_directly_vertex(V0, V1, version = version, use_pseudoinverse = use_pseudoinverse)
             smallest_singular_values.append( ssv )
         else:
-            s=compute_I_Projection_matrix(V0)
+            s=compute_I_Projection_matrix(V0,pose_num)
             smallest_singular_values.append( s[-1] )
             #if s[-1] < svd_threshold:
             #    continue
@@ -281,11 +276,26 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
+    #### read obj files
+    print( "Loading rest pose mesh:", args.rest_pose )
+    rest_pose=TriMesh.FromOBJ_FileName(args.rest_pose)
+    ## Make sure the mesh is storing arrays.
+    rest_pose.vs = np.asarray( rest_pose.vs )
+    rest_pose.faces = np.asarray( rest_pose.faces, dtype = int )
+
+    print( "Loading", len( args.other_poses ), "other mesh poses..." )
+    other_poses = [ TriMesh.FromOBJ_FileName( path ) for path in args.other_poses ]
+    for mesh in other_poses:
+        mesh.vs = np.asarray( mesh.vs )
+        mesh.faces = np.asarray( mesh.faces, dtype = int )
+    print( "...done." )
+
     print( "Generating transformations..." )
     start_time = time.time()
-    qs, errors, smallest_singular_values = find_subspace_intersections( args.rest_pose, args.other_poses, args.version, method = args.method, use_pseudoinverse = args.pinv )
+    qs, errors, smallest_singular_values = find_subspace_intersections( rest_pose, other_poses, args.version, method = args.method, use_pseudoinverse = args.pinv )
+    end_time = time.time()
     print( "... Finished generating transformations." )
-    print( "Finding subspace intersection duration (seconds): ", time.time()-start_time )
+    print( "Finding subspace intersection duration (seconds): ", end_time-start_time )
 
     if args.out is None:
         np.set_printoptions( precision = 24, linewidth = 2000 )
