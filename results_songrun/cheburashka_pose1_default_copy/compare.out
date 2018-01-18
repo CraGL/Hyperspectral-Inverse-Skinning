@@ -1,0 +1,12 @@
+match order of our recovery:  [0]
+############################################
+Per-bone transformation Error: 
+rev error:  0.0305279709923
+############################################
+Weight Error: 
+rev error:  0.000884382709717
+############################################
+Reconstruction Mesh Error: 
+rev: max, mean and median per-vertex distance 1.13078906266e-08 7.77803146108e-09 7.61882251566e-09
+Our E_RMS_kavan2010:  9.10618093294e-06
+############################################
