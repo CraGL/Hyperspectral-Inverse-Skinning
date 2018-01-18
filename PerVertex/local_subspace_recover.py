@@ -253,24 +253,43 @@ def find_subspace_intersections( rest_pose, other_poses, version, method = None,
         something_changed = False
         ## We are going to assume triangles.
         assert mesh0.faces.shape[1] == 3
+        def mag( x ): return np.dot( x,x )
         while True:
+            print( "Propagating..." )
+            something_changed = False
             for face in mesh0.faces:
                 face_qs = q_space[ face ]
                 
                 for i in range(3):
-                    v = np.append( mesh.vs[ face[i] ], [1] )
+                    # v = np.append( mesh.vs[ face[i] ], [1] )
+                    v = vertices0[ face[i] ]
+                    vprime = vertices1[ face[i] ]
                     
-                    v_transformed_own_q = np.dot( v, qs[i].reshape( 4, -1 ) ).reshape( vprime.shape )
-                    v_transformed_next_q = np.dot( v, qs[(i+1)%3].reshape( 4, -1 ) ).reshape( vprime.shape )
-                    v_transformed_prev_q = np.dot( v, qs[(i-1)%3].reshape( 4, -1 ) ).reshape( vprime.shape )
+                    qs = [ q_space[i], q_space[(i+1)%3], q_space[(i+2)%3] ]
+                    qvs = [
+                        np.dot( v, q.reshape( 4, -1 ) ).reshape( vprime.shape ) for q in qs
+                        ]
+                    ## TODO Q: Should we add a little epsilon to qv_costs[1,2] so that
+                    ## if the error is the same, it keeps the old one?
+                    qv_costs = [
+                        mag( qv - vertices1[ face[i] ] ) for qv in qvs
+                        ]
                     
-                    v_transformed_own_q_cost = v_transformed_own_q - vertices1[ face[i] ]
-                    
-            
-            v_transformed = np.dot( v, transformation.reshape( 4, -1 ) ).reshape( vprime.shape )
+                    best_q_index = np.argmin( qv_costs )
+                    if best_q_index != 0:
+                        print( "Wow! Our neighbor had a better q. Changing." )
+                        print( "Old diff:", qv_costs[0] )
+                        print( "New diff:", qv_costs[best_q_index] )
+                        print( "Old error:", errors[i] )
+                        print( "New error:", errors[(i+best_q_index)%3] )
+                        q_space[i] = qs[best_q_index]
+                        ## Copy the error, too, even through that's not quite right.
+                        ## TODO: Recompute that actual error for i and its neighbors.
+                        errors[i] = errors[(i+best_q_index)%3]
+                        something_changed = True
             
             if not something_changed: break
-
+    
     # print (len(q_space))
     # print (max(errors))
     # print (len(q_space[errors<transformation_threshold]))
@@ -291,6 +310,7 @@ if __name__ == '__main__':
     parser.add_argument( '--transformation_threshold', '-t', type=float, help='Threshold for determining whether the subspaces intersect.' )
     parser.add_argument( '--version', '-v', type=int, help='0 means basic least square linear solver. 1 means constrained least square' )
     parser.add_argument( '--method', '-m', type=str, choices=["vertex","nullspace"], help='vertex: minimize transformed vertex error (default). nullspace: minimize distance to 3p-dimensional flats.' )
+    parser.add_argument( '--propagate', action='store_true', help="If this flag is passed, then transformations will be propagated to neighbors if it helps." )
     parser.add_argument( '--pinv', type=bool, help='If True, use the pseudoinverse to solve the systems.' )
     parser.add_argument( '--print-all', type=bool, help='If True, prints all transformations, all costs, and all smallest singular values. Ignored if --out is specified.' )
     parser.add_argument( '--out', '-o', type=str, help='Path to store the result (prints to stdout if not specified).' )
@@ -315,7 +335,7 @@ if __name__ == '__main__':
 
     print( "Generating transformations..." )
     start_time = time.time()
-    qs, errors, smallest_singular_values = find_subspace_intersections( rest_pose, other_poses, args.version, method = args.method, use_pseudoinverse = args.pinv )
+    qs, errors, smallest_singular_values = find_subspace_intersections( rest_pose, other_poses, args.version, method = args.method, use_pseudoinverse = args.pinv, propagate = args.propagate )
     end_time = time.time()
     print( "... Finished generating transformations." )
     print( "Finding subspace intersection duration (seconds): ", end_time-start_time )

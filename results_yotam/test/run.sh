@@ -6,10 +6,10 @@ ROOT_DIR="../.."
 REST_POSE="${ROOT_DIR}"/models/cube4/cube.obj
 OTHER_POSE_DIR="${ROOT_DIR}"/models/cube4/poses-1
 
-INITIAL_GUESS_ARGS="--svd_threshold 1e-15 --transformation_threshold 1e-4 --version 0"
-FLAT_INTERSECTION_ARGS="--energy biquadratic -GT "${OTHER_POSE_DIR}" --error True --handles 4 --fancy-init "${OUTPUT_DIR}"/local_subspace_recover.txt"
+INITIAL_GUESS_ARGS="--svd_threshold 1e-15 --propagate --transformation_threshold 1e-4 --version 0"
+FLAT_INTERSECTION_ARGS="--energy biquadratic --W-projection normalize --max-iter 4 -GT "${OTHER_POSE_DIR}" --error True --handles 4 --max-iter 5 --fancy-init "${OUTPUT_DIR}"/local_subspace_recover.txt"
 # SIMPLEX_HULL_ARGS="-R 0.01"
-SIMPLEX_HULL_ARGS=
+SIMPLEX_HULL_ARGS="--method qp-major"
 
 # Generate
 mkdir -p "${OUTPUT_DIR}"
