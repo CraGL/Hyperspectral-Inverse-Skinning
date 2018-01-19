@@ -82,14 +82,6 @@ if __name__ == '__main__':
 	rev_bones = np.swapaxes(rev_bones, 0, 1)
 	rev_vs = np.array([lbs_all(rest_vs, rev_bones_per_pose, rev_w.T) for rev_bones_per_pose in rev_bones ])	
 	
-	output_folder = os.path.split(args.result)[0]		
-	if args.output is not None:
-		output_folder = args.output
-		
-	our_folder = output_folder + "/our_recovered"
-	if not os.path.exists(our_folder):
-		os.makedirs(our_folder)
-	
 	gt_mesh_paths = glob.glob(args.pose_folder + "/*.obj")
 	gt_mesh_paths.sort()
 	gt_vs = np.array([ TriMesh.FromOBJ_FileName(mesh_path).vs for mesh_path in gt_mesh_paths ])
@@ -105,9 +97,18 @@ if __name__ == '__main__':
 	print( "match order of our recovery: ", ordering )
 	rev_vs = np.array([ rev_vs[i] for i in ordering ])
 	
-	for i, vs in enumerate(rev_vs):
-		output_path = os.path.join(our_folder, gt_names[i])
-		format_loader.write_OBJ( output_path, vs.round(6), rest_fs )
+	if args.output != "NO":
+		output_folder = os.path.split(args.result)[0]		
+		if args.output is not None:
+			output_folder = args.output
+		
+		our_folder = output_folder + "/our_recovered"
+		if not os.path.exists(our_folder):
+			os.makedirs(our_folder)
+		
+		for i, vs in enumerate(rev_vs):
+			output_path = os.path.join(our_folder, gt_names[i])
+			format_loader.write_OBJ( output_path, vs.round(6), rest_fs )
 		
 	def compute_error( gt, data ):
 		error = []
@@ -121,6 +122,7 @@ if __name__ == '__main__':
 		return np.array(error), E_RMS_kavan2010
 		
 	print( "############################################" )
+	print( os.path.basename(args.rest_pose), rev_w.shape[0], "handles" )
 	print( "Reconstruction Mesh Error: " )
 	# print( "rev error: ", np.linalg.norm(gt_vs - rev_vs)/(diag*N) )
 	rev_error, rev_erms = compute_error(gt_vs, rev_vs)

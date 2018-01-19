@@ -10,7 +10,7 @@ SSD_RESULT="${ROOT_DIR}"/SSD_res/elephant-gallop-20-unconstrained.txt
 
 INITIAL_GUESS_ARGS="--svd_threshold 1e-15 --transformation_threshold 1e-4 --version 0"
 FLAT_INTERSECTION_ARGS="--energy biquadratic --W-projection normalize --max-iter 2 --handles 20 --fancy-init ${OUTPUT_DIR}/local_subspace_recover.txt"
-SIMPLEX_HULL_ARGS="--method qp-major"
+SIMPLEX_HULL_ARGS="--method qp-major --max-iter 4"
 
 # Generate
 mkdir -p "${OUTPUT_DIR}"

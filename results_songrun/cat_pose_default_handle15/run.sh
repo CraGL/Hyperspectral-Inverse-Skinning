@@ -3,8 +3,8 @@
 OUTPUT_DIR=.
 ROOT_DIR="../.."
 
-REST_POSE="${ROOT_DIR}"/models/cat/cat.obj
-OTHER_POSE_DIR="${ROOT_DIR}"/models/cat/poses-1
+REST_POSE="${ROOT_DIR}"/models/cat-poses.obj
+OTHER_POSE_DIR="${ROOT_DIR}"/models/cat-poses
 SSD_RESULT="${ROOT_DIR}"/SSD_res/cat-15-output.txt
 SSD_RESULT_UNCONSTRAINED="${ROOT_DIR}"/SSD_res/cat-poses-15-unconstrained.txt
 
