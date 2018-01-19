@@ -78,9 +78,14 @@ def f_and_dfdp_and_dfdB_hand(p, B, vbar, vprime):
 	v = vbar
 	w = vprime
 	
-	vB = np.dot( v, B )
+	## Speed this up! v is block diagonal.
+	# vB = np.dot( v, B )
+	vB = np.dot( v[0,:4], B.T.reshape( -1, 4 ).T ).reshape( B.shape[1], -1 ).T
+	# vp = np.dot( v,p )
+	vp = np.dot( v[0,:4], p.reshape( -1, 4 ).T ).ravel()
+	
 	S = np.dot( vB.T, vB )
-	u = ( np.dot( v,p ) - w ).reshape(-1,1)
+	u = ( vp - w ).reshape(-1,1)
 	R = np.dot( vB, np.linalg.inv(S) )
 	Q = np.dot( R, vB.T )
 	M = u - np.dot( Q, u )
@@ -266,7 +271,7 @@ def generateRandomData():
 	assert 3*P >= handles
 	B = np.random.randn(12*P, handles)
 	p = np.random.randn(12*P)
-	v = np.random.randn(3*P, 12*P)
+	v = np.kron( np.eye( 3*P ), np.append( np.random.randn(3), [1.] ) )
 	w = np.random.randn(3*P)
 	return B, p, v, w, P, handles
 

@@ -111,7 +111,7 @@ def solve_for_z( W, v, vprime, return_energy = False, use_pseudoinverse = True, 
     rhs[:-1] = -0.5*L
     rhs[-1] = 1
     
-    if strategy not in (None, 'positive'):
+    if strategy not in (None, 'positive', 'sparse4'):
         raise RuntimeError( "Unknown strategy: " + repr(strategy) )
     
     if strategy == 'positive':
@@ -131,6 +131,30 @@ def solve_for_z( W, v, vprime, return_energy = False, use_pseudoinverse = True, 
         z = np.dot( np.linalg.pinv(Qbig), rhs )[:-1]
     else:
         z = np.linalg.solve( Qbig, rhs )[:-1]
+    
+    if strategy == 'sparse4':
+        ## Constrain all but the 4 biggest weights to 0 and re-solve.
+        ## UPDATE: Use the absolute value of the weights. Those are the closest to "unused".
+        # biggest_z_indices = np.argsort(z)[:-4]
+        biggest_z_indices = np.argsort(np.abs(z))[:-4]
+        ## It only makes sense to do this if there are at least 4 handles:
+        if len(biggest_z_indices) > 0:
+            ## Constrain them to 0's.
+            rhs[ biggest_z_indices ] = 0
+            ## Zero the rows and columns. (We can zero the columns like this
+            ## because the corresponding right-hand-side values are 0.)
+            ## (Zeroing the columns keeps the system symmetric.)
+            Qbig[ biggest_z_indices, : ] = 0
+            Qbig[ :, biggest_z_indices ] = 0
+            ## Set the diagonal to the identity matrix.
+            ## NOTE: This tuple() is very important. Passing a numpy.array has a
+            ##       very different result.
+            Qbig[ tuple(np.tile( biggest_z_indices.reshape(1,-1), (2,1) )) ] = 1.
+            ## Re-solve.
+            if use_pseudoinverse:
+                z = np.dot( np.linalg.pinv(Qbig), rhs )[:-1]
+            else:
+                z = np.linalg.solve( Qbig, rhs )[:-1]
     
     ## This always passes:
     # assert abs( z.sum() - 1.0 ) < 1e-10

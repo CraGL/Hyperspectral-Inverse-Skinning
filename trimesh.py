@@ -5,12 +5,6 @@ def mag2( vec ):
 	return dot( vec, vec )
 def mag( vec ):
 	return sqrt(mag2(vec))
-def asarrayf( *args, **kwargs ):
-	kwargs['dtype'] = float
-	return asarray( *args, **kwargs )
-def zerosf( *args, **kwargs ):
-	kwargs['dtype'] = float
-	return zeros( *args, **kwargs )
 
 class TriMesh( object ):
 	def __init__( self ):
@@ -89,8 +83,8 @@ class TriMesh( object ):
 		return result
 	
 	def update_face_normals_and_areas( self ):
-		if self.__face_normals is None: self.__face_normals = zerosf( ( len( self.faces ), 3 ) )
-		if self.__face_areas is None: self.__face_areas = zerosf( len( self.faces ) )
+		if self.__face_normals is None: self.__face_normals = zeros( ( len( self.faces ), 3 ) )
+		if self.__face_areas is None: self.__face_areas = zeros( len( self.faces ) )
 		
 		## We need subtraction between vertices.
 		## Convert vertices to arrays once here, or else we'd have to call asarray()
@@ -143,7 +137,7 @@ class TriMesh( object ):
 	
 	
 	def update_vertex_normals( self ):
-		if self.__vertex_normals is None: self.__vertex_normals = zerosf( ( len(self.vs), 3 ) )
+		if self.__vertex_normals is None: self.__vertex_normals = zeros( ( len(self.vs), 3 ) )
 		
 		## Slow:
 		'''
@@ -193,7 +187,7 @@ class TriMesh( object ):
 	
 	
 	def update_vertex_areas( self ):
-		if self.__vertex_areas is None: self.__vertex_areas = zerosf( len(self.vs) )
+		if self.__vertex_areas is None: self.__vertex_areas = zeros( len(self.vs) )
 		
 		## Slow:
 		'''
@@ -642,7 +636,7 @@ class TriMesh( object ):
 		##		   'geometry_changed()', so updating anything but '.vs', '.faces'
 		##		   and '.uvs' is a waste unless I can precisely update the
 		##		   halfedge data structures.
-		#self.__vertex_normals = asarrayf( [ vn for i, vn in enumerate( self.__vertex_normals ) if old2new[i] != -1 ] )
+		#self.__vertex_normals = asfarray( [ vn for i, vn in enumerate( self.__vertex_normals ) if old2new[i] != -1 ] )
 		#self.__edges = [ ( old2new[i], old2new[j] ) for i,j in self.__edges ]
 		#self.__edges = [ edge for edge in self.__edges if -1 not in edge ]
 		self.faces = [ ( old2new[i], old2new[j], old2new[k] ) for i,j,k in self.faces ]
@@ -842,9 +836,10 @@ class TriMesh( object ):
 			if not sline: continue
 			
 			elif sline[0] == 'v':
-				result.vs.append( asarrayf( tuple( map( float, sline[1:] ) ) ) )
+				result.vs.append( [ float(v) for v in sline[1:] ] )
 				## Vertices must have three coordinates.
-				assert len( result.vs[-1] ) == 3
+				## UPDATE: Let's be flexible about this.
+				# assert len( result.vs[-1] ) == 3
 			
 			elif sline[0] == 'f':
 				## The split('/')[0] means we record only the vertex coordinate indices
@@ -854,19 +849,24 @@ class TriMesh( object ):
 				assert len( face_vertex_ids ) == 3
 				
 				## Face vertex indices cannot be zero.
-				assert True not in [ ind == 0 for ind in face_vertex_ids ]
+				## UPDATE: Do this assert once at the end. The following code
+				##         will convert the 0 to -1.
+				# assert not any([ ind == 0 for ind in face_vertex_ids ])
 				
 				## Subtract one from positive indices, and use relative addressing for negative
 				## indices.
 				face_vertex_ids = [
-					## This awkward "make a tuple with both results and select it based on
-					## truth" technique is to make up for Python's lack of a functional 'if'.
-					( ind-1, len(result.vs) + ind )[ ind < 0 ]
+					( ind-1 ) if ( ind >= 0 ) else ( len(result.vs) + ind )
 					for ind in face_vertex_ids
 					]
 				
-				assert False not in [ ind < len( result.vs ) for ind in face_vertex_ids ]
+				## UPDATE: Do this assert once at the end.
+				# assert all([ ind < len( result.vs ) for ind in face_vertex_ids ])
 				result.faces.append( face_vertex_ids )
+		
+		result.vs = asfarray( result.vs )
+		result.faces = asarray( result.faces, dtype = int )
+		assert logical_and( result.faces >= 0, result.faces < len( result.vs ) ).all()
 		
 		return result
 	
@@ -893,7 +893,7 @@ class TriMesh( object ):
 		## If we have uv's, then we will reach 1MB with (1024*1024/(2*16+2*20)) = 14563 vertices.
 		## Print a warning if we're going to save a mesh much larger than a megabyte.
 		if len( self.vs ) > 15000:
-			print( 'Writing a large OBJ to ', fname )
+			print( 'Writing a large OBJ to:', fname )
 		
 		
 		out = file( fname, 'w' )
@@ -933,7 +933,7 @@ class TriMesh( object ):
 		
 		out.close()
 		
-		print( 'OBJ written to ', fname)
+		print( 'OBJ written to:', fname)
 	
 	def write_OFF( self, fname ):
 		'''
@@ -952,9 +952,18 @@ class TriMesh( object ):
 		
 		out.close()
 		
-		print( 'OFF written to ', fname)
+		print( 'OFF written to:', fname)
 
 ## We can't pickle anything that doesn't have a name visible at module scope.
 ## In order to allow pickling of class TriMesh, we'll make a reference to the inner HalfEdge class
 ## here at the module level.
 HalfEdge = TriMesh.HalfEdge
+
+def main():
+    import sys
+    if len( sys.argv ) > 1:
+        mesh = TriMesh.FromOBJ_FileName( sys.argv[1] )
+    # mesh.write_OBJ( sys.argv[2] )
+
+if __name__ == '__main__':
+    main()
