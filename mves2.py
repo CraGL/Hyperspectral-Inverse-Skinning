@@ -251,7 +251,10 @@ def MVES( pts, initial_guess_vertices = None, method = None, linear_solver = Non
 		return bary.ravel()
 	def g_bary_jac( x ):
 		## From: http://www.ee.ic.ac.uk/hp/staff/dmb/matrix/calculus.html#deriv_linear 
-		return scipy.sparse.kron( scipy.sparse.identity(n+1), data.T )
+		# return scipy.sparse.kron( scipy.sparse.identity(n+1), data.T )
+		return scipy.sparse.block_diag( [ data.T ]*(n+1) )
+	def g_bary_jac_cvxopt_spmatrix( x ):
+		return to_spmatrix( g_ones_jac( x ) )
 	def g_bary_jac_dense( x ):
 		return numpy.kron( numpy.identity(n+1), data.T )
 	
@@ -270,6 +273,8 @@ def MVES( pts, initial_guess_vertices = None, method = None, linear_solver = Non
 	def g_ones_jac( x ):
 		## From: http://www.ee.ic.ac.uk/hp/staff/dmb/matrix/calculus.html#deriv_linear
 		return scipy.sparse.kron( numpy.ones((1,n+1)), scipy.sparse.identity(n+1) )
+	def g_ones_jac_cvxopt_spmatrix( x ):
+		return to_spmatrix( g_ones_jac( x ) )
 	def g_ones_jac_dense( x ):
 		return numpy.kron( numpy.ones((1,n+1)), numpy.identity(n+1) )
 	
@@ -443,15 +448,16 @@ def MVES( pts, initial_guess_vertices = None, method = None, linear_solver = Non
 		all_x = [ (f_log_volume( numpy.array(x0) ), x0) ]
 		
 		## set invariant parameters
-		G = -g_bary_jac( x0 )
-# 		Gd = -g_bary_jac_dense( x0 )
-		h = numpy.zeros( G.shape[0] )
-		A = g_ones_jac( x0 )
-# 		Ad = g_ones_jac_dense( x0 )
-		b = numpy.zeros( A.shape[0] )
+		#G = -g_bary_jac( x0 )
+		#sparse_G = to_spmatrix(G)
+		sparse_G = -g_bary_jac_cvxopt_spmatrix( x0 )
+		h = numpy.zeros( sparse_G.size[0] )
+		
+		# A = g_ones_jac( x0 )
+		# sparse_A = to_spmatrix(A)
+		sparse_A = g_ones_jac_cvxopt_spmatrix( x0 )
+		b = numpy.zeros( sparse_A.size[0] )
 		b[-1] = 1 
-		sparse_G = to_spmatrix(G)
-		sparse_A = to_spmatrix(A)
 		
 		try:
 			while True:
@@ -470,7 +476,10 @@ def MVES( pts, initial_guess_vertices = None, method = None, linear_solver = Non
 				## MOSEK is so much faster and better!
 				solution = cvxopt.solvers.qp( cvxopt.matrix(P), cvxopt.matrix(q), sparse_G, cvxopt.matrix(h), sparse_A, cvxopt.matrix(b), solver = 'mosek' )
 				# solution = cvxopt.solvers.qp( cvxopt.matrix(P), cvxopt.matrix(q), sparse_G, cvxopt.matrix(h), sparse_A, cvxopt.matrix(b) )
-				x = numpy.array( solution['x'] )
+				if solution['status'] == 'optimal':
+					x = numpy.array( solution['x'] )
+				else:
+					print( "Solution status not optimal:", solution['status'] )
 				fx = f_log_volume( x )
 				print( "Current log volume: ", fx )
 				
