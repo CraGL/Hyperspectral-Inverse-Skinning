@@ -1123,7 +1123,7 @@ if __name__ == '__main__':
 	parser.add_argument('--f-eps', type=float, help='Function change epsilon (biquadratic).')
 	parser.add_argument('--x-eps', type=float, help='Variable change epsilon (biquadratic).')
 	parser.add_argument('--W-projection', type=str, choices = ['normalize', 'first', 'regularize_translation', 'regularize_identity', 'constrain_magnitude'], help='How to project W (biquadratic): normalize, first, regularize_translation, regularize_identity, constrain_magnitude.')
-	parser.add_argument('--z-strategy', type=str, choices = ['positive'], help='How to solve for z (biquadratic): positive.')
+	parser.add_argument('--z-strategy', type=str, choices = ['positive', 'sparse4'], help='How to solve for z (biquadratic): positive, sparse4.')
 	parser.add_argument('--csv-path', '--CSV', type=str, help='csv file which save objective values.')
 	
 	args = parser.parse_args()
