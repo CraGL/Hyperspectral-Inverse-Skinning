@@ -710,6 +710,7 @@ def optimize_biquadratic( P, H, rest_vs, deformed_vs, x0, solve_for_rest_pose = 
 	
 	f_prev = None
 	W_prev = unpack_W( x0.copy(), P )
+	W = W_prev.copy() ## In case we terminate immediately.
 	iterations = 0
 	converged = False
 	func_values = []
