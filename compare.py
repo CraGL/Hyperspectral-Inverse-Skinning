@@ -231,6 +231,13 @@ if __name__ == '__main__':
 	if args.ssd_result is not None:
 		print( "ssd error: ", np.linalg.norm(gt_w - ssd_w)/gt_w.size )
 	print( "rev error: ", np.linalg.norm(gt_w - rev_w)/gt_w.size )
+	print()
+	print( "gt  average sparsity (1e-5 threshold):", np.average( (gt_w < 1e-5).sum(0) ) )
+	print( "ssd average sparsity (1e-5 threshold):", np.average( (ssd_w < 1e-5).sum(0) ) )
+	print( "rev average sparsity (1e-5 threshold):", np.average( (rev_w < 1e-5).sum(0) ) )
+	print( "gt  average sparsity (0.1 threshold):", np.average( (gt_w < 1e-1).sum(0) ) )
+	print( "ssd average sparsity (0.1 threshold):", np.average( (ssd_w < 1e-1).sum(0) ) )
+	print( "rev average sparsity (0.1 threshold):", np.average( (rev_w < 1e-1).sum(0) ) )
 	print( "############################################" )
 	print( "Reconstruction Mesh Error: " )
 	if args.ssd_result is not None:
