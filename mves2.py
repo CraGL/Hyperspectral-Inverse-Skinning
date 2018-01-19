@@ -101,6 +101,7 @@ def MVES( pts, initial_guess_vertices = None, method = None, linear_solver = Non
 		always be 1.
 	'''
 	if method is None:
+		## This should be 'qp-major' since it works better than 'lp'.
 		method = 'lp'	
 		
 	if linear_solver is None:
@@ -277,6 +278,17 @@ def MVES( pts, initial_guess_vertices = None, method = None, linear_solver = Non
 		return to_spmatrix( g_ones_jac( x ) )
 	def g_ones_jac_dense( x ):
 		return numpy.kron( numpy.ones((1,n+1)), numpy.identity(n+1) )
+	def g_ones_rhs():
+		b = numpy.zeros( n+1 )
+		b[-1] = 1
+		return b
+	def g_ones_rhs_alt():
+		## From: Robust Minimum Volume Simplex Analysis for Hyperspectral Unmixing (A. Agathos, J. Li, J. M. Bioucas-Dias, A. Plaza 2014 European Signal Processing Conference (EUSIPCO))
+		# rhs = numpy.dot( numpy.dot( numpy.ones( (1,data.shape[1]) ), data.T ), numpy.linalg.inv( numpy.dot( data, data.T ) ) )
+		rhs = numpy.linalg.solve( numpy.dot( data, data.T ), numpy.dot( numpy.ones( (1,data.shape[1]) ), data.T ).T ).T
+		## It's always the same as our right-hand-side: [ 0, 0, ..., 0, 0, 1 ]
+		print( "g_ones_rhs_alt:", rhs )
+		return rhs.ravel()
 	
 	if DEBUG:
 		print( "Checking the homogeneous coordinate constraint gradient." )
@@ -395,8 +407,7 @@ def MVES( pts, initial_guess_vertices = None, method = None, linear_solver = Non
 		G = -g_bary_jac( x0 )
 		h = numpy.zeros( G.shape[0] )
 		A = g_ones_jac( x0 )
-		b = numpy.zeros( A.shape[0] )
-		b[-1] = 1 
+		b = g_ones_rhs()
 		sparse_G = to_spmatrix(G)
 		sparse_A = to_spmatrix(A)
 		try:
@@ -456,8 +467,7 @@ def MVES( pts, initial_guess_vertices = None, method = None, linear_solver = Non
 		# A = g_ones_jac( x0 )
 		# sparse_A = to_spmatrix(A)
 		sparse_A = g_ones_jac_cvxopt_spmatrix( x0 )
-		b = numpy.zeros( sparse_A.size[0] )
-		b[-1] = 1 
+		b = g_ones_rhs()
 		
 		try:
 			while True:
@@ -480,6 +490,8 @@ def MVES( pts, initial_guess_vertices = None, method = None, linear_solver = Non
 					x = numpy.array( solution['x'] )
 				else:
 					print( "Solution status not optimal:", solution['status'] )
+					## Copy x0 over, and the optimization will terminate due to no change.
+					x = x0.copy()
 				fx = f_log_volume( x )
 				print( "Current log volume: ", fx )
 				
@@ -526,8 +538,7 @@ def MVES( pts, initial_guess_vertices = None, method = None, linear_solver = Non
 		G = -g_bary_jac( x0 )
 		h = numpy.zeros( G.shape[0] )
 		A = g_ones_jac( x0 ).todense()
-		b = numpy.zeros( A.shape[0] )
-		b[-1] = 1
+		b = g_ones_rhs()
 		from binary_search_opt import min_quad_with_linear_constraints, binary_search
 		while True:
 			print("Binary outer iteration")
@@ -592,7 +603,7 @@ def test():
 	print( 'pts:', pts )
 	#numpy.random.seed(0)
 	#pts = numpy.random.random_sample((200, 16))
-	solution = MVES( pts )
+	solution, weights, iterations = MVES( pts, method = 'qp-major' )
 	print( 'solution' )
 	print( solution )
 
