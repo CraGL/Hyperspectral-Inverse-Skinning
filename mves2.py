@@ -254,7 +254,7 @@ def MVES( pts, initial_guess_vertices = None, method = None, linear_solver = Non
 		# return scipy.sparse.kron( scipy.sparse.identity(n+1), data.T )
 		return scipy.sparse.block_diag( [ data.T ]*(n+1) )
 	def g_bary_jac_cvxopt_spmatrix( x ):
-		return to_spmatrix( g_ones_jac( x ) )
+		return to_spmatrix( g_bary_jac( x ) )
 	def g_bary_jac_dense( x ):
 		return numpy.kron( numpy.identity(n+1), data.T )
 	
