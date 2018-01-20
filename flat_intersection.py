@@ -1056,7 +1056,7 @@ def optimize(P, H, all_R_mats, deformed_vs, x0):
 	return converged, x
 	
 
-def per_vertex_transformation(x, P, rest_vs, deformed_vs):
+def per_vertex_transformation(x, P, rest_vs, deformed_vs, z_strategy = None):
 	
 	import flat_intersection_biquadratic_gradients as biquadratic
 	
@@ -1086,7 +1086,7 @@ def per_vertex_transformation(x, P, rest_vs, deformed_vs):
 		
 		v = np.append( rest_vs[j], [1] )
 		
-		z2, ssv = biquadratic.solve_for_z( np.hstack([ pt.reshape(-1,1), pt+B ]), v, vprime, return_energy = False, use_pseudoinverse = True )
+		z2, ssv = biquadratic.solve_for_z( np.hstack([ pt.reshape(-1,1), pt+B ]), v, vprime, return_energy = False, use_pseudoinverse = True, strategy = z_strategy )
 		if ssv < 1e-5: 
 			print( "Vertex", j, "has small singular values:", ssv )
 		transformation = np.dot( np.hstack([ pt.reshape(-1,1), pt+B ]), z2 )
@@ -1142,6 +1142,7 @@ if __name__ == '__main__':
 	OBJ_name = os.path.splitext(os.path.basename(args.rest_pose))[0]
 	print( "The name for the OBJ is:", OBJ_name )
 	rest_mesh = TriMesh.FromOBJ_FileName( args.rest_pose )
+	rest_vs = np.array( rest_mesh.vs )
 	
 	pose_paths = glob.glob(args.pose_folder + "/*.obj")
 	pose_paths.sort()
@@ -1159,7 +1160,7 @@ if __name__ == '__main__':
 	if args.energy != 'biquadratic':
 		all_flats = []
 		all_R_mats = []
-		for i, pos in enumerate(rest_mesh.vs):
+		for i, pos in enumerate(rest_vs):
 			left_m = np.zeros((3*P, 12*P))
 			unit_left_m = left_m.copy()
 			pos_h = np.ones(4)
@@ -1179,7 +1180,7 @@ if __name__ == '__main__':
 		
 		print( "The rank of the stack of all pose row matrices is: ", np.linalg.matrix_rank( np.vstack( all_flats ) ) )
 	else:
-		all_R_mats = np.append( rest_mesh.vs, np.ones( ( len( rest_mesh.vs ), 1 ) ), axis = 1 )
+		all_R_mats = np.append( rest_vs, np.ones( ( len( rest_vs ), 1 ) ), axis = 1 )
 	
 	start_time = time.time()
 	
@@ -1192,7 +1193,6 @@ if __name__ == '__main__':
 		vertex_trans has the shape of N-by-P-by-12
 		deformed_vs has the shape of N-by-P-by-3
 		'''
-		rest_vs = np.array(rest_vs)
 		vertex_trans = vertex_trans.reshape((N, P, 12))
 		assert( len(rest_vs.shape) == 2 )
 		assert( len(vertex_trans.shape) == 3 )
@@ -1204,10 +1204,12 @@ if __name__ == '__main__':
 		assert( vertex_trans.shape[1] == P )
 		assert( gt_vs.shape[1] == P )
 		
+		diag = np.linalg.norm(rest_vs.max( axis = 0 ) - rest_vs.min( axis = 0 ))
+		
 		vs = np.hstack((rest_vs, np.ones((N,1))))
 		rev_vs = np.array([[np.dot(tran.reshape(3,4),v)[:3] for tran in trans_across_poses ] for trans_across_poses, v in zip(vertex_trans, vs)])
 		
-		return 1000*np.linalg.norm( gt_vs.ravel() - rev_vs.ravel() )/np.sqrt(3*P*N)
+		return 1000*np.linalg.norm( gt_vs.ravel() - rev_vs.ravel() )*2/(np.sqrt(3*P*N)*diag)
 		
 	def solve_for_H( H ):
 		x = None
@@ -1318,7 +1320,7 @@ if __name__ == '__main__':
 		else:
 			raise RuntimeError( "Unknown energy parameter: " + str(parser.energy) )
 		
-		rev_vertex_trans, vertex_dists = per_vertex_transformation(x, P, rest_mesh.vs, deformed_vs)	
+		rev_vertex_trans, vertex_dists = per_vertex_transformation(x, P, rest_vs, deformed_vs, z_strategy = args.z_strategy)
 		
 		if error_test:
 			transformation_error = abs( rev_vertex_trans - gt_vertices )
@@ -1336,7 +1338,7 @@ if __name__ == '__main__':
 		THRESHOLD = 1
 		while( upper_h < MAX_H ):
 			rev_vertex_trans = solve_for_H( upper_h )
-			err = vertex_error(rest_mesh.vs, rev_vertex_trans, deformed_vs )
+			err = vertex_error(rest_vs, rev_vertex_trans, deformed_vs )
 			if( err <= THRESHOLD ):
 				break
 			else:
@@ -1347,16 +1349,17 @@ if __name__ == '__main__':
 			while( upper_h - lower_h > 1 ):
 				curr_h = ( upper_h + lower_h ) // 2
 				rev_vertex_trans = solve_for_H( curr_h )
-				err = vertex_error(rest_mesh.vs, rev_vertex_trans, deformed_vs )
+				err = vertex_error(rest_vs, rev_vertex_trans, deformed_vs )
 				if( err <= THRESHOLD ):	upper_h = curr_h
 				else:					lower_h = curr_h
-				
-			rev_vertex_trans = solve_for_H( upper_h )		
-	else:
-		rev_vertex_trans = solve_for_H( H )
-			
+			H = upper_h
+		else:
+			H = MAX_H			
+
+	rev_vertex_trans = solve_for_H( H )
+	print( "Number of bones:", H )		
 	print( "Time for solving: ", time.time() - start_time )
-	print( "Final vertex error RMS is:", vertex_error(rest_mesh.vs, rev_vertex_trans, deformed_vs ) )
+	print( "Final vertex error RMS is:", vertex_error(rest_vs, rev_vertex_trans, deformed_vs ) )
 
 	output_folder = args.output
 	if output_folder == "":

@@ -1,9 +1,0 @@
-match order of our recovery:  [0 2 3 4 5 6 7 8 9 1]
-############################################
-Reconstruction Mesh Error: 
-rev: max, mean and median per-vertex distance 0.01328529748 0.000958904294046 0.0007446622963
-Our E_RMS_kavan2010:  1.51074854039
-match order of ssd recovery:  [0 9 1 2 3 4 5 6 7 8]
-ssd: max, mean and median per-vertex distance 0.0188798839063 0.00188847302847 0.00154436584489
-SSD E_RMS_kavan2010:  2.8264519557
-############################################
