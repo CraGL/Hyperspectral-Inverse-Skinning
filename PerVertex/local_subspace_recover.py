@@ -338,7 +338,7 @@ if __name__ == '__main__':
     qs, errors, smallest_singular_values = find_subspace_intersections( rest_pose, other_poses, args.version, method = args.method, use_pseudoinverse = args.pinv, propagate = args.propagate )
     end_time = time.time()
     print( "... Finished generating transformations." )
-    print( "Finding subspace intersection duration (seconds): ", end_time-start_time )
+    print( "Finding subspace intersection duration (minutes): ", (end_time-start_time)/60 )
 
     if args.out is None:
         np.set_printoptions( precision = 24, linewidth = 2000 )

@@ -339,8 +339,8 @@ if __name__ == '__main__':
 		weights = mves2.MVES_solution_weights_for_points( solution, Ts_mapper.project( all_Ts ) )
 		assert len( weights ) == len( all_Ts )
 	
-	running_time = time.time() - startTime
-	print("\nOptimization costs: %.2f seconds" %running_time)
+	running_time = (time.time() - startTime)/60
+	print("\nOptimization costs: %.2f minutes" %running_time)
 	print( "solution simplex volumn: ", simplex_volumn( solution[:-1] ).round(4) )
 	
 	recovered = Ts_mapper.unproject( solution[:-1].T )

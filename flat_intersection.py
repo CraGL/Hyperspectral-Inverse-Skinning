@@ -1358,7 +1358,7 @@ if __name__ == '__main__':
 
 	rev_vertex_trans = solve_for_H( H )
 	print( "Number of bones:", H )		
-	print( "Time for solving: ", time.time() - start_time )
+	print( "Time for solving(minutes): ", (time.time() - start_time)/60 )
 	print( "Final vertex error RMS is:", vertex_error(rest_vs, rev_vertex_trans, deformed_vs ) )
 
 	output_folder = args.output
