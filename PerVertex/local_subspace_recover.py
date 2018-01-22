@@ -175,6 +175,8 @@ def solve_directly(V0, V1, method, version=0, use_pseudoinverse = None):
             ## Reshape the right-hand-side in column-major order (F).
             x=scipy.linalg.solve( left, right ).ravel( order='F' )
     elif version==1:
+    	v0_center = V0[0]
+    	v1_center = V1[0]
         new_left = np.zeros( ( 5,5 ) )
         new_left[:4,:4] = left
         new_left[:-1,-1] = v0_center.T.squeeze()

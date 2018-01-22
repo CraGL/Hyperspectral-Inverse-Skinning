@@ -62,55 +62,96 @@ def match_data( gt_data, target ):
 
 if __name__ == '__main__':
 	
-	parser = argparse.ArgumentParser( description='Compare our results and SSD approch results with ground truth.' )
+	parser = argparse.ArgumentParser( description='Compare recovered results with ground truth.' )
 	parser.add_argument( 'rest_pose', type=str, help='Rest pose (OBJ).')
 	parser.add_argument( 'pose_folder', type=str, help='Folder containing deformed poses.')
 	parser.add_argument( 'result', type=str, help='our results(txt).')
-	parser.add_argument( '--ssd_result', '--SSD', type=str, help='SSD results(txt).')
+	parser.add_argument( '--kavan', type=str, default=False, help='if it is a kavan result.')
 	parser.add_argument( '--output', '-O', type=str, help='path to save recovered poses.')
 	parser.add_argument( '--showAll', '--all', type=bool, default=False, help='print the error for each pose')
 	args = parser.parse_args()
 		
 	rest_mesh = TriMesh.FromOBJ_FileName(args.rest_pose)
+	name = os.path.splitext(os.path.basename(args.rest_pose))[0]
 	rest_vs = np.array(rest_mesh.vs)
-	rest_fs = np.array(rest_mesh.faces)
-		
+	center = rest_vs.mean(axis=0)
+	
+	## diagonal
+	diag = rest_vs.max( axis = 0 ) - rest_vs.min( axis = 0 )
+	radius = (np.linalg.norm(diag))/2
+	N = len(rest_vs)
+	
+	print( "Loading recovered result ... " )
 	rev_bones, rev_w = format_loader.load_result(args.result)
 	np.set_printoptions(precision=6, suppress=True)
-				
+	print( "Finish Loading recovered result." )
+		
 	## Adjust bones data to Pose-by-bone-by-transformation
 	rev_bones = np.swapaxes(rev_bones, 0, 1)
-	rev_vs = np.array([lbs_all(rest_vs, rev_bones_per_pose, rev_w.T) for rev_bones_per_pose in rev_bones ])	
+	rev_vs = np.array([lbs_all(rest_vs, rev_bones_per_pose, rev_w.T) for rev_bones_per_pose in rev_bones ])
+	rev_vs = np.array([(vs-center)/radius for vs in rev_vs])
+	rev_fs = np.array(rest_mesh.faces)
 	
 	gt_mesh_paths = glob.glob(args.pose_folder + "/*.obj")
 	gt_mesh_paths.sort()
 	gt_vs = np.array([ TriMesh.FromOBJ_FileName(mesh_path).vs for mesh_path in gt_mesh_paths ])
-	gt_names = [os.path.basename(mesh_path) for mesh_path in gt_mesh_paths]
 	
-	## diagonal
-	diag = rest_vs.max( axis = 0 ) - rest_vs.min( axis = 0 )
-	diag = np.linalg.norm(diag)
-	N = len(rest_vs)
+	ref_center = center
+	ref_radius = radius
+	if( args.kavan ):
+		ref_vs = gt_vs[0]
+		ref_radius = (np.linalg.norm(ref_vs.max( axis = 0 ) - ref_vs.min( axis = 0 )))/2
+		ref_center = ref_vs.mean(axis=0)
+	
+	gt_vs = np.array([ (vs-ref_center)/ref_radius for vs in gt_vs])
+	gt_names = [os.path.basename(mesh_path) for mesh_path in gt_mesh_paths]
 	P = len( gt_vs )
 	
-	ordering = match_data( gt_vs, rev_vs )
-	print( "match order of our recovery: ", ordering )
-	rev_vs = np.array([ rev_vs[i] for i in ordering ])
+	rev_v_flags = np.full((N,),False)
+	rev_v_order = np.arange(N)
+	
+	
+	if( args.kavan ):
+		print( "Compute error for kavan result, rotate the coordinates." )
+		ref_fs = np.array(TriMesh.FromOBJ_FileName(gt_mesh_paths[0]).faces)
+		
+		## swap y and z coordinates across all the poses
+		R = np.array([[1,0,0],[0,0,-1],[0,1,0]])
+		rev_vs = np.array([np.dot(R,vs.T).T for vs in rev_vs])	
+		
+		## find the correct vertex correspondence
+		for rev_f, ref_f in zip( rev_fs, ref_fs ):
+			for i in range(3):
+				if rev_v_flags[ref_f[i]] == False:	
+					rev_v_order[ref_f[i]] = rev_f[i]
+					rev_v_flags[ref_f[i]] = True
+				else:
+					assert( rev_v_order[ref_f[i]] == rev_f[i] )
+	
+# 	ordering = match_data( gt_vs, rev_vs )
+# 	print( "match order of our recovery: ", ordering )
+# 	rev_vs = np.array([ rev_vs[i] for i in ordering ])
 	
 	if args.output != "NO":
 		output_folder = os.path.split(args.result)[0]		
 		if args.output is not None:
 			output_folder = args.output
 		
-		our_folder = output_folder + "/our_recovered"
+		our_folder = os.path.join(output_folder, name)
 		if not os.path.exists(our_folder):
 			os.makedirs(our_folder)
 		
 		for i, vs in enumerate(rev_vs):
+			vs = vs*ref_radius + ref_center
 			output_path = os.path.join(our_folder, gt_names[i])
-			format_loader.write_OBJ( output_path, vs.round(6), rest_fs )
+			format_loader.write_OBJ( output_path, vs.round(6), rev_fs )
 		
 	def compute_error( gt, data ):
+	
+		## align
+		gt = np.array([vs-vs.mean(axis=0) for vs in gt])
+		data = np.array([vs-vs.mean(axis=0) for vs in data])
+	
 		error = []
 		for pose_gt, pose_data in zip(gt, data):
 			error.append( np.array([np.linalg.norm(pt_gt - pt_data) for pt_gt, pt_data in zip(pose_gt, pose_data)]) )
@@ -125,42 +166,19 @@ if __name__ == '__main__':
 	print( os.path.basename(args.rest_pose), rev_w.shape[0], "handles" )
 	print( "Reconstruction Mesh Error: " )
 	# print( "rev error: ", np.linalg.norm(gt_vs - rev_vs)/(diag*N) )
+	rev_vs = np.array([vs[rev_v_order] for vs in rev_vs])
+
+# 	ordering = match_data( gt_vs, rev_vs )
+# 	print( "match order of our recovery: ", ordering )
+# 	rev_vs = np.array([ rev_vs[i] for i in ordering ])
+	
 	rev_error, rev_erms = compute_error(gt_vs, rev_vs)
-	rev_error = rev_error / diag
-	rev_erms = rev_erms *2 / diag
 	print( "rev: max, mean and median per-vertex distance", np.max(rev_error), np.mean(rev_error), np.median(rev_error) )
 	print( "Our E_RMS_kavan2010: ", rev_erms )
 	if args.showAll:
 		print( "rev per pose max, mean and median error:")
 		for i in range( len(rev_error) ):
 			print( gt_names[i], np.max(rev_error[i]), np.mean(rev_error[i]), np.median(rev_error[i]) )
-	if args.ssd_result is not None:
-		ssd_bones, ssd_w = format_loader.load_result(args.ssd_result)
-		ssd_bones = np.swapaxes(ssd_bones, 0, 1)
-		ssd_vs = np.array([lbs_all(rest_vs, ssd_bones_per_pose, ssd_w.T) for ssd_bones_per_pose in ssd_bones ])
-		
-		ordering = match_data( gt_vs, ssd_vs )
-		print( "match order of ssd recovery: ", ordering )
-		ssd_vs = np.array([ ssd_vs[i] for i in ordering ])
-		
-		# print( "ssd error: ", np.linalg.norm(gt_vs - ssd_vs)/(diag*N) )
-		ssd_error, ssd_erms = compute_error(gt_vs, ssd_vs)
-		ssd_error = ssd_error / diag
-		ssd_erms = ssd_erms *2 / diag
-		print( "ssd: max, mean and median per-vertex distance", np.max(ssd_error), np.mean(ssd_error), np.median(ssd_error) )
-		print( "SSD E_RMS_kavan2010: ", ssd_erms )
-		if args.showAll:
-			print( "ssd per pose max, mean and median error:")
-			for i in range( len(ssd_error) ):
-				print( gt_names[i], np.max(ssd_error[i]), np.mean(ssd_error[i]), np.median(ssd_error[i]) )
-
-		ssd_folder = output_folder + "/ssd_recovered"
-		if not os.path.exists(ssd_folder):
-			os.makedirs(ssd_folder)
-		
-		for i, vs in enumerate(ssd_vs):
-			output_path = os.path.join(ssd_folder, gt_names[i])
-			format_loader.write_OBJ( output_path, vs.round(6), rest_fs )
 	print( "############################################" )
 
 

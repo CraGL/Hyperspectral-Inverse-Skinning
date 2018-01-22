@@ -23,6 +23,34 @@ import format_loader
 from trimesh import TriMesh
 
 MAX_H = 64
+class ErrorRecorder:
+	'''
+	A class to compute RMS error.
+	'''
+	csv_path=None
+	rest_vs=None
+	deformed_vs=None
+	P=None
+	z_strategy=None
+	values=None
+	
+	def __init__(self):
+		self.values=[]
+		
+	def add_error(self,x):
+		rev_vertex_trans, vertex_dists = per_vertex_transformation(x, self.P, self.rest_vs, self.deformed_vs, z_strategy = self.z_strategy)
+		err = vertex_error(self.rest_vs, rev_vertex_trans, self.deformed_vs )
+		self.values.append(err)
+		
+	def clear_error(self):
+		self.values=[]
+		
+	def save_error(self):
+		if self.csv_path is not None:
+			values = np.array( self.values )
+			np.savetxt(self.csv_path, values, delimiter=",")
+			
+error_recorder=ErrorRecorder()
 
 ## http://scipy-cookbook.readthedocs.io/items/RankNullspace.html
 def nullspace(A, atol=1e-13, rtol=0):
@@ -148,9 +176,34 @@ def unpack( X, poses ):
 iteration = [0]
 def reset_progress():
 	iteration[0] = 0
+	error_recorder.clear_error()
 def show_progress( x ):
 	iteration[0] += 1
 	print("Iteration", iteration[0])
+	error_recorder.add_error(x)
+	
+def vertex_error(rest_vs, vertex_trans, gt_vs):
+	'''
+	rest_vs has the shape of N-by-3
+	vertex_trans has the shape of N-by-P-by-12
+	deformed_vs has the shape of N-by-P-by-3
+	'''
+	assert( len(gt_vs.shape) == 3 )
+	N = gt_vs.shape[0]
+	P = gt_vs.shape[1]
+	assert( gt_vs.shape[2] == 3 )
+	vertex_trans = vertex_trans.reshape((N, P, 12))
+	assert( len(rest_vs.shape) == 2 )
+	assert( rest_vs.shape[0] == N )
+	assert( rest_vs.shape[1] == 3 )
+	
+	diag = np.linalg.norm(rest_vs.max( axis = 0 ) - rest_vs.min( axis = 0 ))
+	
+	vs = np.hstack((rest_vs, np.ones((N,1))))
+	rev_vs = np.array([[np.dot(tran.reshape(3,4),v)[:3] for tran in trans_across_poses ] for trans_across_poses, v in zip(vertex_trans, vs)])
+	
+	return 1000*np.linalg.norm( gt_vs.ravel() - rev_vs.ravel() )*2/(np.sqrt(3*P*N)*diag)
+
 
 constraints = []
 			
@@ -223,8 +276,8 @@ def zero_energy_test(base_dir):
 	gt_vertices = np.swapaxes(gt_vertices, 0, 1)
 	gt_vertices = gt_vertices.reshape( len(gt_vertices), -1 )
 	
-# 	gt_W_path = "models/cheburashka/cheburashka.DMAT"
-# 	gt_W = np.array( format_loader.load_DMAT(gt_W_path) ).T
+#	gt_W_path = "models/cheburashka/cheburashka.DMAT"
+#	gt_W = np.array( format_loader.load_DMAT(gt_W_path) ).T
 	
 	return gt_bones, gt_vertices
 	
@@ -407,7 +460,8 @@ def optimize_nullspace_directly(P, H, row_mats, deformed_vs, x0, strategy = None
 			B = grassmann.B_from_Cayley_A( A, H )
 			x = pack( p, B )
 			
-			solution = scipy.optimize.minimize( f_point_distance_sum_and_gradient, x, jac = True, method = 'BFGS', callback = show_progress, options={'disp':True, 'maxiter': MAX_NONLINEAR_ITER} )
+# 			solution = scipy.optimize.minimize( f_point_distance_sum_and_gradient, x, jac = True, method = 'BFGS', callback = show_progress, options={'disp':True, 'maxiter': MAX_NONLINEAR_ITER} )
+			solution = scipy.optimize.minimize( f_point_distance_sum_and_gradient, x, jac = True, method = 'BFGS', callback = show_progress, options={'disp':True, 'maxiter': max_iter} )
 			x = solution.x
 			## Only break if we converge and ran just a few iterations.
 			if solution.success and solution.nit < MIN_NONLINEAR_ITER: break
@@ -417,10 +471,11 @@ def optimize_nullspace_directly(P, H, row_mats, deformed_vs, x0, strategy = None
 	f = f_point_distance_sum_and_gradient( solution.x )[0]
 	print( "f_point_distance_sum_and_gradient value at solution:", f )
 	converged = abs( f ) < 1e-2
+	error_recorder.save_error()
 	
 	return converged, solution.x
 
-def optimize_nullspace_cayley(P, H, row_mats, deformed_vs, x0, strategy = None):
+def optimize_nullspace_cayley(P, H, row_mats, deformed_vs, x0, strategy = None, max_iter = None):
 
 	## To make function values comparable, we need to normalize.
 	normalization = normalization_factor_from_row_mats( row_mats )
@@ -479,7 +534,7 @@ def optimize_nullspace_cayley(P, H, row_mats, deformed_vs, x0, strategy = None):
 		# print( "scipy.optimize.check_grad() error:", grad_err )
 		# solution = scipy.optimize.minimize( f_point_distance_sum_and_gradient, x0, jac = True, method = 'L-BFGS-B', callback = show_progress, options={'disp':True} )
 		# solution = scipy.optimize.minimize( f_point_distance_sum_and_gradient, x0, jac = True, method = 'CG', callback = show_progress, options={'disp':True} )
-		solution = scipy.optimize.minimize( f_point_distance_sum_and_gradient, x0, jac = True, method = 'BFGS', callback = show_progress, options={'disp':True} )
+		solution = scipy.optimize.minimize( f_point_distance_sum_and_gradient, x0, jac = True, method = 'BFGS', callback = show_progress, options={'maxiter':max_iter,'disp':True} )
 		# solution = scipy.optimize.minimize( f_point_distance_sum_and_gradient, x0, jac = True, callback = show_progress, options={'disp':True} )
 	else:
 		raise RuntimeError( "Unknown strategy: " + str(strategy) )
@@ -491,6 +546,7 @@ def optimize_nullspace_cayley(P, H, row_mats, deformed_vs, x0, strategy = None):
 	pt, A = cayley.unpack( solution.x, P, H )
 	B = cayley.B_from_Cayley_A( A, H )
 	x_pb = pack( pt, B )
+	error_recorder.save_error()
 	
 	return converged, x_pb
 
@@ -643,7 +699,7 @@ def optimize_biquadratic( P, H, rest_vs, deformed_vs, x0, solve_for_rest_pose = 
 	print( "Normalization:", normalization )
 	
 	if strategy is None:
-# 		strategy = []
+#		strategy = []
 		strategy = ['ssv:weighted']
 	else:
 		strategy = strategy.split('+')
@@ -784,7 +840,12 @@ def optimize_biquadratic( P, H, rest_vs, deformed_vs, x0, solve_for_rest_pose = 
 			W = biquadratic.solve_for_W_with_system( W_system, W_rhs, use_pseudoinverse = use_pseudoinverse, projection = W_projection, first_column = first_column )
 			f *= normalization / weights
 			print( "Function value:", f )
-			func_values.append(f)
+			
+#			rev_vertex_trans, vertex_dists = per_vertex_transformation(pack_W( W ), P, rest_vs[:,:3], deformed_vs, z_strategy = z_strategy)
+#			err = vertex_error(rest_vs[:,:3], rev_vertex_trans, deformed_vs )
+#			func_values.append(err)
+			error_recorder.add_error(pack_W( W ))
+			
 			print( "Max sub-function value:", fis.max() )
 			print( "Min sub-function value:", fis.min() )
 			print( "Average sub-function value:", np.average( fis ) )
@@ -824,9 +885,10 @@ def optimize_biquadratic( P, H, rest_vs, deformed_vs, x0, solve_for_rest_pose = 
 	
 	print( "Terminated after", iterations, "iterations." )
 
-	if csv_path is not None:
-		func_values = np.array( func_values )
-		np.savetxt(csv_path, func_values, delimiter=",")
+#	if csv_path is not None:
+#		func_values = np.array( func_values )
+#		np.savetxt(csv_path, func_values, delimiter=",")
+	error_recorder.save_error()
 	
 	if solve_for_rest_pose:
 		return converged, pack_W( W ), rest_vs
@@ -1087,10 +1149,10 @@ def per_vertex_transformation(x, P, rest_vs, deformed_vs, z_strategy = None):
 		v = np.append( rest_vs[j], [1] )
 		
 		z2, ssv = biquadratic.solve_for_z( np.hstack([ pt.reshape(-1,1), pt+B ]), v, vprime, return_energy = False, use_pseudoinverse = True, strategy = z_strategy )
-		if ssv < 1e-5: 
-			print( "Vertex", j, "has small singular values:", ssv )
+#		if ssv < 1e-5: 
+#			print( "Vertex", j, "has small singular values:", ssv )
 		transformation = np.dot( np.hstack([ pt.reshape(-1,1), pt+B ]), z2 )
-# 		assert abs( transformation.squeeze() - transformation2.squeeze() ).max() < 1e-7
+#		assert abs( transformation.squeeze() - transformation2.squeeze() ).max() < 1e-7
 		
 		rev_vertex_transformations.append( transformation )
 		# vertex_dists.append( np.linalg.norm( np.dot( vbar, transformation ) - vprime ) )
@@ -1112,7 +1174,7 @@ if __name__ == '__main__':
 	parser.add_argument('--strategy', '-S', type=str, choices = ['function', 'gradient', 'hessian', 'mixed', 'grassmann', 'pinv', 'pinv+ssv:skip', 'pinv+ssv:weighted', 'ssv:skip', 'ssv:weighted'], help='Strategy: function, gradient (default), hessian, mixed, grassmann (for energy B only), pinv and ssv (for energy biquadratic only).')
 	parser.add_argument('--energy', '-E', type=str, default='B', choices = ['B', 'cayley', 'B+cayley', 'B+B', 'cayley+cayley', 'biquadratic', 'biquadratic+B', 'biquadratic+handles', 'laplacian'], help='Energy: B (default), cayley, B+cayley, B+B, cayley+cayley, biquadratic, biquadratic+B, biquadratic+handles, laplacian.')
 	## UPDATE: type=bool does not do what we think it does. bool("False") == True.
-	##         For more, see https://stackoverflow.com/questions/15008758/parsing-boolean-values-with-argparse
+	##		   For more, see https://stackoverflow.com/questions/15008758/parsing-boolean-values-with-argparse
 	def str2bool(s): return {'true': True, 'false': False}[s.lower()]
 	parser.add_argument('--solve-for-rest-pose', type=str2bool, default=False, help='Whether to solve for the rest pose (only affects "biquadratic" energy (default: False).')
 	parser.add_argument('--error', type=str2bool, default=False, help='Whether to compute transformation error and vertex error compared with ground truth.')
@@ -1120,7 +1182,7 @@ if __name__ == '__main__':
 	parser.add_argument('--fancy-init', '-I', type=str, help='Valid points generated from local subspace intersection.')
 	parser.add_argument('--fancy-init-errors', type=str, help='Errors for data generated from local subspace intersection.')
 	parser.add_argument('--fancy-init-ssv', type=str, help='Smallest singular values for data generated from local subspace intersection.')
-	parser.add_argument('--output', '-O', type=str, default="", help='output path.')
+	parser.add_argument('--output', '-O', type=str, help='output path.')
 	parser.add_argument('--max-iter', type=int, help='Maximum number of iterations.')
 	parser.add_argument('--f-eps', type=float, help='Function change epsilon (biquadratic).')
 	parser.add_argument('--x-eps', type=float, help='Variable change epsilon (biquadratic).')
@@ -1157,6 +1219,13 @@ if __name__ == '__main__':
 	deformed_vs = np.swapaxes(deformed_vs, 0, 1).reshape(N, P, 3)
 	all_rights = deformed_vs.copy()
 	
+	## build global error recorder
+	error_recorder.P = P
+	error_recorder.rest_vs = rest_vs
+	error_recorder.deformed_vs = deformed_vs
+	error_recorder.z_strategy = args.z_strategy
+	error_recorder.csv_path = args.csv_path
+	
 	if args.energy != 'biquadratic':
 		all_flats = []
 		all_R_mats = []
@@ -1186,31 +1255,7 @@ if __name__ == '__main__':
 	
 	if ground_truth_path is not None:
 		gt_bones, gt_vertices = zero_energy_test(ground_truth_path)
-	
-	def vertex_error(rest_vs, vertex_trans, gt_vs):
-		'''
-		rest_vs has the shape of N-by-3
-		vertex_trans has the shape of N-by-P-by-12
-		deformed_vs has the shape of N-by-P-by-3
-		'''
-		vertex_trans = vertex_trans.reshape((N, P, 12))
-		assert( len(rest_vs.shape) == 2 )
-		assert( len(vertex_trans.shape) == 3 )
-		assert( len(gt_vs.shape) == 3 )
-		assert( rest_vs.shape[1] == 3 )
-		assert( rest_vs.shape[0] == N )
-		assert( vertex_trans.shape[0] == N )
-		assert( gt_vs.shape[0] == N )
-		assert( vertex_trans.shape[1] == P )
-		assert( gt_vs.shape[1] == P )
-		
-		diag = np.linalg.norm(rest_vs.max( axis = 0 ) - rest_vs.min( axis = 0 ))
-		
-		vs = np.hstack((rest_vs, np.ones((N,1))))
-		rev_vs = np.array([[np.dot(tran.reshape(3,4),v)[:3] for tran in trans_across_poses ] for trans_across_poses, v in zip(vertex_trans, vs)])
-		
-		return 1000*np.linalg.norm( gt_vs.ravel() - rev_vs.ravel() )*2/(np.sqrt(3*P*N)*diag)
-		
+			
 	def solve_for_H( H ):
 		x = None
 		x0 = None
@@ -1249,7 +1294,7 @@ if __name__ == '__main__':
 			for i in range(B.shape[1]):
 				B[:,i] /= np.linalg.norm(B[:,i])
 			
-			if fancy_init_path is not None: 		
+			if fancy_init_path is not None:			
 				qs_data = np.loadtxt(fancy_init_path)
 				print( "# of good valid vertices: ", qs_data.shape[0] )
 				from space_mapper import SpaceMapper
@@ -1328,9 +1373,9 @@ if __name__ == '__main__':
 			print( "Largest, average and meidan vertex errors are: ", vertex_dists.max(), vertex_dists.mean(), np.median(vertex_dists) )
 		
 		return rev_vertex_trans
-# 		if ground_truth_path is None and converged:
-# 			print("Converged at handle #", H)
-# 			break
+#		if ground_truth_path is None and converged:
+#			print("Converged at handle #", H)
+#			break
 			
 	if H is None:
 		upper_h = 16
@@ -1350,7 +1395,7 @@ if __name__ == '__main__':
 				curr_h = ( upper_h + lower_h ) // 2
 				rev_vertex_trans = solve_for_H( curr_h )
 				err = vertex_error(rest_vs, rev_vertex_trans, deformed_vs )
-				if( err <= THRESHOLD ):	upper_h = curr_h
+				if( err <= THRESHOLD ): upper_h = curr_h
 				else:					lower_h = curr_h
 			H = upper_h
 		else:
@@ -1362,20 +1407,21 @@ if __name__ == '__main__':
 	print( "Final vertex error RMS is:", vertex_error(rest_vs, rev_vertex_trans, deformed_vs ) )
 
 	output_folder = args.output
-	if output_folder == "":
-		curr_folder = os.path.abspath(".")
-		assert os.path.basename(curr_folder) == "InverseSkinning"
-		output_folder = os.path.join( "results", OBJ_name, + pose_name )
+#	if output_folder is not None:
+#		curr_folder = os.path.abspath(".")
+#		assert os.path.basename(curr_folder) == "InverseSkinning"
+#		output_folder = os.path.join( "results", OBJ_name, + pose_name )
 	
-	if not os.path.exists(output_folder):
-		os.makedirs(output_folder)
+	if output_folder is not None:
+		if not os.path.exists(output_folder):
+			os.makedirs(output_folder)
 	
-	H = int(rev_vertex_trans.shape[1]/12)
-	for i in range(H):
-		per_pose_transformtion = rev_vertex_trans[:,i*12:(1+i)*12]
-		per_pose_transformtion = per_pose_transformtion.reshape(-1,3,4)
-		per_pose_transformtion = np.swapaxes(per_pose_transformtion, 1, 2).reshape(-1,12)
-		output_path = os.path.join( output_folder, str(i+1) + ".DMAT" )
-		format_loader.write_DMAT( output_path, per_pose_transformtion )
+		H = int(rev_vertex_trans.shape[1]/12)
+		for i in range(H):
+			per_pose_transformtion = rev_vertex_trans[:,i*12:(1+i)*12]
+			per_pose_transformtion = per_pose_transformtion.reshape(-1,3,4)
+			per_pose_transformtion = np.swapaxes(per_pose_transformtion, 1, 2).reshape(-1,12)
+			output_path = os.path.join( output_folder, str(i+1) + ".DMAT" )
+			format_loader.write_DMAT( output_path, per_pose_transformtion )
 	
 	
