@@ -89,7 +89,7 @@ def to_spmatrix( M ):
 	import cvxopt
 	return cvxopt.spmatrix( M.data, numpy.asarray( M.row, dtype = int ), numpy.asarray( M.col, dtype = int ) )
 
-def MVES( pts, initial_guess_vertices = None, method = None, linear_solver = None, max_iter = None ):
+def MVES( pts, initial_guess_vertices = None, method = None, linear_solver = None, max_iter = None, min_weight = None ):
 	'''
 	Given:
 		pts: A sequence of n-dimensional points (e.g. points are rows)
@@ -103,7 +103,10 @@ def MVES( pts, initial_guess_vertices = None, method = None, linear_solver = Non
 	if method is None:
 		## This should be 'qp-major' since it works better than 'lp'.
 		method = 'lp'	
-		
+	
+	if min_weight is None:
+		min_weight = 0.0
+	
 	if linear_solver is None:
 		linear_solver = 'glpk'
 	
@@ -258,6 +261,10 @@ def MVES( pts, initial_guess_vertices = None, method = None, linear_solver = Non
 		return to_spmatrix( g_bary_jac( x ) )
 	def g_bary_jac_dense( x ):
 		return numpy.kron( numpy.identity(n+1), data.T )
+	def g_bary_rhs():
+		b = numpy.zeros( (n+1)*data.shape[1] )
+		b[:] = min_weight
+		return b
 	
 	if DEBUG:
 		print( "Checking the positive barycentric coordinate constraint gradient." )
@@ -405,7 +412,7 @@ def MVES( pts, initial_guess_vertices = None, method = None, linear_solver = Non
 		
 		## set invariant parameters
 		G = -g_bary_jac( x0 )
-		h = numpy.zeros( G.shape[0] )
+		h = g_bary_rhs()
 		A = g_ones_jac( x0 )
 		b = g_ones_rhs()
 		sparse_G = to_spmatrix(G)
@@ -462,7 +469,7 @@ def MVES( pts, initial_guess_vertices = None, method = None, linear_solver = Non
 		#G = -g_bary_jac( x0 )
 		#sparse_G = to_spmatrix(G)
 		sparse_G = -g_bary_jac_cvxopt_spmatrix( x0 )
-		h = numpy.zeros( sparse_G.size[0] )
+		h = g_bary_rhs()
 		
 		# A = g_ones_jac( x0 )
 		# sparse_A = to_spmatrix(A)
@@ -536,7 +543,7 @@ def MVES( pts, initial_guess_vertices = None, method = None, linear_solver = Non
 		print( "Solve MEVS with linear binary search." )	
 		## Binary search
 		G = -g_bary_jac( x0 )
-		h = numpy.zeros( G.shape[0] )
+		h = g_bary_rhs()
 		A = g_ones_jac( x0 ).todense()
 		b = g_ones_rhs()
 		from binary_search_opt import min_quad_with_linear_constraints, binary_search

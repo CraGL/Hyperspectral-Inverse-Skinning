@@ -1388,7 +1388,7 @@ if __name__ == '__main__':
 		if error_test:
 			transformation_error = abs( rev_vertex_trans - gt_vertices )
 			print( "Largest, average and median transformation errors are: ", transformation_error.max(), transformation_error.mean(), np.median(transformation_error.ravel()) )
-			print( "Largest, average and meidan vertex errors are: ", vertex_dists.max(), vertex_dists.mean(), np.median(vertex_dists) )
+			print( "Largest, average and median vertex errors are: ", vertex_dists.max(), vertex_dists.mean(), np.median(vertex_dists) )
 		
 		return rev_vertex_trans
 #		if ground_truth_path is None and converged:

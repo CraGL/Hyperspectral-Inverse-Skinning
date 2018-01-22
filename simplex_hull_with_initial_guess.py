@@ -66,6 +66,7 @@ if __name__ == '__main__':
 	parser.add_argument('--robust-percentile', '-R', type=float, help='Fraction of outliers to discard. Default: 0.')
 	parser.add_argument('--dimension', '-D', type=int, help='Dimension (number of handles minus one). Default: automatic.')
 	parser.add_argument('--positive-weights', type=str2bool, default=False, help='If True, recovered weights must all be positive. If False, weights can be negative to better match vertices.')
+	parser.add_argument('--min-weight', type=float, help='The minimum weight when solving.')
 	parser.add_argument('--WPCA', type=str2bool, help='If True, uses weighted PCA instead of regular PCA. Requires')
 	parser.add_argument('--transformation-errors', type=str, help='Errors for data generated from local subspace intersection.')
 	parser.add_argument('--transformation-ssv', type=str, help='Smallest singular values for data generated from local subspace intersection.')
@@ -184,7 +185,7 @@ if __name__ == '__main__':
 		# print( "Saved input points to MVES in MATLAB format as:", 'MVES_input.mat' )
 	 
 		## Compute minimum-volume enclosing simplex
-		solution, weights, iter_num = mves2.MVES( uncorrelated, method=args.method, linear_solver = args.linear_solver, max_iter = args.max_iter )
+		solution, weights, iter_num = mves2.MVES( uncorrelated, method=args.method, linear_solver = args.linear_solver, max_iter = args.max_iter, min_weight = args.min_weight )
 		volume = abs( np.linalg.det( solution ) )
 		
 		print( "solution" )
@@ -204,7 +205,8 @@ if __name__ == '__main__':
 			rows_to_discard = argsorted[ :num_rows_to_discard ]
 			uncorrelated_robust = np.delete( uncorrelated, rows_to_discard, axis = 0 )
 			print( "Re-running MVES" )
-			solution, weights_robust, iter_num = mves2.MVES( uncorrelated_robust, method = args.method, linear_solver = args.linear_solver, max_iter = args.max_iter )
+			solution, weights_robust, iter_num = mves2.MVES( uncorrelated_robust, method = args.method, linear_solver = args.linear_solver,
+				max_iter = args.max_iter, min_weight = args.min_weight )
 			weights = weights_robust
 			volume = abs( np.linalg.det( solution ) )
 			print( "robust solution" )

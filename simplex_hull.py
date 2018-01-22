@@ -159,6 +159,7 @@ if __name__ == '__main__':
 	parser.add_argument('--ground-truth', '-GT', type=str, help='Ground truth data path.')
 	parser.add_argument('--robust-percentile', '-R', type=float, help='Fraction of outliers to discard. Default: 0.')
 	parser.add_argument('--dimension', '-D', type=int, help='Dimension (number of handles minus one). Default: automatic.')
+	parser.add_argument('--min-weight', type=float, help='The minimum weight when solving.')
 	parser.add_argument('--output', '-O', type=str, help="output path")
 	## Only if the solver is still slow for big examples:
 	parser.add_argument('--random-percent', type=float, help='If specified, compute with a random % subset of the points. Default: off (equivalent to 100).')
@@ -259,7 +260,7 @@ if __name__ == '__main__':
 	#	plt.show()
 	 
 		## Compute minimum-volume enclosing simplex
-		solution, weights, iter_num = mves2.MVES( uncorrelated, method = args.method, linear_solver = args.linear_solver, max_iter = args.max_iter )
+		solution, weights, iter_num = mves2.MVES( uncorrelated, method = args.method, linear_solver = args.linear_solver, max_iter = args.max_iter, min_weight = args.min_weight )
 		volume = abs( np.linalg.det( solution ) )
 		
 		'''
@@ -320,7 +321,7 @@ if __name__ == '__main__':
 			rows_to_discard = argsorted[ :num_rows_to_discard ]
 			uncorrelated_robust = numpy.delete( uncorrelated, rows_to_discard, axis = 0 )
 			print( "Re-running MVES" )
-			solution, weights_robust, iter_num = mves2.MVES( uncorrelated_robust, method = args.method, linear_solver = args.linear_solver, max_iter = args.max_iter )
+			solution, weights_robust, iter_num = mves2.MVES( uncorrelated_robust, method = args.method, linear_solver = args.linear_solver, max_iter = args.max_iter, min_weight = args.min_weight )
 			weights = numpy.dot( numpy.linalg.inv( solution ), numpy.concatenate( ( uncorrelated.T, numpy.ones((1,uncorrelated.shape[0])) ), axis=0 ) ).T
 			volume = abs( np.linalg.det( solution ) )
 			print( "robust solution" )
