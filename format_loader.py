@@ -128,7 +128,7 @@ def write_result(path, res, weights, iter_num, time, col_major=False):
 		f.write("#####################################################\n")
 		f.write("# (C) Songrun (songruner@gmail.com)\n")
 		f.write("#\n")
-		f.write("# Running time: " + repr(round(time, 3)) + " (s)\n")
+		f.write("# Running time: " + repr(round(time, 3)) + " (m)\n")
 		f.write("# Repeat      : " + repr(iter_num) + "\n")
 		f.write("#\n")
 		f.write("#####################################################\n")

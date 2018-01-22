@@ -67,6 +67,128 @@ void BlendScene::init_scene(
 	}
 }
 
+void BlendScene::load_results(std::string result_path)
+{
+	using namespace std;
+	using namespace Eigen;
+	using namespace pythonlike;
+	
+	string section = "";
+	int count=0;
+	int B=0;
+	int nframes=0;
+	int rows=0;
+	vector< Matrix4d > all_transformations;
+	
+	string line;
+	ifstream file (result_path);
+	if (file.is_open()) {
+		while ( getline (file,line) ) {
+			vector<string> words = split( strip(line), ',' );
+			
+			if(words.size() == 3 && words[0] == "*BONEANIMATION") {
+				section = "bone";
+				nframes = stoi(words[2].substr(8));
+				count=0;
+				B += 1;
+			}
+			else if( words.size() > 0 and words[0] == "*VERTEXWEIGHTS" ) {
+				section = "weight";
+				rows = stoi( split( split(words[1], ' ')[0], '=' )[1] );
+				W.resize(rows, B);
+				count = 0;
+			}
+			else if( section == "bone" && count < nframes ) {
+				vector<string> words = split(strip(line), ' ');
+				assert( words.size() == 17 );
+				Matrix4d M;
+				for(int i=0; i<4; i++)
+					for(int j=0; j<4; j++)
+						M(i,j) = stod(words[1+i*4+j]);
+				all_transformations.push_back( M );
+				count += 1;
+			}
+			else if( section == "weight" && count < rows ) {
+				vector<string> words = split(strip(line), ' ');
+				assert( words.size() % 2 == 0 );
+				int ridx = stoi( words[0] );
+				int num = words.size()/2-1;
+				for( int i=0; i<num; i++) {
+					int cidx = stoi( words[i*2+2] );
+					double val = stod( words[i*2+3] );
+					W(ridx, cidx) = val;
+				}
+				count += 1;
+			}
+		}
+		file.close();
+	}
+
+	else cout << "Unable to open file" << endl;
+	
+	assert( all_transformations.size() == B*nframes );
+	P = nframes;
+	H = B;
+	for( int i=0; i<nframes; i++ ) {
+		vector< Matrix4d > transformations_per_pose;
+		for( int j=0; j<B; j++ ) {
+			transformations_per_pose.push_back( all_transformations[nframes*j+i] );
+		}
+		bone_transformations.push_back( transformations_per_pose );
+	}	
+}
+
+void BlendScene::init_scene(
+	const std::string & rest_path, 
+	const std::string & result_path)
+{
+	using namespace std;
+	using namespace Eigen;
+	using namespace pythonlike;
+	
+	load_results( result_path );
+	// insert rest pose and its bone transformations
+	P += 1;
+	vector< Matrix4d > rest_transformations(H, Matrix4d::Identity());
+	bone_transformations.insert(bone_transformations.begin(), rest_transformations);
+	poses.reserve(P);	
+	poses.clear();	
+	MeshType rest_pose;
+	rest_pose.read_triangle_mesh(rest_path);
+	if( rest_pose.CN.size() == 0 ) {
+		std::cout << "No normals in the mesh; computing per-vertex normals automatically." << std::endl;
+		rest_pose.compute_per_vertex_normals();
+		rest_pose.color_faces_with_weights(W);
+	}
+	poses.push_back(rest_pose);
+	
+	MatrixXd V = rest_pose.V.cast<double>();
+	for(int k=1; k<P; k++) {
+		MeshType pos;
+		pos.copy( rest_pose );
+		
+		for( int i=0; i<V.rows(); i++ ) {
+			Vector4d p = V.row(i).homogeneous().transpose();
+			RowVector4d deformed_p = RowVector4d::Zero();
+			for( int j=0; j<H; j++ ) {
+				Matrix4d transform = bone_transformations[k][j];
+				deformed_p += (transform*p).transpose()*W(i,j);
+			}
+			pos.V.row(i) = deformed_p.head(3).cast<float>();
+		}
+		pos.compute_per_vertex_normals();
+		poses.push_back(pos);
+	}
+	
+	dQ.clear();
+	T.resize(4*H, 3);
+	T.setZero();
+	for(int i=0; i<H; i++) {
+		dQ.push_back(Eigen::Quaterniond(1,0,0,0));
+		T.block(4*i,0,3,3).setIdentity();
+	}
+}
+
 void BlendScene::show_pose(const int index_pos) {
 	
 	using namespace std;
@@ -90,6 +212,7 @@ void BlendScene::show_pose(const int index_pos) {
 	camera.m_far = 500;
 	
 	pose_index = index_pos;
+	
 }
 
 void BlendScene::compute_handle_positions()

@@ -15,6 +15,9 @@ On GitHub as a gist: https://gist.github.com/yig/32fe51874f3911d1c612
 #include <string>
 #include <sstream>
 #include <numeric>
+#include <cctype>
+#include <locale>
+#include <functional> 
 #include <sys/stat.h> // stat() used in os_path_exists()
 
 namespace pythonlike
@@ -183,6 +186,28 @@ inline bool os_path_exists( const std::string& path )
     return 0 == stat( path.c_str(), &buffer );
 }
 
+// Behave like the python strip() function.
+inline std::string strip( std::string s )
+{
+    s.erase(s.begin(), std::find_if(s.begin(), s.end(),
+            std::not1(std::ptr_fun<int, int>(std::isspace))));
+    s.erase(std::find_if(s.rbegin(), s.rend(),
+            std::not1(std::ptr_fun<int, int>(std::isspace))).base(), s.end());
+    return s;
+}
+
+// Behave like the python split() function.
+inline std::vector<std::string> split(const std::string& s, char delimiter=' ')
+{
+	std::vector<std::string> tokens;
+	std::string token;
+	std::istringstream tokenStream(s);
+	while (std::getline(tokenStream, token, delimiter))
+	{
+		tokens.push_back(strip(token));
+   	}
+	return tokens;
+}
 
 // Can be used with std::transform() to transform a range using an std::map
 template< typename T, typename U >

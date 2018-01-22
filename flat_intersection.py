@@ -31,15 +31,28 @@ class ErrorRecorder:
 	rest_vs=None
 	deformed_vs=None
 	P=None
+	H=None
+	energy=None
 	z_strategy=None
 	values=None
 	
 	def __init__(self):
 		self.values=[]
 		
-	def add_error(self,x):
+	def add_error(self, data, enable_cayley=True):
+		P = self.P
+		H = self.H
+		x = data.copy()
+		if enable_cayley == True and self.energy == 'cayley':
+			import flat_intersection_cayley_grassmann_gradients as cayley
+			pt, A = cayley.unpack( data, P, H )
+			B = cayley.B_from_Cayley_A( A, H )
+			x = pack( pt, B )
+		
 		rev_vertex_trans, vertex_dists = per_vertex_transformation(x, self.P, self.rest_vs, self.deformed_vs, z_strategy = self.z_strategy)
 		err = vertex_error(self.rest_vs, rev_vertex_trans, self.deformed_vs )
+		
+		print( "Added error: ", err )
 		self.values.append(err)
 		
 	def clear_error(self):
@@ -176,7 +189,7 @@ def unpack( X, poses ):
 iteration = [0]
 def reset_progress():
 	iteration[0] = 0
-	error_recorder.clear_error()
+# 	error_recorder.clear_error()
 def show_progress( x ):
 	iteration[0] += 1
 	print("Iteration", iteration[0])
@@ -1190,6 +1203,7 @@ if __name__ == '__main__':
 	parser.add_argument('--z-strategy', type=str, choices = ['positive', 'sparse4'], help='How to solve for z (biquadratic): positive, sparse4.')
 	parser.add_argument('--csv-path', '--CSV', type=str, help='csv file which save objective values.')
 	parser.add_argument('--handle-threshold', type=int, default=1, help='RMS threshold to determine proper number of handles.')
+	parser.add_argument('--forced-init', type=str2bool, default=False, help='Whether to use the same initial guess.')
 	
 	args = parser.parse_args()
 	H = args.handles
@@ -1220,6 +1234,8 @@ if __name__ == '__main__':
 	all_rights = deformed_vs.copy()
 	
 	## build global error recorder
+	error_recorder.energy = args.energy
+	error_recorder.H = H 
 	error_recorder.P = P
 	error_recorder.rest_vs = rest_vs
 	error_recorder.deformed_vs = deformed_vs
@@ -1277,7 +1293,7 @@ if __name__ == '__main__':
 
 		else:
 			print("#handles: ", H)
-			if error_test:		np.random.seed(0)
+			if error_test or args.forced_init:		np.random.seed(0)
 			
 			x0 = np.random.rand(H*12*P)
 			
@@ -1304,6 +1320,8 @@ if __name__ == '__main__':
 				
 			x0 = pack( pt, B )
 		
+		print( "Initial guess: ", x0 )
+		error_recorder.add_error(x0, enable_cayley=False)
 		if 3*P < B.shape[1]:
 			print( "Warning: Not enough poses for the handles without pseudoinverse in the energy." )
 		
@@ -1311,7 +1329,7 @@ if __name__ == '__main__':
 			# converged, x = optimize(P, H, all_R_mats, deformed_vs, x0)
 			converged, x = optimize_nullspace_directly(P, H, all_R_mats, deformed_vs, x0, strategy = args.strategy, max_iter = args.max_iter )
 		elif args.energy == 'cayley':
-			converged, x = optimize_nullspace_cayley( P, H, all_R_mats, deformed_vs, x0, strategy = args.strategy )
+			converged, x = optimize_nullspace_cayley( P, H, all_R_mats, deformed_vs, x0, strategy = args.strategy, max_iter = args.max_iter )
 		elif args.energy == 'B+cayley':
 			converged, x = optimize_nullspace_directly(P, H, all_R_mats, deformed_vs, x0, strategy = args.strategy)
 			converged, x = optimize_nullspace_cayley( P, H, all_R_mats, deformed_vs, x, strategy = args.strategy )

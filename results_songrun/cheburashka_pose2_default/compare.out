@@ -1,1 +1,0 @@
-python -u ../../compare.py --write-OBJ True --SSD ../../SSD_res/cheb11-2-output.txt ../../models/cheburashka/cheburashka.obj ../../models/cheburashka/poses-2 ../../models/cheburashka/cheburashka.DMAT ./result.txt

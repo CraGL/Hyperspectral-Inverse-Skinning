@@ -1,4 +1,0 @@
-python -u ./recover_poses.py --output NO ./models/cat-poses.obj ./models/cat-poses ./SSD_unconstrained/cat-poses-10-unconstrained.txt
-python -u ./recover_poses.py --output NO ./models/cat-poses.obj ./models/cat-poses ./SSD_unconstrained/cat-poses-15-unconstrained.txt
-python -u ./recover_poses.py --output NO ./models/cat-poses.obj ./models/cat-poses ./SSD_unconstrained/cat-poses-20-unconstrained.txt
-python -u ./recover_poses.py --output NO ./models/cat-poses.obj ./models/cat-poses ./SSD_unconstrained/cat-poses-25-unconstrained.txt

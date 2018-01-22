@@ -15,7 +15,7 @@ for REST_POSE in $(basename "${MODEL_DIR}"/*.obj)
 do
 	name="${REST_POSE%$OBJ_SUFF}"
 	POSES_DIR="${MODEL_DIR}/${name}"
-	for OUTPUT_DIR in "${TEST_DIR}"/"${name}"
+	for OUTPUT_DIR in "${TEST_DIR}"/"${name}"*
 	do
 		test_dir=$(basename "${OUTPUT_DIR}")
 		H=${test_dir#$name-}
