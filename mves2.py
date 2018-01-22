@@ -2,7 +2,7 @@ from __future__ import print_function, division
 
 # python3 is needed.
 import scipy.optimize, numpy
-import scipy.sparse
+import scipy.sparse.linalg
 
 USE_OUR_GRADIENTS = True
 if USE_OUR_GRADIENTS:
@@ -21,6 +21,11 @@ def points_to_data( pts ):
 	data[:-1] = pts.T
 	
 	return n, data
+
+def repeated_block_diag_times_matrix( block, matrix ):
+	# return scipy.sparse.block_diag( [ block ]*( matrix.shape[0]//block.shape[1] ) ).dot( matrix )
+	# print( abs( scipy.sparse.block_diag( [ block ]*( matrix.shape[0]//block.shape[1] ) ).dot( matrix ) - numpy.dot( block, matrix.reshape( block.shape[1], -1, order='F' ) ).reshape( -1, matrix.shape[1], order='F' ) ).max() )
+	return numpy.dot( block, matrix.reshape( block.shape[1], -1, order='F' ) ).reshape( -1, matrix.shape[1], order='F' )
 
 #### find points that has each channel's max and min value. totally 2*L points (may duplicate)
 def min_max( data ):
@@ -330,9 +335,10 @@ def MVES( pts, initial_guess_vertices = None, method = None, linear_solver = Non
 		assert ( bary <= 1+eps ).all()
 		assert ( abs( bary.sum(0) - 1.0 ) < eps ).all()
 		
+		x0 = numpy.linalg.inv( x0.T ).ravel()
 		print( "inital volume:", f_volume( x0 ) )
 		print( "inital log volume:", f_log_volume( x0 ) )
-		return numpy.linalg.inv( x0.T ).ravel()
+		return x0
 	
 	## Make an initial guess.
 	if initial_guess_vertices is None:
@@ -531,7 +537,105 @@ def MVES( pts, initial_guess_vertices = None, method = None, linear_solver = Non
 					x0 = item[1]
 		print( "Final log volume:", f_log_volume( numpy.array(x0) ) )
 		solution = numpy.linalg.inv( unpack( numpy.array(x0) ) )
+	
+	elif method.lower() == "sisal":
+		print( "Solve MEVS with SISAL." )
+		x0 = x0[:,numpy.newaxis]
+		f0 = f_log_volume( x0 )
+		all_x = [ (f0, x0) ]
 		
+		Lambda = 1.
+		Tao = (n+1)*1000/len(pts)
+		Mu = 1e-6
+		def hnorm( X ): return numpy.maximum( -X, 0.0 ).sum()
+		def soft( X, beta ): return numpy.maximum( numpy.abs( X + beta/2.0 ) - beta/2.0, 0.0 )*numpy.sign(X)
+		def allclose( x1, x2 ): numpy.allclose( x1, x2, rtol=1e-03, atol=1e-06 )
+		
+		# A = g_bary_jac( x0 )
+		Ablock = data.T
+		Areps = n+1
+		Ashape = ( Ablock.shape[0]*Areps, Ablock.shape[1]*Areps )
+		## A should be #pts*dimension-by-dimension^2
+		# assert A.shape[0] > A.shape[1]
+		assert Ablock.shape[0] > Ablock.shape[1]
+		
+		# A.T * A
+		AtAblock = Ablock.T.dot(Ablock)
+		
+		# F = Mu * numpy.eye(AtA.shape[0]) + Tao*AtA
+		F = Mu * numpy.eye(AtAblock.shape[0]) + Tao*AtAblock
+		Finv = numpy.linalg.inv(F)
+		B = g_ones_jac(x0)
+		## B.dot anything can be sped up as a vertical block sum.
+		BFinv = B.dot( scipy.sparse.block_diag( [ Finv ]*Areps ) )
+		eq10monster = BFinv.T.dot( scipy.sparse.linalg.inv( B.dot( BFinv.T ) ) ).todense()
+		
+		a = g_ones_rhs().reshape(-1,1)
+		
+		l0 = f0 + Lambda*hnorm( repeated_block_diag_times_matrix( Ablock, x0 ) )
+		
+		try:
+			while True:
+				g = f_log_volume_grad( x0 ).reshape(-1,1)
+				
+				## Algorithm 3
+				d = numpy.zeros( ( Ashape[0], 1 ) )
+				z = numpy.zeros( d.shape )
+				alg_3_iterations = 0
+				x3 = x0
+				while True:
+					alg_3_iterations += 1
+					b = Mu*x3 - g + Tao*numpy.asfarray( repeated_block_diag_times_matrix( Ablock.T, z + d ) )
+					x = numpy.asfarray( repeated_block_diag_times_matrix( Finv, b ) ) - numpy.asfarray( eq10monster.dot( BFinv.dot( b ) - a ) )
+					Ax = numpy.asfarray( repeated_block_diag_times_matrix( Ablock, x ) )
+					z = soft( Ax - d, Mu/Tao )
+					d = d - ( Ax - z )
+					# print( x )
+					if numpy.allclose( x, x3 ):
+						print( "Terminating Algorithm 3 after", alg_3_iterations, "iterations." )
+						break
+					x3 = x
+					if alg_3_iterations >= 1000000:
+						print( "Terminating Algorithm 3 after", alg_3_iterations, "iterations (too many)." )
+						break
+				
+				iter_num += 1
+				
+				fx = f_log_volume( x )
+				print( "Current log volume: ", fx )
+				lx = fx + Lambda*hnorm( repeated_block_diag_times_matrix( Ablock, x ) )
+				
+				## Line search.
+				## Was the last solution better?
+				while l0 < lx:
+					## Bisect the distance between the last solution and the current one.
+					x = 0.5*( x0 + x )
+					fx = f_log_volume( x )
+					lx = fx + Lambda*hnorm( repeated_block_diag_times_matrix( Ablock, x ) )
+					
+					print( "Volume increased! Bisecting. New log volume:", fx )
+					
+					## Break this line search if we are too close.
+					if numpy.allclose( x, x0 ):
+						break
+				
+				## Have we converged?
+				if( numpy.allclose( x, x0, rtol=1e-02, atol=1e-05 ) ):
+					print("all close!")
+					break
+				elif iter_num >= MAX_ITER:
+					print("Exceed the maximum number of iterations!")
+					break
+				all_x.append( ( fx, x ) )
+				x0 = x
+				l0 = lx
+		except KeyboardInterrupt:
+			print( "Terminated by KeyboardInterrupt." )
+		
+		print( "SISAL Iterations:", iter_num )
+		print( "Final log volume:", f_log_volume( numpy.array(x0) ) )
+		solution = numpy.linalg.inv( unpack( numpy.array(x0) ) )
+	
 	elif method == "BINARY" or method == "binary":
 		print( "Solve MEVS with linear binary search." )	
 		## Binary search
@@ -597,13 +701,15 @@ def MVES_solution_weights_for_points( solution, pts ):
 	pts = numpy.asarray( pts )
 	return numpy.dot( numpy.linalg.inv( solution ), numpy.concatenate( ( pts.T, numpy.ones((1,pts.shape[0])) ), axis=0 ) ).T
 
-def test():
+def test( method ):
+	if method is None: method = 'qp-major'
+	
 	pts = [ [ 0,1 ], [ 1,0 ], [ -2,0 ], [ 0, 0 ] ]
 	# pts = [ [ 0,.9 ], [.1,.9], [ 1,0 ], [ 0, 0 ] ]
 	print( 'pts:', pts )
 	#numpy.random.seed(0)
 	#pts = numpy.random.random_sample((200, 16))
-	solution, weights, iterations = MVES( pts, method = 'qp-major' )
+	solution, weights, iterations = MVES( pts, method = method )
 	print( 'solution' )
 	print( solution )
 
@@ -620,7 +726,7 @@ if __name__ == '__main__':
 	import sys
 	argv = sys.argv[1:]
 	
-	test()
+	test( argv[0] if len( argv ) > 0 else None )
 	sys.exit(0)
 	
 	import scipy.io 
