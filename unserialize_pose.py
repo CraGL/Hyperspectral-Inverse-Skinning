@@ -20,6 +20,7 @@ if __name__ == "__main__":
 
 	mesh = TriMesh.FromOBJ_FileName(rest_path)
 	
+	first_name = "mesh_0000"
 	with open( input_path ) as f:
 		for i, line in enumerate( f ):
 			if i == 0:
@@ -27,8 +28,8 @@ if __name__ == "__main__":
 				P, N = dims[0], int(dims[1]/3)
 			else:
 				vs = np.array(map( float, line.strip().split() )).reshape(N, 3)
-				
-				format_loader.write_OBJ( output_folder+str(i)+".obj", vs, mesh.faces )
+				name = first_name[:-len(str(i-1))]+str(i-1)
+				format_loader.write_OBJ( output_folder+name+".obj", vs, mesh.faces )
 			
 	
 	

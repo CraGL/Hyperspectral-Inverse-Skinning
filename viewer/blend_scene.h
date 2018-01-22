@@ -57,6 +57,8 @@ struct BlendScene
     Eigen::MatrixXd W;		// weights
     Eigen::MatrixXd C; 		// estimated controls
     
+    std::vector< std::vector< Eigen::Matrix4d > > bone_transformations;	// Pose-by-bone-by-homogeneous transformation
+    
     Eigen::Quaterniond rotation;
     Eigen::Vector3d translation;
     RotationList dQ;
@@ -65,6 +67,7 @@ struct BlendScene
     ShaderSettings shader_settings;
     
     void init_scene(const std::vector< std::string > & mesh_paths, const std::string &weight_path);
+    void init_scene(const std::string & rest_path, const std::string & result_path);
     void show_pose(const int index_pos);
     void compute_handle_positions();
 
@@ -92,6 +95,7 @@ struct BlendScene
 	void bind_transforms( GLuint program_id, bool is_animated );
 	void build_mesh_program(GLuint &program_id);
 	void build_wire_program(GLuint &program_id);
+	void load_results(std::string result_path);
 	
 };
 

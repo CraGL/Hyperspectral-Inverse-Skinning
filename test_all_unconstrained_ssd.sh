@@ -11,6 +11,6 @@ do
 	name="${rest_pose%$OBJ_SUFF}"
 	for result in "${SSD_DIR}"/"${name}"*.txt
 	do
-		python -u ./recover_poses.py --output NO "${MODEL_DIR}"/"${rest_pose}" "${MODEL_DIR}"/"${name}" "${result}" 2>&1 | tee -a "${OUTPUT_FILE}"
+		echo python -u ./recover_poses.py --output NO "${MODEL_DIR}"/"${rest_pose}" "${MODEL_DIR}"/"${name}" "${result}" 2>&1 | tee -a "${OUTPUT_FILE}"
 	done	
 done

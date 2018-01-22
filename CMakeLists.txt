@@ -52,6 +52,10 @@ include_directories( "${OpenImageIO_INCLUDE_DIR}" )
 ## PNGLIB
 find_package(PNG REQUIRED)
 
+## We need Zlib
+find_package(ZLIB REQUIRED)
+include_directories( "${ZLIB_INCLUDE_DIRS}" )
+
 link_directories(
 	/usr/local/lib
 	/opt/local/lib
@@ -105,6 +109,23 @@ add_executable(viewer
 	viewer/draw_handles.cpp
 	)
 target_link_libraries(viewer
+	${GUI_LIBS}
+)
+
+## Another simple viewer
+add_executable(viewer2
+	viewer2.cpp
+	jsoncpp.cpp
+	viewer/save_screenshot.cpp
+	viewer/stb_image_write.cpp
+	viewer/shaderHelper.cpp
+	viewer/blend_scene.cpp
+	viewer/vertex_array_object.cpp
+	viewer/flattener.cpp
+	viewer/controls.cpp
+	viewer/draw_handles.cpp
+	)
+target_link_libraries(viewer2
 	${GUI_LIBS}
 )
 
