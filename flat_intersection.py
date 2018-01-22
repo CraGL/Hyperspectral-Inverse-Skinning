@@ -22,7 +22,7 @@ np.set_printoptions( linewidth = 2000 )
 import format_loader
 from trimesh import TriMesh
 
-MAX_H = 20
+MAX_H = 64
 
 ## http://scipy-cookbook.readthedocs.io/items/RankNullspace.html
 def nullspace(A, atol=1e-13, rtol=0):
@@ -643,6 +643,7 @@ def optimize_biquadratic( P, H, rest_vs, deformed_vs, x0, solve_for_rest_pose = 
 	print( "Normalization:", normalization )
 	
 	if strategy is None:
+# 		strategy = []
 		strategy = ['ssv:weighted']
 	else:
 		strategy = strategy.split('+')
@@ -1055,7 +1056,7 @@ def optimize(P, H, all_R_mats, deformed_vs, x0):
 	return converged, x
 	
 
-def per_vertex_transformation(x, P, rest_vs, deformed_vs):
+def per_vertex_transformation(x, P, rest_vs, deformed_vs, z_strategy = None):
 	
 	import flat_intersection_biquadratic_gradients as biquadratic
 	
@@ -1085,7 +1086,7 @@ def per_vertex_transformation(x, P, rest_vs, deformed_vs):
 		
 		v = np.append( rest_vs[j], [1] )
 		
-		z2, ssv = biquadratic.solve_for_z( np.hstack([ pt.reshape(-1,1), pt+B ]), v, vprime, return_energy = False, use_pseudoinverse = True )
+		z2, ssv = biquadratic.solve_for_z( np.hstack([ pt.reshape(-1,1), pt+B ]), v, vprime, return_energy = False, use_pseudoinverse = True, strategy = z_strategy )
 		if ssv < 1e-5: 
 			print( "Vertex", j, "has small singular values:", ssv )
 		transformation = np.dot( np.hstack([ pt.reshape(-1,1), pt+B ]), z2 )
@@ -1126,6 +1127,7 @@ if __name__ == '__main__':
 	parser.add_argument('--W-projection', type=str, choices = ['normalize', 'first', 'regularize_translation', 'regularize_identity', 'constrain_magnitude'], help='How to project W (biquadratic): normalize, first, regularize_translation, regularize_identity, constrain_magnitude.')
 	parser.add_argument('--z-strategy', type=str, choices = ['positive', 'sparse4'], help='How to solve for z (biquadratic): positive, sparse4.')
 	parser.add_argument('--csv-path', '--CSV', type=str, help='csv file which save objective values.')
+	parser.add_argument('--handle-threshold', type=int, default=1, help='RMS threshold to determine proper number of handles.')
 	
 	args = parser.parse_args()
 	H = args.handles
@@ -1140,6 +1142,7 @@ if __name__ == '__main__':
 	OBJ_name = os.path.splitext(os.path.basename(args.rest_pose))[0]
 	print( "The name for the OBJ is:", OBJ_name )
 	rest_mesh = TriMesh.FromOBJ_FileName( args.rest_pose )
+	rest_vs = np.array( rest_mesh.vs )
 	
 	pose_paths = glob.glob(args.pose_folder + "/*.obj")
 	pose_paths.sort()
@@ -1157,7 +1160,7 @@ if __name__ == '__main__':
 	if args.energy != 'biquadratic':
 		all_flats = []
 		all_R_mats = []
-		for i, pos in enumerate(rest_mesh.vs):
+		for i, pos in enumerate(rest_vs):
 			left_m = np.zeros((3*P, 12*P))
 			unit_left_m = left_m.copy()
 			pos_h = np.ones(4)
@@ -1177,21 +1180,39 @@ if __name__ == '__main__':
 		
 		print( "The rank of the stack of all pose row matrices is: ", np.linalg.matrix_rank( np.vstack( all_flats ) ) )
 	else:
-		all_R_mats = np.append( rest_mesh.vs, np.ones( ( len( rest_mesh.vs ), 1 ) ), axis = 1 )
+		all_R_mats = np.append( rest_vs, np.ones( ( len( rest_vs ), 1 ) ), axis = 1 )
 	
 	start_time = time.time()
-	if H is None:
-		Hs = range(2, MAX_H)
-	else:
-		Hs = [H]
-	
-	x = None
 	
 	if ground_truth_path is not None:
 		gt_bones, gt_vertices = zero_energy_test(ground_truth_path)
 	
-	for H in Hs:
-	
+	def vertex_error(rest_vs, vertex_trans, gt_vs):
+		'''
+		rest_vs has the shape of N-by-3
+		vertex_trans has the shape of N-by-P-by-12
+		deformed_vs has the shape of N-by-P-by-3
+		'''
+		vertex_trans = vertex_trans.reshape((N, P, 12))
+		assert( len(rest_vs.shape) == 2 )
+		assert( len(vertex_trans.shape) == 3 )
+		assert( len(gt_vs.shape) == 3 )
+		assert( rest_vs.shape[1] == 3 )
+		assert( rest_vs.shape[0] == N )
+		assert( vertex_trans.shape[0] == N )
+		assert( gt_vs.shape[0] == N )
+		assert( vertex_trans.shape[1] == P )
+		assert( gt_vs.shape[1] == P )
+		
+		diag = np.linalg.norm(rest_vs.max( axis = 0 ) - rest_vs.min( axis = 0 ))
+		
+		vs = np.hstack((rest_vs, np.ones((N,1))))
+		rev_vs = np.array([[np.dot(tran.reshape(3,4),v)[:3] for tran in trans_across_poses ] for trans_across_poses, v in zip(vertex_trans, vs)])
+		
+		return 1000*np.linalg.norm( gt_vs.ravel() - rev_vs.ravel() )*2/(np.sqrt(3*P*N)*diag)
+		
+	def solve_for_H( H ):
+		x = None
 		x0 = None
 		## 0 energy test
 		if zero_test:
@@ -1299,20 +1320,46 @@ if __name__ == '__main__':
 		else:
 			raise RuntimeError( "Unknown energy parameter: " + str(parser.energy) )
 		
-		if ground_truth_path is None and converged:
-			print("Converged at handle #", H)
-			break
-	print( "Time for solving: ", time.time() - start_time )
+		rev_vertex_trans, vertex_dists = per_vertex_transformation(x, P, rest_vs, deformed_vs, z_strategy = args.z_strategy)
+		
+		if error_test:
+			transformation_error = abs( rev_vertex_trans - gt_vertices )
+			print( "Largest, average and median transformation errors are: ", transformation_error.max(), transformation_error.mean(), np.median(transformation_error.ravel()) )
+			print( "Largest, average and meidan vertex errors are: ", vertex_dists.max(), vertex_dists.mean(), np.median(vertex_dists) )
+		
+		return rev_vertex_trans
+# 		if ground_truth_path is None and converged:
+# 			print("Converged at handle #", H)
+# 			break
+			
+	if H is None:
+		upper_h = 16
+		lower_h = 1
+		THRESHOLD = 1
+		while( upper_h < MAX_H ):
+			rev_vertex_trans = solve_for_H( upper_h )
+			err = vertex_error(rest_vs, rev_vertex_trans, deformed_vs )
+			if( err <= THRESHOLD ):
+				break
+			else:
+				lower_h = upper_h
+				upper_h *= 2
 	
-	if ground_truth_path is not None and converged == False:
-		print("Exceed Maximum #handles ", MAX_H)
-	
-	rev_vertex_trans, vertex_dists = per_vertex_transformation(x, P, rest_mesh.vs, deformed_vs)	
-	if error_test:
-		transformation_error = abs( rev_vertex_trans - gt_vertices )
-		print( "Largest, average and median transformation errors are: ", transformation_error.max(), transformation_error.mean(), np.median(transformation_error.ravel()) )
-		print( "Largest, average and meidan vertex errors are: ", vertex_dists.max(), vertex_dists.mean(), np.median(vertex_dists) )
+		if upper_h < MAX_H:
+			while( upper_h - lower_h > 1 ):
+				curr_h = ( upper_h + lower_h ) // 2
+				rev_vertex_trans = solve_for_H( curr_h )
+				err = vertex_error(rest_vs, rev_vertex_trans, deformed_vs )
+				if( err <= THRESHOLD ):	upper_h = curr_h
+				else:					lower_h = curr_h
+			H = upper_h
+		else:
+			H = MAX_H			
 
+	rev_vertex_trans = solve_for_H( H )
+	print( "Number of bones:", H )		
+	print( "Time for solving(minutes): ", (time.time() - start_time)/60 )
+	print( "Final vertex error RMS is:", vertex_error(rest_vs, rev_vertex_trans, deformed_vs ) )
 
 	output_folder = args.output
 	if output_folder == "":

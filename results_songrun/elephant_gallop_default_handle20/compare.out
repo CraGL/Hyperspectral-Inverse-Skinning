@@ -1,6 +1,0 @@
-Traceback (most recent call last):
-  File "../../recover_poses.py", line 104, in <module>
-    ordering = match_data( gt_vs, rev_vs )
-  File "../../recover_poses.py", line 53, in match_data
-    assert( gt_data.shape == target.shape )
-AssertionError
