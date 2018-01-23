@@ -85,7 +85,7 @@ def quadratic_for_z( W, v, vprime ):
     
     return Q, L, C
 
-def solve_for_z( W, v, vprime, return_energy = False, use_pseudoinverse = True, strategy = None ):
+def solve_for_z( W, v, vprime, return_energy = False, use_pseudoinverse = True, strategy = None, **kwargs ):
     Q, L, C = quadratic_for_z( W, v, vprime )
     
     # sv = np.linalg.svd( Q, compute_uv = False )
@@ -111,8 +111,15 @@ def solve_for_z( W, v, vprime, return_energy = False, use_pseudoinverse = True, 
     rhs[:-1] = -0.5*L
     rhs[-1] = 1
     
-    if strategy not in (None, 'positive', 'sparse4'):
+    if strategy not in (None, 'positive', 'sparse4', 'neighbors'):
         raise RuntimeError( "Unknown strategy: " + repr(strategy) )
+    
+    if strategy == 'neighbors' and 'neighborz' in kwargs:
+        neighborz = kwargs['neighborz']
+        neighbor_weight = kwargs['neighbor_weight']
+        ## Add the identity * weight to the original diagonal.
+        Qbig[ np.diag_indices( Q.shape[0] ) ] += neighbor_weight
+        rhs[ :Q.shape[0] ] += neighbor_weight*neighborz
     
     if strategy == 'positive':
         assert not use_pseudoinverse

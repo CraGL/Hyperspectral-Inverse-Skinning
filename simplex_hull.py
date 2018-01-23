@@ -344,17 +344,21 @@ if __name__ == '__main__':
 	print("\nOptimization costs: %.2f minutes" %running_time)
 	print( "solution simplex volumn: ", simplex_volumn( solution[:-1] ).round(4) )
 	
-	save_json = False
+	## If we have 4 bones, we can visualize the results in 3D!
+	save_json = solution.shape[1] == 4
 	if save_json:
 		import json
-		norm_min = solution.dot(weights).min(axis=0)
-		norm_scale = 1./( solution.dot(weights).max(axis=0) - solution.dot(weights).min(axis=0) ).max()
+		assert solution.shape[1] == 4
+		simplex_vs = solution.T[:,:-1]
+		norm_min = simplex_vs.min(axis=0)
+		norm_scale = 1./( simplex_vs.max(axis=0) - simplex_vs.min(axis=0) ).max()
 		def normalizer( pts ):
 			return ( pts - norm_min ) * norm_scale
-		json.save( open("data.json",'w'), { "float_colors": { solution.dot(weights).tolist() } }
-		json_vs = solution.T[:-1]
-		assert solution.shape[1] == 4
-		json.save( open("data-overlay.json",'w'), { "vs": { json_vs.tolist() }, "faces":, json_vs[ array([[0,3,2],[3,1,2],[3,0,1],[1,0,2]]) ] }
+		
+		out_vs = normalizer( uncorrelated )
+		simplex_vs = normalizer( simplex_vs )*255.0
+		json.dump( { "float_colors": out_vs.tolist() }, open("data.json",'w') )
+		json.dump( { "vs": simplex_vs.tolist(), "faces": simplex_vs[ numpy.array([[0,3,2],[3,1,2],[3,0,1],[1,0,2]]) ].tolist() }, open("data-overlay.json",'w') )
 	
 	recovered = Ts_mapper.unproject( solution[:-1].T )
 	print( 'recovered', recovered.shape )
