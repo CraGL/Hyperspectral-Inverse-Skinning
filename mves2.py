@@ -101,7 +101,7 @@ def MVES( pts, initial_guess_vertices = None, method = None, linear_solver = Non
 		initial_guess_vertices (optional): A sequence of n+1
 			n-dimensional points to use as an initial guess for the solution.
 	Returns:
-		The inverse of n+1 n+1-dimensional points. The inverse of the returned
+		n+1 n+1-dimensional points. The returned
 		matrix has the points as the columns. The last coordinate of each point will
 		always be 1.
 	'''

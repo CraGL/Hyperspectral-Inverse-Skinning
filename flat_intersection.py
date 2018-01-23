@@ -692,7 +692,7 @@ def optimize_approximated_quadratic(P, H, row_mats, deformed_vs, x0, f_eps = Non
 	
 	return converged, x
 
-def optimize_biquadratic( P, H, rest_vs, deformed_vs, x0, solve_for_rest_pose = False, csv_path = None, f_eps = None, x_eps = None, max_iter = None, f_zero_threshold = None, strategy = None, W_projection = None, z_strategy = None, **kwargs ):
+def optimize_biquadratic( P, H, rest_vs, deformed_vs, x0, solve_for_rest_pose = False, csv_path = None, f_eps = None, x_eps = None, max_iter = None, f_zero_threshold = None, strategy = None, W_projection = None, z_strategy = None, mesh = None, **kwargs ):
 	'''
 	Given:
 		P: Number of poses
@@ -779,6 +779,14 @@ def optimize_biquadratic( P, H, rest_vs, deformed_vs, x0, solve_for_rest_pose = 
 		first_column = estimate_point_on_subspace( kwargs['guess_data'], kwargs['guess_errors'], kwargs['guess_ssv'] )
 		x0 = replace_x0_with_better_p( x0, P, first_column )
 	
+	if z_strategy == 'neighbors':
+		assert mesh is not None
+		neighbors = [
+			np.asarray( mesh.vertex_vertex_neighbors( i ) ) for i in range(len( rest_vs ))
+			]
+		current_zs = np.zeros( ( len( rest_vs ), H ) )
+		z_neighbor_weight = 0.01
+	
 	f_prev = None
 	W_prev = unpack_W( x0.copy(), P )
 	W = W_prev.copy() ## In case we terminate immediately.
@@ -811,13 +819,24 @@ def optimize_biquadratic( P, H, rest_vs, deformed_vs, x0, solve_for_rest_pose = 
 			if solve_for_rest_pose:
 				rest_vs = rest_vs.copy()
 			
+			## New iteration. Copy the current z's to the last z's.
+			if z_strategy == 'neighbors': last_zs = current_zs.copy()
+			
 			for i, deformed_v in enumerate(deformed_vs):
 				vprime = deformed_v.reshape((3*P,1))
 				v = rest_vs[i]
 				
 				## 1
-				z, ssz, fi = biquadratic.solve_for_z( W_prev, v, vprime, return_energy = True, use_pseudoinverse = use_pseudoinverse, strategy = z_strategy )
+				if z_strategy == 'neighbors' and iterations > 1:
+					z, ssz, fi = biquadratic.solve_for_z( W_prev, v, vprime, return_energy = True, use_pseudoinverse = use_pseudoinverse, strategy = z_strategy,
+						neighborz = np.average( last_zs[ neighbors[i] ], axis = 0 ), neighbor_weight = z_neighbor_weight
+						)
+				else:
+					z, ssz, fi = biquadratic.solve_for_z( W_prev, v, vprime, return_energy = True, use_pseudoinverse = use_pseudoinverse, strategy = z_strategy )
 				fis[i] = fi
+				
+				## Save z if that's what we're up to.
+				if z_strategy == 'neighbors': current_zs[i] = z
 				
 				if 'ssv:skip' in strategy:
 					if ssz < 1e-5:
@@ -1197,7 +1216,7 @@ if __name__ == '__main__':
 	parser.add_argument('--f-eps', type=float, help='Function change epsilon (biquadratic).')
 	parser.add_argument('--x-eps', type=float, help='Variable change epsilon (biquadratic).')
 	parser.add_argument('--W-projection', type=str, choices = ['normalize', 'first', 'regularize_translation', 'regularize_identity', 'constrain_magnitude'], help='How to project W (biquadratic): normalize, first, regularize_translation, regularize_identity, constrain_magnitude.')
-	parser.add_argument('--z-strategy', type=str, choices = ['positive', 'sparse4'], help='How to solve for z (biquadratic): positive, sparse4.')
+	parser.add_argument('--z-strategy', type=str, choices = ['positive', 'sparse4', 'neighbors'], help='How to solve for z (biquadratic): positive, sparse4, neighbors.')
 	parser.add_argument('--csv-path', '--CSV', type=str, help='csv file which save objective values.')
 	parser.add_argument('--handle-threshold', type=int, default=1, help='RMS threshold to determine proper number of handles.')
 	parser.add_argument('--forced-init', type=str2bool, default=False, help='Whether to use the same initial guess.')
@@ -1358,7 +1377,7 @@ if __name__ == '__main__':
 				guess_ssv = np.loadtxt( args.fancy_init_ssv )
 				converged, x = optimize_biquadratic( P, H, all_R_mats, deformed_vs, x0, strategy = args.strategy, max_iter = args.max_iter, f_eps = args.f_eps, x_eps = args.x_eps, W_projection = args.W_projection, z_strategy = args.z_strategy, guess_data = guess_data, guess_errors = guess_errors, guess_ssv = guess_ssv, csv_path = args.csv_path  )
 			else:
-				converged, x = optimize_biquadratic( P, H, all_R_mats, deformed_vs, x0, strategy = args.strategy, max_iter = args.max_iter, f_eps = args.f_eps, x_eps = args.x_eps, W_projection = args.W_projection, z_strategy = args.z_strategy, csv_path = args.csv_path  )
+				converged, x = optimize_biquadratic( P, H, all_R_mats, deformed_vs, x0, strategy = args.strategy, max_iter = args.max_iter, f_eps = args.f_eps, x_eps = args.x_eps, W_projection = args.W_projection, z_strategy = args.z_strategy, csv_path = args.csv_path, mesh = rest_mesh )
 		elif args.energy == 'biquadratic+handles':
 			converged, x = optimize_biquadratic( P, H, all_R_mats, deformed_vs, x0, strategy = args.strategy, max_iter = args.max_iter, f_eps = args.f_eps, x_eps = args.x_eps, W_projection = args.W_projection, z_strategy = args.z_strategy )
 			p, B = unpack( x, P )
