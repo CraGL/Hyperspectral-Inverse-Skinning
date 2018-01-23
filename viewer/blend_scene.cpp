@@ -158,6 +158,9 @@ void BlendScene::init_scene(
 	if( rest_pose.CN.size() == 0 ) {
 		std::cout << "No normals in the mesh; computing per-vertex normals automatically." << std::endl;
 		rest_pose.compute_per_vertex_normals();
+	}
+	if( rest_pose.C.size() == 0 ) {
+		std::cout << "Compute colors with weights." << std::endl;
 		rest_pose.color_faces_with_weights(W);
 	}
 	poses.push_back(rest_pose);

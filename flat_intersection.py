@@ -35,6 +35,7 @@ class ErrorRecorder:
 	energy=None
 	z_strategy=None
 	values=None
+	ground_truth=None
 	
 	def __init__(self):
 		self.values=[]
@@ -49,7 +50,7 @@ class ErrorRecorder:
 			B = cayley.B_from_Cayley_A( A, H )
 			x = pack( pt, B )
 		
-		rev_vertex_trans, vertex_dists = per_vertex_transformation(x, self.P, self.rest_vs, self.deformed_vs, z_strategy = self.z_strategy)
+		rev_vertex_trans = per_vertex_transformation(x, self.P, self.rest_vs, self.deformed_vs, z_strategy = self.z_strategy)
 		err = vertex_error(self.rest_vs, rev_vertex_trans, self.deformed_vs )
 		
 		print( "Added error: ", err )
@@ -1136,7 +1137,6 @@ def per_vertex_transformation(x, P, rest_vs, deformed_vs, z_strategy = None):
 	import flat_intersection_biquadratic_gradients as biquadratic
 	
 	rev_vertex_transformations = []
-	vertex_dists = []
 
 	pt, B = unpack(x,P)
 	num_underconstrained = 0
@@ -1168,11 +1168,8 @@ def per_vertex_transformation(x, P, rest_vs, deformed_vs, z_strategy = None):
 #		assert abs( transformation.squeeze() - transformation2.squeeze() ).max() < 1e-7
 		
 		rev_vertex_transformations.append( transformation )
-		# vertex_dists.append( np.linalg.norm( np.dot( vbar, transformation ) - vprime ) )
-		v_transformed = np.dot( v, transformation.reshape( 4, -1 ) ).reshape( vprime.shape )
-		vertex_dists.append( np.linalg.norm( v_transformed - vprime ) )
 	
-	return np.array( rev_vertex_transformations ).squeeze(), np.array( vertex_dists )
+	return np.array( rev_vertex_transformations ).squeeze()
 	
 
 if __name__ == '__main__':
@@ -1241,6 +1238,7 @@ if __name__ == '__main__':
 	error_recorder.deformed_vs = deformed_vs
 	error_recorder.z_strategy = args.z_strategy
 	error_recorder.csv_path = args.csv_path
+	error_recorder.ground_truth = args.ground_truth
 	
 	if args.energy != 'biquadratic':
 		all_flats = []
@@ -1383,12 +1381,11 @@ if __name__ == '__main__':
 		else:
 			raise RuntimeError( "Unknown energy parameter: " + str(parser.energy) )
 		
-		rev_vertex_trans, vertex_dists = per_vertex_transformation(x, P, rest_vs, deformed_vs, z_strategy = args.z_strategy)
+		rev_vertex_trans = per_vertex_transformation(x, P, rest_vs, deformed_vs, z_strategy = args.z_strategy)
 		
 		if error_test:
 			transformation_error = abs( rev_vertex_trans - gt_vertices )
 			print( "Largest, average and median transformation errors are: ", transformation_error.max(), transformation_error.mean(), np.median(transformation_error.ravel()) )
-			print( "Largest, average and median vertex errors are: ", vertex_dists.max(), vertex_dists.mean(), np.median(vertex_dists) )
 		
 		return rev_vertex_trans
 #		if ground_truth_path is None and converged:
