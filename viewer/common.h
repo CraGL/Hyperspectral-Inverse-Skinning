@@ -183,6 +183,8 @@ struct MeshType
 		for(int i=0; i<colors.rows(); i++){
 			C.row(i) = colors.row(i);
 		}
+		
+		C = C.array().cwiseMax(0);
 	}
 };
 
