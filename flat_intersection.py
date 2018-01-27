@@ -928,6 +928,66 @@ def optimize_biquadratic( P, H, rest_vs, deformed_vs, x0, solve_for_rest_pose = 
 	else:
 		return converged, pack_W( W )
 
+def optimize_iterative_pca( P, H, row_mats, deformed_vs, x0, f_eps = None, x_eps = None, max_iter = None, f_zero_threshold = None, strategy = None, W_projection = None, z_strategy = None, mesh = None, **kwargs ):
+	
+	assert( len(row_mats) == len(deformed_vs) )
+
+	x = x0.copy()
+	
+	## Allocate for our system, rhs, and per-vertex solution
+	lh = np.zeros((15*P, 15*P))
+	rh = np.zeros(15*P)
+	Q = np.zeros( ( len( row_mats ), 12*P ) )
+	
+	from space_mapper import SpaceMapper
+	converged = False
+	
+	iterations = 0
+	try:
+		while True:
+			iterations += 1
+			print( "Starting iteration", iterations )
+		
+			pt, B = unpack(x,P)
+		
+			## Upper left of system
+			BBT = np.eye(12*P) - np.dot(B, np.dot( np.linalg.pinv(np.dot(B.T,B)), B.T))
+			lh[:12*P, :12*P] = BBT
+		
+			for i in range( len(row_mats) ): 
+				## Lagrange multipliers
+				vbar = row_mats[i]
+				lh[12*P:, :12*P] = vbar
+				lh[:12*P, 12*P:] = vbar.T
+				## Set the right-hand side
+				rh[:12*P] = np.dot( BBT, pt ).ravel()
+				rh[12*P:] = deformed_vs[i].ravel()
+			
+				## Solve for the new 12*P transformation for the vertex
+				Q[i] = np.linalg.solve(lh, rh)[:12*P]
+				# Q[i] = np.dot( np.linalg.pinv(lh), rh)[:12*P]
+		
+			mapper = SpaceMapper.Uncorrellated_Space( Q, dimension = B.shape[1] )
+			pt = mapper.Xavg_
+			B = mapper.V_[:H-1]
+			x = pack( pt.T, B.T )
+			print( "|p - p0|:", np.linalg.norm( pt.ravel() - unpack( x0,P )[0].ravel() ) )
+			print( "B angles with B0|:", ( B.T * unpack( x0,P )[1] ).sum(0) )
+			print( "|x - x0|:", np.linalg.norm( x - x0 ) )
+			print( "max( x - x0 ):", abs( x - x0 ).max() )
+			if np.allclose( x, x0 ):
+				print( "Terminated under threshold after iterations:", iterations )
+				converged = True
+				break
+			if iterations == max_iter:
+				print( "Terminated because of too many iterations:", iterations )
+				break
+			x0 = x.copy()
+	except KeyboardInterrupt:
+		print( "Terminated by KeyboardInterrupt." )
+	
+	return converged, x
+
 def optimize_laplacian( P, H, rest_mesh, deformed_vs, qs_data, qs_errors, qs_ssv, f_eps = None, x_eps = None, max_iter = None, f_zero_threshold = None, z_strategy = None ):
 	'''
 	Returns ( converged, final x ).
@@ -1201,7 +1261,7 @@ if __name__ == '__main__':
 	parser.add_argument('--ground-truth', '-GT', type=str, help='Ground truth data path.')
 	parser.add_argument('--recovery', '-R', type=float, help='Recovery test epsilon (default no recovery test).')
 	parser.add_argument('--strategy', '-S', type=str, choices = ['function', 'gradient', 'hessian', 'mixed', 'grassmann', 'pinv', 'pinv+ssv:skip', 'pinv+ssv:weighted', 'ssv:skip', 'ssv:weighted'], help='Strategy: function, gradient (default), hessian, mixed, grassmann (for energy B only), pinv and ssv (for energy biquadratic only).')
-	parser.add_argument('--energy', '-E', type=str, default='B', choices = ['B', 'cayley', 'B+cayley', 'B+B', 'cayley+cayley', 'biquadratic', 'biquadratic+B', 'biquadratic+handles', 'laplacian'], help='Energy: B (default), cayley, B+cayley, B+B, cayley+cayley, biquadratic, biquadratic+B, biquadratic+handles, laplacian.')
+	parser.add_argument('--energy', '-E', type=str, default='B', choices = ['B', 'cayley', 'B+cayley', 'B+B', 'cayley+cayley', 'biquadratic', 'biquadratic+B', 'biquadratic+handles', 'laplacian', 'ipca'], help='Energy: B (default), cayley, B+cayley, B+B, cayley+cayley, biquadratic, biquadratic+B, biquadratic+handles, laplacian, iterative pca.')
 	## UPDATE: type=bool does not do what we think it does. bool("False") == True.
 	##		   For more, see https://stackoverflow.com/questions/15008758/parsing-boolean-values-with-argparse
 	def str2bool(s): return {'true': True, 'false': False}[s.lower()]
@@ -1397,6 +1457,8 @@ if __name__ == '__main__':
 			qs_ssv = None
 			if args.fancy_init_ssv is not None: qs_ssv = np.loadtxt(args.fancy_init_ssv)
 			converged, x = optimize_laplacian( P, H, rest_mesh, deformed_vs, qs_data, qs_errors, qs_ssv, max_iter = args.max_iter, f_eps = args.f_eps, x_eps = args.x_eps, z_strategy = args.z_strategy )
+		elif args.energy == 'ipca':
+			converged, x = optimize_iterative_pca( P, H, all_R_mats, deformed_vs, x0, strategy = args.strategy, max_iter = args.max_iter, f_eps = args.f_eps, x_eps = args.x_eps, W_projection = args.W_projection, z_strategy = args.z_strategy )
 		else:
 			raise RuntimeError( "Unknown energy parameter: " + str(parser.energy) )
 		
