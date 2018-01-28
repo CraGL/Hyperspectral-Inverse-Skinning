@@ -473,6 +473,7 @@ def optimize_nullspace_directly(P, H, row_mats, deformed_vs, x0, strategy = None
 		# solution = scipy.optimize.minimize( f_point_distance_sum_and_gradient, x0, jac = True, hess = f_hess, method = 'Newton-CG', callback = show_progress, options={'disp':True} )
 		# solution = scipy.optimize.minimize( f_point_distance_sum_and_gradient, x0, jac = True, hess = f_hess, method = 'Newton-CG', callback = show_progress, options={'maxiter':max_iter, 'disp':True} )
 		solution = scipy.optimize.minimize( f_point_distance_sum_and_gradient, x0, jac = True, hess = f_hess_numeric, method = 'Newton-CG', callback = show_progress, options={'maxiter':max_iter, 'disp':True} )
+		# solution = scipy.optimize.minimize( f_point_distance_sum_and_gradient, x0, jac = True, hess = f_hess_numeric, method = 'trust-ncg', callback = show_progress, options={'maxiter':max_iter, 'disp':True} )
 	elif strategy == 'mixed':
 		## Mixed with quadratic for p:
 		x = x0.copy()
@@ -483,6 +484,23 @@ def optimize_nullspace_directly(P, H, row_mats, deformed_vs, x0, strategy = None
 			solution = scipy.optimize.minimize( f_point_distance_sum_and_gradient, x, jac = True, method = 'L-BFGS-B', callback = show_progress, options={'disp':True, 'maxiter': MAX_NONLINEAR_ITER} )
 			x = solution.x
 			if solution.success: break
+	elif strategy == 'newton':
+		iteration = 0
+		step = 0.1
+		try:
+			while True:
+				iteration += 1
+				x = x0 - step*np.linalg.solve( f_hess_numeric( x0 ), f_point_distance_sum_and_gradient( x0 )[1] )
+				show_progress( x )
+				if np.allclose( x, x0 ):
+					print( "Newton terminating after", iteration, "iterations because x change is small." )
+					break
+				if iteration == max_iter:
+					print( "Terminating because maximum iterations reached:", iteration )
+					break
+				x0 = x.copy()
+		except KeyboardInterrupt:
+			print( "Terminated by KeyboardInterrupt." )
 	elif strategy == 'grassmann':
 		## Mixed with grassmann projections
 		import flat_intersection_cayley_grassmann_gradients as grassmann
@@ -950,7 +968,7 @@ def optimize_biquadratic( P, H, rest_vs, deformed_vs, x0, solve_for_rest_pose = 
 	else:
 		return converged, pack_W( W )
 
-def optimize_iterative_pca( P, H, row_mats, deformed_vs, x0, f_eps = None, x_eps = None, max_iter = None, f_zero_threshold = None, strategy = None, W_projection = None, z_strategy = None, mesh = None, **kwargs ):
+def optimize_iterative_pca( P, H, row_mats, deformed_vs, x0, max_iter = None, strategy = None, **kwargs ):
 	
 	assert( len(row_mats) == len(deformed_vs) )
 
@@ -993,6 +1011,9 @@ def optimize_iterative_pca( P, H, row_mats, deformed_vs, x0, f_eps = None, x_eps
 			pt = mapper.Xavg_
 			B = mapper.V_[:H-1]
 			x = pack( pt.T, B.T )
+			if strategy == 'perfectp':
+				_, x = optimize_approximated_quadratic( P, H, row_mats, deformed_vs, x, max_iter = 1 )
+			error_recorder.add_error(x)
 			print( "|p - p0|:", np.linalg.norm( pt.ravel() - unpack( x0,P )[0].ravel() ) )
 			print( "B angles with B0|:", ( B.T * unpack( x0,P )[1] ).sum(0) )
 			print( "|x - x0|:", np.linalg.norm( x - x0 ) )
@@ -1282,7 +1303,7 @@ if __name__ == '__main__':
 	parser.add_argument('--handles', '-H', type=int, help='Number of handles.')
 	parser.add_argument('--ground-truth', '-GT', type=str, help='Ground truth data path.')
 	parser.add_argument('--recovery', '-R', type=float, help='Recovery test epsilon (default no recovery test).')
-	parser.add_argument('--strategy', '-S', type=str, choices = ['function', 'gradient', 'hessian', 'mixed', 'grassmann', 'pinv', 'pinv+ssv:skip', 'pinv+ssv:weighted', 'ssv:skip', 'ssv:weighted'], help='Strategy: function, gradient (default), hessian, mixed, grassmann (for energy B only), pinv and ssv (for energy biquadratic only).')
+	parser.add_argument('--strategy', '-S', type=str, choices = ['function', 'gradient', 'hessian', 'newton', 'mixed', 'grassmann', 'pinv', 'pinv+ssv:skip', 'pinv+ssv:weighted', 'ssv:skip', 'ssv:weighted', 'perfectp'], help='Strategy: function, gradient (default), hessian, newton, mixed, grassmann (for energy B only), pinv and ssv (for energy biquadratic only), perfectp (ipca only).')
 	parser.add_argument('--energy', '-E', type=str, default='B', choices = ['B', 'cayley', 'B+cayley', 'B+B', 'cayley+cayley', 'biquadratic', 'biquadratic+B', 'biquadratic+handles', 'laplacian', 'ipca'], help='Energy: B (default), cayley, B+cayley, B+B, cayley+cayley, biquadratic, biquadratic+B, biquadratic+handles, laplacian, iterative pca.')
 	## UPDATE: type=bool does not do what we think it does. bool("False") == True.
 	##		   For more, see https://stackoverflow.com/questions/15008758/parsing-boolean-values-with-argparse
