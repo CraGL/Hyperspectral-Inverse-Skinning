@@ -35,6 +35,7 @@ class ErrorRecorder:
 	energy=None
 	z_strategy=None
 	values=None
+	ground_truth=None
 	
 	def __init__(self):
 		self.values=[]
@@ -49,7 +50,7 @@ class ErrorRecorder:
 			B = cayley.B_from_Cayley_A( A, H )
 			x = pack( pt, B )
 		
-		rev_vertex_trans, vertex_dists = per_vertex_transformation(x, self.P, self.rest_vs, self.deformed_vs, z_strategy = self.z_strategy)
+		rev_vertex_trans = per_vertex_transformation(x, self.P, self.rest_vs, self.deformed_vs, z_strategy = self.z_strategy)
 		err = vertex_error(self.rest_vs, rev_vertex_trans, self.deformed_vs )
 		
 		print( "Added error: ", err )
@@ -949,6 +950,66 @@ def optimize_biquadratic( P, H, rest_vs, deformed_vs, x0, solve_for_rest_pose = 
 	else:
 		return converged, pack_W( W )
 
+def optimize_iterative_pca( P, H, row_mats, deformed_vs, x0, f_eps = None, x_eps = None, max_iter = None, f_zero_threshold = None, strategy = None, W_projection = None, z_strategy = None, mesh = None, **kwargs ):
+	
+	assert( len(row_mats) == len(deformed_vs) )
+
+	x = x0.copy()
+	
+	## Allocate for our system, rhs, and per-vertex solution
+	lh = np.zeros((15*P, 15*P))
+	rh = np.zeros(15*P)
+	Q = np.zeros( ( len( row_mats ), 12*P ) )
+	
+	from space_mapper import SpaceMapper
+	converged = False
+	
+	iterations = 0
+	try:
+		while True:
+			iterations += 1
+			print( "Starting iteration", iterations )
+		
+			pt, B = unpack(x,P)
+		
+			## Upper left of system
+			BBT = np.eye(12*P) - np.dot(B, np.dot( np.linalg.pinv(np.dot(B.T,B)), B.T))
+			lh[:12*P, :12*P] = BBT
+		
+			for i in range( len(row_mats) ): 
+				## Lagrange multipliers
+				vbar = row_mats[i]
+				lh[12*P:, :12*P] = vbar
+				lh[:12*P, 12*P:] = vbar.T
+				## Set the right-hand side
+				rh[:12*P] = np.dot( BBT, pt ).ravel()
+				rh[12*P:] = deformed_vs[i].ravel()
+			
+				## Solve for the new 12*P transformation for the vertex
+				Q[i] = np.linalg.solve(lh, rh)[:12*P]
+				# Q[i] = np.dot( np.linalg.pinv(lh), rh)[:12*P]
+		
+			mapper = SpaceMapper.Uncorrellated_Space( Q, dimension = B.shape[1] )
+			pt = mapper.Xavg_
+			B = mapper.V_[:H-1]
+			x = pack( pt.T, B.T )
+			print( "|p - p0|:", np.linalg.norm( pt.ravel() - unpack( x0,P )[0].ravel() ) )
+			print( "B angles with B0|:", ( B.T * unpack( x0,P )[1] ).sum(0) )
+			print( "|x - x0|:", np.linalg.norm( x - x0 ) )
+			print( "max( x - x0 ):", abs( x - x0 ).max() )
+			if np.allclose( x, x0 ):
+				print( "Terminated under threshold after iterations:", iterations )
+				converged = True
+				break
+			if iterations == max_iter:
+				print( "Terminated because of too many iterations:", iterations )
+				break
+			x0 = x.copy()
+	except KeyboardInterrupt:
+		print( "Terminated by KeyboardInterrupt." )
+	
+	return converged, x
+
 def optimize_laplacian( P, H, rest_mesh, deformed_vs, qs_data, qs_errors, qs_ssv, f_eps = None, x_eps = None, max_iter = None, f_zero_threshold = None, z_strategy = None ):
 	'''
 	Returns ( converged, final x ).
@@ -1177,7 +1238,6 @@ def per_vertex_transformation(x, P, rest_vs, deformed_vs, z_strategy = None):
 	import flat_intersection_biquadratic_gradients as biquadratic
 	
 	rev_vertex_transformations = []
-	vertex_dists = []
 
 	pt, B = unpack(x,P)
 	num_underconstrained = 0
@@ -1209,11 +1269,8 @@ def per_vertex_transformation(x, P, rest_vs, deformed_vs, z_strategy = None):
 #		assert abs( transformation.squeeze() - transformation2.squeeze() ).max() < 1e-7
 		
 		rev_vertex_transformations.append( transformation )
-		# vertex_dists.append( np.linalg.norm( np.dot( vbar, transformation ) - vprime ) )
-		v_transformed = np.dot( v, transformation.reshape( 4, -1 ) ).reshape( vprime.shape )
-		vertex_dists.append( np.linalg.norm( v_transformed - vprime ) )
 	
-	return np.array( rev_vertex_transformations ).squeeze(), np.array( vertex_dists )
+	return np.array( rev_vertex_transformations ).squeeze()
 	
 
 if __name__ == '__main__':
@@ -1226,7 +1283,7 @@ if __name__ == '__main__':
 	parser.add_argument('--ground-truth', '-GT', type=str, help='Ground truth data path.')
 	parser.add_argument('--recovery', '-R', type=float, help='Recovery test epsilon (default no recovery test).')
 	parser.add_argument('--strategy', '-S', type=str, choices = ['function', 'gradient', 'hessian', 'mixed', 'grassmann', 'pinv', 'pinv+ssv:skip', 'pinv+ssv:weighted', 'ssv:skip', 'ssv:weighted'], help='Strategy: function, gradient (default), hessian, mixed, grassmann (for energy B only), pinv and ssv (for energy biquadratic only).')
-	parser.add_argument('--energy', '-E', type=str, default='B', choices = ['B', 'cayley', 'B+cayley', 'B+B', 'cayley+cayley', 'biquadratic', 'biquadratic+B', 'biquadratic+handles', 'laplacian'], help='Energy: B (default), cayley, B+cayley, B+B, cayley+cayley, biquadratic, biquadratic+B, biquadratic+handles, laplacian.')
+	parser.add_argument('--energy', '-E', type=str, default='B', choices = ['B', 'cayley', 'B+cayley', 'B+B', 'cayley+cayley', 'biquadratic', 'biquadratic+B', 'biquadratic+handles', 'laplacian', 'ipca'], help='Energy: B (default), cayley, B+cayley, B+B, cayley+cayley, biquadratic, biquadratic+B, biquadratic+handles, laplacian, iterative pca.')
 	## UPDATE: type=bool does not do what we think it does. bool("False") == True.
 	##		   For more, see https://stackoverflow.com/questions/15008758/parsing-boolean-values-with-argparse
 	def str2bool(s): return {'true': True, 'false': False}[s.lower()]
@@ -1282,6 +1339,7 @@ if __name__ == '__main__':
 	error_recorder.deformed_vs = deformed_vs
 	error_recorder.z_strategy = args.z_strategy
 	error_recorder.csv_path = args.csv_path
+	error_recorder.ground_truth = args.ground_truth
 	
 	if args.energy != 'biquadratic':
 		all_flats = []
@@ -1421,15 +1479,16 @@ if __name__ == '__main__':
 			qs_ssv = None
 			if args.fancy_init_ssv is not None: qs_ssv = np.loadtxt(args.fancy_init_ssv)
 			converged, x = optimize_laplacian( P, H, rest_mesh, deformed_vs, qs_data, qs_errors, qs_ssv, max_iter = args.max_iter, f_eps = args.f_eps, x_eps = args.x_eps, z_strategy = args.z_strategy )
+		elif args.energy == 'ipca':
+			converged, x = optimize_iterative_pca( P, H, all_R_mats, deformed_vs, x0, strategy = args.strategy, max_iter = args.max_iter, f_eps = args.f_eps, x_eps = args.x_eps, W_projection = args.W_projection, z_strategy = args.z_strategy )
 		else:
 			raise RuntimeError( "Unknown energy parameter: " + str(parser.energy) )
 		
-		rev_vertex_trans, vertex_dists = per_vertex_transformation(x, P, rest_vs, deformed_vs, z_strategy = args.z_strategy)
+		rev_vertex_trans = per_vertex_transformation(x, P, rest_vs, deformed_vs, z_strategy = args.z_strategy)
 		
 		if error_test:
 			transformation_error = abs( rev_vertex_trans - gt_vertices )
 			print( "Largest, average and median transformation errors are: ", transformation_error.max(), transformation_error.mean(), np.median(transformation_error.ravel()) )
-			print( "Largest, average and median vertex errors are: ", vertex_dists.max(), vertex_dists.mean(), np.median(vertex_dists) )
 		
 		return rev_vertex_trans
 #		if ground_truth_path is None and converged:
