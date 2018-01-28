@@ -25,6 +25,11 @@ import autograd
 
 from flat_intersection import pack, unpack
 
+def repeated_block_diag_times_matrix( block, matrix ):
+	# return scipy.sparse.block_diag( [ block ]*( matrix.shape[0]//block.shape[1] ) ).dot( matrix )
+	# print( abs( scipy.sparse.block_diag( [ block ]*( matrix.shape[0]//block.shape[1] ) ).dot( matrix ) - numpy.dot( block, matrix.reshape( block.shape[1], -1, order='F' ) ).reshape( -1, matrix.shape[1], order='F' ) ).max() )
+	return np.dot( block, matrix.reshape( block.shape[1], -1, order='F' ) ).reshape( -1, matrix.shape[1], order='F' )
+
 def f( x, vbar, vprime, poses ):
 	v = vbar
 	w = vprime
@@ -74,6 +79,62 @@ def hess( *args ):
     # print( "finished one hessian slow" )
     return result
 
+def f_and_dfdp_and_dfdB_hand(p, B, vbar, vprime):
+	v = vbar
+	w = vprime
+	
+	## Speed this up! v is block diagonal.
+	# vB = np.dot( v, B )
+	vB = np.dot( v[0,:4], B.T.reshape( -1, 4 ).T ).reshape( B.shape[1], -1 ).T
+	# vp = np.dot( v,p )
+	vp = np.dot( v[0,:4], p.reshape( -1, 4 ).T ).ravel()
+	
+	S = np.dot( vB.T, vB )
+	u = ( vp - w ).reshape(-1,1)
+	R = np.dot( vB, np.linalg.inv(S) )
+	Q = np.dot( R, vB.T )
+	M = u - np.dot( Q, u )
+	# MuR = np.dot( np.dot( M, u.T ), R )
+	## Actually, M'*R is identically zero.
+	# uMR = np.dot( np.dot( u, M.T ), R )
+	assert len( u.shape ) == 2
+	assert len( M.shape ) == 2
+	
+	E = ( M * M ).sum()
+	
+	# dE/dp = 2*v'*M
+	gradp = 2 * np.dot( v.T, M )
+	
+	# dE/dB = - dE/dp * (u'*R)
+	gradB = np.dot( -gradp, np.dot( u.T, R ) )
+	# print( gradB )
+	
+	return E, gradp.squeeze(), gradB
+def dfdp_hand(p, B, vbar, vprime):
+	v = vbar
+	w = vprime
+	
+	## Speed this up! v is block diagonal.
+	# vB = np.dot( v, B )
+	vB = np.dot( v[0,:4], B.T.reshape( -1, 4 ).T ).reshape( B.shape[1], -1 ).T
+	# vp = np.dot( v,p )
+	vp = np.dot( v[0,:4], p.reshape( -1, 4 ).T ).ravel()
+	
+	S = np.dot( vB.T, vB )
+	u = ( vp - w ).reshape(-1,1)
+	R = np.dot( vB, np.linalg.inv(S) )
+	Q = np.dot( R, vB.T )
+	M = u - np.dot( Q, u )
+	# MuR = np.dot( np.dot( M, u.T ), R )
+	## Actually, M'*R is identically zero.
+	# uMR = np.dot( np.dot( u, M.T ), R )
+	assert len( u.shape ) == 2
+	assert len( M.shape ) == 2
+	
+	# dE/dp = 2*v'*M
+	gradp = 2 * np.dot( v.T, M )
+	return gradp.squeeze()
+
 def fAndGpAndHp_fast(p, B, vbar, vprime):
 	v = vbar
 	w = vprime
@@ -101,10 +162,17 @@ def fAndGpAndHp_fast(p, B, vbar, vprime):
 	assert(B_cols)
 	assert(w_rows == v_rows)
 	
-	vB = np.dot( v, B )
+	## Speed this up! v is block diagonal.
+	# vB = np.dot( v, B )
+	vB = repeated_block_diag_times_matrix( v[:1,:4], B )
+	
 	A = np.dot(np.dot(vB, np.linalg.inv(np.dot(vB.T,vB)) ), vB.T)
 	foo = np.eye( A.shape[0] ) - A
-	S = np.dot( foo, v )
+	# foo = -A
+	# foo[ np.diag_indices( A.shape[0] ) ] += 1.
+	# S = np.dot( foo, v )
+	S = repeated_block_diag_times_matrix( v[:1,:4].T, foo.T ).T
+	# print( "fast diff:", abs( S-S2 ).max() )
 	r = np.dot( foo, w )
 	Q = np.dot( S.T, S )
 	L = np.dot( S.T, r )
@@ -121,7 +189,11 @@ def dfdp( xp, xb, vbar, vprime, poses ):
 	p = xp.squeeze()
 	B = xb.reshape(-1,12*poses).T
 	
-	return fAndGpAndHp_fast( p, B, vbar, vprime )[1]
+	# result = fAndGpAndHp_fast( p, B, vbar, vprime )[1]
+	gradp_hand = dfdp_hand( p, B, vbar, vprime )
+	# print( 'gradp diff:', abs( gradp_hand - result ).max() )
+	# return result
+	return gradp_hand
 def dfdp2( xp, xb, vbar, vprime, poses ):
 	## Adapted from flat_intersection.unpack()
 	p = xp.squeeze()
@@ -184,6 +256,24 @@ def dfdB( xp, xb, vbar, vprime, poses):
 	## This matches pack()
 	return gradientB.T.ravel()
 
+def dfdB_hand( xp, xb, vbar, vprime, poses):
+	v = vbar
+	w = vprime
+	
+	p = xp.squeeze()
+	## Adapted from flat_intersection.unpack()
+	B = xb.reshape(-1,12*poses).T
+	
+	# other = dfdB_orig( xp, xb, vbar, vprime, poses )
+	
+	result = f_and_dfdp_and_dfdB_hand( p, B, vbar, vprime )[2]
+	# print( "MC:", other )
+	# print( "hand:", result.ravel() )
+	return result.T.ravel()
+
+dfdB_orig = dfdB
+dfdB = dfdB_hand
+
 dfdB2 = autograd.jacobian( dfdB, 1 )
 # dfdpdB = autograd.jacobian( dfdB, 0 )
 dfdpdB = autograd.jacobian( dfdp, 1 )
@@ -208,16 +298,17 @@ def hess_fast( x, vbar, vprime, poses ):
 hess = hess_fast
 
 def generateRandomData(P):
-	#np.random.seed(0)
-	handles = 2
+	np.random.seed(0)
+	handles = 3
 	B = np.random.randn(12*P, handles)
 	p = np.random.randn(12*P)
-	v = np.random.randn(3*P, 12*P)
+	# v = np.random.randn(3*P, 12*P)
+	v = np.kron( np.eye( 3*P ), np.append( np.random.randn(3), [1.] ) )
 	w = np.random.randn(3*P)
 	return B, p, v, w
 
 if __name__ == '__main__':
-	poses = 1
+	poses = 3
 	B, p, v, w = generateRandomData(poses)
 	x = pack( p, B )
 	
@@ -225,7 +316,7 @@ if __name__ == '__main__':
 	
 	functionValue = f( x, v, w, poses )
 	print('functionValue = ', functionValue)
-	hessValue = hess( x, v, w, poses )
+	hessValue = hess_slow( x, v, w, poses )
 	print( 'hessian shape:', hessValue.shape )
 	
 	f_fast, gp_fast, hp_fast = flat_intersection_direct_gradients.fAndGpAndHp_fast( p, B, v, w )

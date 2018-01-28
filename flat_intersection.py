@@ -319,6 +319,8 @@ def optimize_nullspace_directly(P, H, row_mats, deformed_vs, x0, strategy = None
 	
 	## To make function values comparable, we need to normalize.
 	normalization = normalization_factor_from_row_mats( row_mats )
+	# print( "===== Turning off function value normalization; watch termination thresholds! =====" )
+	# normalization = 1.
 	
 	def f_point_distance_sum(x):
 		dist = 0
@@ -361,7 +363,7 @@ def optimize_nullspace_directly(P, H, row_mats, deformed_vs, x0, strategy = None
 		return	f_point_distance_sum(x), f_point_distance_sum_gradient(x)
 		
 	from flat_intersection_direct_gradients import f_and_dfdp_and_dfdB, f_and_dfdp_and_dfdB_dumb, fAndGpAndHp_fast, d2f_dp2_dumb
-	def f_point_distance_sum_and_gradient(x):
+	def f_point_distance_sum_and_gradient(x, verbose = True):
 		pt, B = unpack(x,P)
 		pt = pt.squeeze()
 		
@@ -389,7 +391,7 @@ def optimize_nullspace_directly(P, H, row_mats, deformed_vs, x0, strategy = None
 			grad_p += gradj_p
 			grad_B += gradj_B
 		
-		print( "f:", f )
+		if verbose: print( "f:", f, "|grad p|:", np.linalg.norm(gradj_p), "|grad B|:", np.linalg.norm(grad_B) )
 		
 		return f * normalization, pack( grad_p * normalization, grad_B * normalization )
 	
@@ -403,6 +405,25 @@ def optimize_nullspace_directly(P, H, row_mats, deformed_vs, x0, strategy = None
 			vprime = vs.ravel()
 			vbar = row_mats[j]
 			hess += flat_intersection_hessians.hess( x, vbar, vprime, P )
+		
+		print( "Computing hessian finished." )
+		
+		return hess
+	
+	def f_hess_numeric(x):
+		import hessian
+		
+		print( "Computing hessian begins." )
+		
+		hess = hessian.hessian( x, grad = lambda x: f_point_distance_sum_and_gradient(x,verbose=False)[1] )
+		
+		'''
+		hess = np.zeros( ( len(x), len(x) ) )
+		for j, vs in enumerate(deformed_vs):
+			vprime = vs.ravel()
+			vbar = row_mats[j]
+			hess += flat_intersection_hessians.hess( x, vbar, vprime, P )
+		'''
 		
 		print( "Computing hessian finished." )
 		
@@ -449,7 +470,8 @@ def optimize_nullspace_directly(P, H, row_mats, deformed_vs, x0, strategy = None
 	elif strategy == 'hessian':
 		## Use the Hessian:
 		# solution = scipy.optimize.minimize( f_point_distance_sum_and_gradient, x0, jac = True, hess = f_hess, method = 'Newton-CG', callback = show_progress, options={'disp':True} )
-		solution = scipy.optimize.minimize( f_point_distance_sum_and_gradient, x0, jac = True, hess = f_hess, method = 'Newton-CG', callback = show_progress, options={'maxiter':max_iter, 'disp':True} )
+		# solution = scipy.optimize.minimize( f_point_distance_sum_and_gradient, x0, jac = True, hess = f_hess, method = 'Newton-CG', callback = show_progress, options={'maxiter':max_iter, 'disp':True} )
+		solution = scipy.optimize.minimize( f_point_distance_sum_and_gradient, x0, jac = True, hess = f_hess_numeric, method = 'Newton-CG', callback = show_progress, options={'maxiter':max_iter, 'disp':True} )
 	elif strategy == 'mixed':
 		## Mixed with quadratic for p:
 		x = x0.copy()
