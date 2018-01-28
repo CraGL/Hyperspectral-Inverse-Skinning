@@ -1409,12 +1409,12 @@ if __name__ == '__main__':
 			x = pack( p, B )
 			converged, x = optimize_biquadratic( P, H-1, all_R_mats, deformed_vs, x, strategy = args.strategy, max_iter = args.max_iter, f_eps = args.f_eps, x_eps = args.x_eps, W_projection = args.W_projection, z_strategy = args.z_strategy )
 		elif args.energy == 'biquadratic+B':
-			converged, x = optimize_biquadratic( P, H, all_R_mats, deformed_vs, x0, strategy = args.strategy, max_iter = args.max_iter, f_eps = args.f_eps, x_eps = args.x_eps, W_projection = args.W_projection, z_strategy = args.z_strategy )
+			converged, x = optimize_biquadratic( P, H, all_R_mats[:,0,:4], deformed_vs, x0, strategy = args.strategy, max_iter = args.max_iter, f_eps = args.f_eps, x_eps = args.x_eps, W_projection = args.W_projection, z_strategy = args.z_strategy )
 			for i in range(10):
 				print( "Now trying B for one iteration." )
-				converged, x = optimize_nullspace_directly(P, H, all_R_mats, deformed_vs, x, max_iter = 1)
+				converged, x = optimize_nullspace_directly(P, H, all_R_mats, deformed_vs, x, strategy = 'hessian', max_iter = 1)
 				print( "Now biquadratic again." )
-				converged, x = optimize_biquadratic( P, H, all_R_mats, deformed_vs, x, strategy = args.strategy, max_iter = args.max_iter, f_eps = args.f_eps, x_eps = args.x_eps, W_projection = args.W_projection, z_strategy = args.z_strategy )
+				converged, x = optimize_biquadratic( P, H, all_R_mats[:,0,:4], deformed_vs, x, strategy = args.strategy, max_iter = args.max_iter, f_eps = args.f_eps, x_eps = args.x_eps, W_projection = args.W_projection, z_strategy = args.z_strategy )
 		elif args.energy == 'laplacian':
 			qs_errors = None
 			if args.fancy_init_errors is not None: qs_errors = np.loadtxt(args.fancy_init_errors)

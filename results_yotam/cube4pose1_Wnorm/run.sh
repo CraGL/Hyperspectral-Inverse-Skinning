@@ -3,8 +3,8 @@
 OUTPUT_DIR=.
 ROOT_DIR="../.."
 
-REST_POSE="${ROOT_DIR}"/models/cube4/cube.obj
-OTHER_POSE_DIR="${ROOT_DIR}"/models/cube4/poses-1
+REST_POSE="${ROOT_DIR}"/models/cube.obj
+OTHER_POSE_DIR="${ROOT_DIR}"/models/cube
 
 INITIAL_GUESS_ARGS="--svd_threshold 1e-15 --transformation_threshold 1e-4 --version 0"
 FLAT_INTERSECTION_ARGS="--energy biquadratic --W-projection normalize -GT "${OTHER_POSE_DIR}" --error True --handles 4 --fancy-init "${OUTPUT_DIR}"/local_subspace_recover.txt"
