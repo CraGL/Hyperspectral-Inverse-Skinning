@@ -233,8 +233,10 @@ def f_and_dfdp_and_dfdA_matrixcalculus(p, A, v, w, handles, nullspace = False):
     assert(v_rows == w_rows)
     
     if nullspace:
-        vmag2 = np.dot( v[0,:4], v[0,:4] )
-        v = v / np.sqrt( vmag2 )
+        vmag = np.linalg.norm( v[0,:4] )
+        ## Normalize v and vprime
+        v = v / vmag
+        w = w / vmag
         w = np.dot( v.T, w )
         v = np.dot( v.T, v )
     
@@ -270,55 +272,58 @@ def f_and_dfdp_and_dfdA_matrixcalculus(p, A, v, w, handles, nullspace = False):
     return functionValue, gradientp, A_from_X( gradientA, handles )
 
 def f_and_dfdp_and_dfdA_hand(p, A, vbar, vprime, nullspace = False):
-	V = vbar
-	w = vprime
-	
-	if nullspace:
-		vmag2 = np.dot( V[0,:4], V[0,:4] )
-		V = V / np.sqrt( vmag2 )
-		w = np.dot( V.T, w )
-		V = np.dot( V.T, V )
-	
-	## Matrices computing the Cayley transform to obtain B in our energy expression.
-	F = np.dot( A.T, A )
-	I_F = np.eye(F.shape[0])
-	G = np.linalg.inv( I_F + F )
-	AG = np.dot( A, G )
-	B = np.zeros( ( F.shape[0] + A.shape[0], A.shape[1] ) )
-	ImFG = np.dot( I_F - F, G )
-	B[:F.shape[0]] = ImFG
-	B[F.shape[0]:] = 2*AG
-	
-	u = ( np.dot( V,p ) - w ).reshape(-1,1)
-	VB = np.dot( V, B )
-	S = np.dot( VB.T, VB )
-	R = np.dot( VB, np.linalg.inv(S) )
-	Q = np.dot( R, VB.T )
-	M = u - np.dot( Q, u )
-	# MuR = np.dot( np.dot( M, u.T ), R )
-	## Actually, M'*R is identically zero.
-	# uMR = np.dot( np.dot( u, M.T ), R )
-	assert len( u.shape ) == 2
-	assert len( M.shape ) == 2
-	
-	E = ( M * M ).sum()
-	
-	# dE/dp = 2*(v - Q*v)'*M
-	gradp = 2 * np.dot( ( V - np.dot( Q, V ) ).T, M )
-	
-	BBox = np.dot( gradp, np.dot( u.T, R ) )
-	K1 = B.copy()
-	K1[:F.shape[0]] = I_F + ImFG
-	K2 = np.zeros( ( F.shape[0] + A.shape[0], A.shape[0] ) )
-	K2[:F.shape[0]] = np.dot( K1[:F.shape[0]], A.T )
-	K2[F.shape[0]:] = 2*( np.dot( AG, A.T ) - np.eye(A.shape[0]) )
-	
-	# dE/dA = A*G*BBox.T*K1 + K2.T*BBox*G.T
-	gradAleft = np.dot( AG, np.dot( BBox.T, K1 ) )
-	gradAright = np.dot( K2.T, np.dot( BBox, G.T ) )
-	gradA = gradAleft + gradAright
-	
-	return E, gradp.squeeze(), gradA
+    V = vbar
+    w = vprime
+    
+    if nullspace:
+        vmag = np.linalg.norm( V[0,:4] )
+        ## Normalize v and vprime
+        V = V / vmag
+        w = w / vmag
+        w = np.dot( V.T, w )
+        V = np.dot( V.T, V )
+    
+    ## Matrices computing the Cayley transform to obtain B in our energy expression.
+    F = np.dot( A.T, A )
+    I_F = np.eye(F.shape[0])
+    G = np.linalg.inv( I_F + F )
+    AG = np.dot( A, G )
+    B = np.zeros( ( F.shape[0] + A.shape[0], A.shape[1] ) )
+    ImFG = np.dot( I_F - F, G )
+    B[:F.shape[0]] = ImFG
+    B[F.shape[0]:] = 2*AG
+    
+    u = ( np.dot( V,p ) - w ).reshape(-1,1)
+    VB = np.dot( V, B )
+    S = np.dot( VB.T, VB )
+    # print( 'S:', S )
+    R = np.dot( VB, np.linalg.inv(S) )
+    Q = np.dot( R, VB.T )
+    M = u - np.dot( Q, u )
+    # MuR = np.dot( np.dot( M, u.T ), R )
+    ## Actually, M'*R is identically zero.
+    # uMR = np.dot( np.dot( u, M.T ), R )
+    assert len( u.shape ) == 2
+    assert len( M.shape ) == 2
+    
+    E = ( M * M ).sum()
+    
+    # dE/dp = 2*(v - Q*v)'*M
+    gradp = 2 * np.dot( ( V - np.dot( Q, V ) ).T, M )
+    
+    BBox = np.dot( gradp, np.dot( u.T, R ) )
+    K1 = B.copy()
+    K1[:F.shape[0]] = I_F + ImFG
+    K2 = np.zeros( ( F.shape[0] + A.shape[0], A.shape[0] ) )
+    K2[:F.shape[0]] = np.dot( K1[:F.shape[0]], A.T )
+    K2[F.shape[0]:] = 2*( np.dot( AG, A.T ) - np.eye(A.shape[0]) )
+    
+    # dE/dA = A*G*BBox.T*K1 + K2.T*BBox*G.T
+    gradAleft = np.dot( AG, np.dot( BBox.T, K1 ) )
+    gradAright = np.dot( K2.T, np.dot( BBox, G.T ) )
+    gradA = gradAleft + gradAright
+    
+    return E, gradp.squeeze(), gradA
 
 def f_and_dfdp_and_Hfp(p, A, v, w, handles, nullspace = False):
     B = B_from_Cayley_A( A, handles )
@@ -326,8 +331,10 @@ def f_and_dfdp_and_Hfp(p, A, v, w, handles, nullspace = False):
     # print( B )
     
     if nullspace:
-        vmag2 = np.dot( v[0,:4], v[0,:4] )
-        v = v / np.sqrt( vmag2 )
+        vmag = np.linalg.norm( v[0,:4] )
+        ## Normalize v and vprime
+        v = v / vmag
+        w = w / vmag
         w = np.dot( v.T, w )
         v = np.dot( v.T, v )
     
@@ -395,10 +402,9 @@ def generateRandomData():
     w = np.random.randn(3*P)
     return p, A, v, w, P, handles
 
-def main():
+def test( nullspace = False ):
     global SKIP_CHECKS
     
-    nullspace = False
     print( "Using nullspace version:", nullspace )
     
     SKIP_CHECKS = False
@@ -450,6 +456,10 @@ def main():
     grad_err = scipy.optimize.check_grad( lambda x: f_gradf_packed(x)[0], f_packed_autograd, pack( p, A, poses, handles ) )
     print( "scipy.optimize.check_grad() error (autograd):", grad_err )
     '''
+
+def main():
+    test( nullspace = True )
+    test( nullspace = False )
 
 if __name__ == '__main__':
     main()

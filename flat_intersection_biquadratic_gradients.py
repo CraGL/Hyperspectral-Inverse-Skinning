@@ -89,9 +89,11 @@ def quadratic_for_z( W, v, vprime, nullspace = False ):
     vprime = vprime.squeeze()
     
     if nullspace:
-        vmag2 = np.dot( v.squeeze(), v.squeeze() )
-        ## Normalize v
-        v = v / np.sqrt( vmag2 )
+        assert len( v.ravel() ) == 4
+        vmag = np.linalg.norm( v.squeeze() )
+        ## Normalize v and vprime
+        v = v / vmag
+        vprime = vprime / vmag
         ## Multiply vprime on the left by v.T (v as a column vector)
         vprime = repeated_block_diag_times_matrix( v.T, vprime.reshape(-1,1) ).squeeze()
         ## v becomes nullspace projection
@@ -294,9 +296,11 @@ def linear_matrix_equation_for_W( v, vprime, z, nullspace = False ):
     ## Reshape v into a row matrix
     v = v.reshape(1,-1)
     if nullspace:
-        vmag2 = np.dot( v.squeeze(), v.squeeze() )
-        ## Normalize v
-        v = v / np.sqrt( vmag2 )
+        assert len( v.ravel() ) == 4
+        vmag = np.linalg.norm( v.squeeze() )
+        ## Normalize v and vprime
+        v = v / vmag
+        vprime = vprime / vmag
         ## Multiply vprime on the left by v.T (v as a column vector)
         vprime = repeated_block_diag_times_matrix( v.T, vprime.reshape(-1,1) )
         ## v becomes nullspace projection
@@ -476,15 +480,15 @@ def generateRandomData( poses = None, handles = None ):
     vprime = np.random.randn(3*poses)
     return W, v, V, vprime, poses, handles
 
-if __name__ == '__main__':
-    use_pseudoinverse = True
-    nullspace = False
+def test( use_pseudoinverse = True, nullspace = False ):
+    print( "Using pseudoinverse:", use_pseudoinverse )
+    print( "Using nullspace version:", nullspace )
     
     W, v, V, vprime, poses, handles = generateRandomData( poses = 2, handles = 5 )
     
     z, ssv, f = solve_for_z( W, v, vprime, nullspace = nullspace, return_energy = True, use_pseudoinverse = use_pseudoinverse )
     
-    import flat_intersection_direct_gradients_nullspace as flat_intersection_direct_gradients
+    import flat_intersection_direct_gradients
     f2, _, _ = flat_intersection_direct_gradients.f_and_dfdp_and_dfdB_hand( W[:,0], W[:,1:] - W[:,:1], V, vprime, nullspace = nullspace )
     
     print( 'function value:', f )
@@ -493,8 +497,8 @@ if __name__ == '__main__':
     
     A, B, Y = linear_matrix_equation_for_W( v, vprime, z, nullspace = nullspace )
     W_next = solve_for_W( [A], [B], [Y], use_pseudoinverse = use_pseudoinverse )
-    print( 'W:', W )
-    print( 'W from solve_for_W():', W_next )
+    print( 'W:', W[:2] )
+    print( 'W from solve_for_W():', W_next[:2] )
     # print( 'W from solve_for_W() column norms:', ( W_next*W_next ).sum(0) )
     print( '|W difference|:', abs( W - W_next ).max() )
     
@@ -504,3 +508,7 @@ if __name__ == '__main__':
     print( "If pack/unpack work, these should be zeros:" )
     print( abs( W - W2 ).max() )
     print( abs( x - x2 ).max() )
+
+if __name__ == '__main__':
+    test( use_pseudoinverse = True, nullspace = False )
+    test( use_pseudoinverse = True, nullspace = True )

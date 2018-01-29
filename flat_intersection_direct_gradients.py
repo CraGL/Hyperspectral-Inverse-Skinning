@@ -49,8 +49,10 @@ def f_and_dfdp_and_dfdB(p, B, vbar, vprime, nullspace = False):
 	assert(v_rows == w_rows)
 	
 	if nullspace:
-		vmag2 = np.dot( v[0,:4], v[0,:4] )
-		v = v / np.sqrt( vmag2 )
+		vmag = np.linalg.norm( v[0,:4] )
+		## Normalize v and vprime
+		v = v / vmag
+		w = w / vmag
 		w = np.dot( v.T, w )
 		v = np.dot( v.T, v )
 
@@ -93,11 +95,13 @@ def f_and_dfdp_and_dfdB_hand(p, B, vbar, vprime, nullspace = False):
 	v = v[:1,:4]
 	
 	if nullspace:
-		vmag2 = np.dot( v.squeeze(), v.squeeze() )
-		## Normalize v
-		v = v / np.sqrt( vmag2 )
+		assert len( v.ravel() ) == 4
+		vmag = np.linalg.norm( v.squeeze() )
+		## Normalize v and vprime
+		v = v / vmag
+		w = w / vmag
 		## Multiply w on the left by v.T
-		w = repeated_block_diag_times_matrix( v.T, vprime.reshape(-1,1) ).squeeze()
+		w = repeated_block_diag_times_matrix( v.T, w.reshape(-1,1) ).squeeze()
 		## v becomes nullspace projection
 		v = np.dot( v.T, v )
 	
@@ -139,8 +143,11 @@ def fAndGB(p, B, vbar, vprime, nullspace = False):
 	w = vprime
 	
 	if nullspace:
-		vmag2 = np.dot( v[0,:4], v[0,:4] )
-		v = v / np.sqrt( vmag2 )
+		vmag = np.linalg.norm( v[0,:4] )
+		## Normalize v and vprime
+		v = v / vmag
+		w = w / vmag
+		## Multiply on the left by v.T
 		w = np.dot( v.T, w )
 		v = np.dot( v.T, v )
 	
@@ -184,8 +191,11 @@ def fAndGp(p, B, vbar, vprime, nullspace = False):
 	w = vprime
 	
 	if nullspace:
-		vmag2 = np.dot( v[0,:4], v[0,:4] )
-		v = v / np.sqrt( vmag2 )
+		vmag = np.linalg.norm( v[0,:4] )
+		## Normalize v and vprime
+		v = v / vmag
+		w = w / vmag
+		## Multiply on the left by v.T
 		w = np.dot( v.T, w )
 		v = np.dot( v.T, v )
 	
@@ -232,8 +242,11 @@ def d2f_dp2_dumb( p, B, vbar, vprime, nullspace = False ):
 	w = vprime
 	
 	if nullspace:
-		vmag2 = np.dot( v[0,:4], v[0,:4] )
-		v = v / np.sqrt( vmag2 )
+		vmag = np.linalg.norm( v[0,:4] )
+		## Normalize v and vprime
+		v = v / vmag
+		w = w / vmag
+		## Multiply on the left by v.T
 		w = np.dot( v.T, w )
 		v = np.dot( v.T, v )
 
@@ -277,11 +290,13 @@ def fAndGpAndHp_fast(p, B, vbar, vprime, nullspace = False):
 	v = v[:1,:4]
 	
 	if nullspace:
-		vmag2 = np.dot( v.squeeze(), v.squeeze() )
-		## Normalize v
-		v = v / np.sqrt( vmag2 )
+		assert len( v.ravel() ) == 4
+		vmag = np.linalg.norm( v.squeeze() )
+		## Normalize v and vprime
+		v = v / vmag
+		w = w / vmag
 		## Multiply w on the left by v.T
-		w = repeated_block_diag_times_matrix( v.T, vprime.reshape(-1,1) ).squeeze()
+		w = repeated_block_diag_times_matrix( v.T, w.reshape(-1,1) ).squeeze()
 		## v becomes nullspace projection
 		v = np.dot( v.T, v )
 	
@@ -377,20 +392,19 @@ def unpack( X, poses ):
 
 	return point, B
 
-if __name__ == '__main__':
-	nullspace = True
+def test( nullspace = False ):
 	print( "Using nullspace version:", nullspace )
 	B, p, v, w, poses, handles = generateRandomData()
 	functionValue, gradientp, gradientB = f_and_dfdp_and_dfdB( p, B, v, w, nullspace = nullspace )
 	functionValue_dumb, gradientp_dumb, gradientB_dumb = f_and_dfdp_and_dfdB_dumb( p, B, v, w, nullspace = nullspace )
 	
 	print('functionValue = ', functionValue)
-	print('gradient p = ', gradientp)
-	print('gradient B = ', gradientB)
+	print('gradient p = ', gradientp[:2])
+	print('gradient B = ', gradientB[:2])
 	
 	print('functionValue_dumb = ', functionValue_dumb)
-	print('gradient p dumb = ', gradientp_dumb)
-	print('gradient B dumb = ', gradientB_dumb)
+	print('gradient p dumb = ', gradientp_dumb[:2])
+	print('gradient B dumb = ', gradientB_dumb[:2])
 	
 	print( "Function value matches if zero:", abs( functionValue - functionValue_dumb ) )
 	print( "gradient p matches if zero:", abs( gradientp - gradientp_dumb ).max() )
@@ -400,9 +414,9 @@ if __name__ == '__main__':
 	hp_dumb = d2f_dp2_dumb( p, B, v, w, nullspace = nullspace )
 	
 	print('functionValue_fast = ', f_fast)
-	print('gradient p fast = ', gp_fast )
-	print('hess p fast = ', hp_fast )
-	print('hess p dumb = ', hp_dumb )
+	print('gradient p fast = ', gp_fast[:2] )
+	print('hess p fast = ', hp_fast[:2] )
+	print('hess p dumb = ', hp_dumb[:2] )
 	
 	print( "Function value matches if zero:", abs( functionValue - f_fast ) )
 	print( "gradient p matches if zero:", abs( gradientp - gp_fast ).max() )
@@ -410,8 +424,8 @@ if __name__ == '__main__':
 	
 	f_hand, gradp_hand, gradB_hand = f_and_dfdp_and_dfdB_hand( p, B, v, w, nullspace = nullspace )
 	print( 'f hand = ', f_hand )
-	print( 'gradient p hand = ', gradp_hand )
-	print( 'gradient B hand = ', gradB_hand )
+	print( 'gradient p hand = ', gradp_hand[:2] )
+	print( 'gradient B hand = ', gradB_hand[:2] )
 	print( "Function value matches if zero:", abs( functionValue - f_hand ) )
 	print( "gradient p matches if zero:", abs( gradientp - gradp_hand ).max() )
 	print( "gradient B matches if zero:", abs( gradientB - gradB_hand ).max() )
@@ -425,6 +439,10 @@ if __name__ == '__main__':
 	import scipy.optimize
 	grad_err = scipy.optimize.check_grad( lambda x: f_gradf_packed(x)[0], lambda x: f_gradf_packed(x)[1], pack( p, B ) )
 	print( "scipy.optimize.check_grad() error:", grad_err )
+
+if __name__ == '__main__':
+	test( nullspace = True )
+	test( nullspace = False )
 
 ## f_and_dfdp_and_dfdB_hand() wins
 f_and_dfdp_and_dfdB = f_and_dfdp_and_dfdB_hand

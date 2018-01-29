@@ -60,8 +60,11 @@ def f( x, vbar, vprime, poses, nullspace = False ):
 	assert(w_rows == v_rows)
 	
 	if nullspace:
-		vmag2 = np.dot( v[0,:4], v[0,:4] )
-		v = v / np.sqrt( vmag2 )
+		vmag = np.linalg.norm( v[0,:4] )
+		## Normalize v and vprime
+		v = v / vmag
+		w = w / vmag
+		## Multiply on the left by v.T
 		w = np.dot( v.T, w )
 		v = np.dot( v.T, v )
 	
@@ -97,11 +100,13 @@ def dfdp_hand(p, B, vbar, vprime, nullspace = False):
 	v = v[:1,:4]
 	
 	if nullspace:
-		vmag2 = np.dot( v.squeeze(), v.squeeze() )
-		## Normalize v
-		v = v / np.sqrt( vmag2 )
+		assert len( v.ravel() ) == 4
+		vmag = np.linalg.norm( v.squeeze() )
+		## Normalize v and vprime
+		v = v / vmag
+		w = w / vmag
 		## Multiply w on the left by v.T
-		w = repeated_block_diag_times_matrix( v.T, vprime.reshape(-1,1) ).squeeze()
+		w = repeated_block_diag_times_matrix( v.T, w.reshape(-1,1) ).squeeze()
 		## v becomes nullspace projection
 		v = np.dot( v.T, v )
 	
@@ -155,8 +160,11 @@ def dfdB( xp, xb, vbar, vprime, poses, nullspace = False ):
 	w = vprime
 	
 	if nullspace:
-		vmag2 = np.dot( v[0,:4], v[0,:4] )
-		v = v / np.sqrt( vmag2 )
+		vmag = np.linalg.norm( v[0,:4] )
+		## Normalize v and vprime
+		v = v / vmag
+		w = w / vmag
+		## Multiply on the left by v.T
 		w = np.dot( v.T, w )
 		v = np.dot( v.T, v )
 	
