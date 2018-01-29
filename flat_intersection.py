@@ -533,6 +533,8 @@ def optimize_nullspace_cayley(P, H, row_mats, deformed_vs, x0, strategy = None, 
 
 	## To make function values comparable, we need to normalize.
 	normalization = normalization_factor_from_row_mats( row_mats )
+	# print( "===== Turning off function value normalization; watch termination thresholds! =====" )
+	# normalization = 1.
 	
 	if True:
 		## This one is better. Fewer degrees of freedom.
@@ -551,7 +553,7 @@ def optimize_nullspace_cayley(P, H, row_mats, deformed_vs, x0, strategy = None, 
 	## start from random
 	# x0 = np.random.random(len(x0))
 	
-	def f_point_distance_sum_and_gradient(x):
+	def f_point_distance_sum_and_gradient(x, verbose = True):
 		pt, A = cayley.unpack( x, P, H )
 		pt = pt.squeeze()
 		
@@ -568,9 +570,28 @@ def optimize_nullspace_cayley(P, H, row_mats, deformed_vs, x0, strategy = None, 
 			grad_p += gradj_p
 			grad_A += gradj_A
 		
-		print( "f:", f )
+		if verbose: print( "f:", f, "|grad p|:", np.linalg.norm(gradj_p), "|grad A|:", np.linalg.norm(grad_A) )
 		
 		return f * normalization, cayley.pack( grad_p * normalization, grad_A * normalization, P, H )
+	
+	def f_hess_numeric(x):
+		import hessian
+		
+		print( "Computing hessian begins." )
+		
+		hess = hessian.hessian( x, grad = lambda x: f_point_distance_sum_and_gradient(x,verbose=False)[1] )
+		
+		'''
+		hess = np.zeros( ( len(x), len(x) ) )
+		for j, vs in enumerate(deformed_vs):
+			vprime = vs.ravel()
+			vbar = row_mats[j]
+			hess += flat_intersection_hessians.hess( x, vbar, vprime, P )
+		'''
+		
+		print( "Computing hessian finished." )
+		
+		return hess
 	
 	## Print the initial function.
 	print( "f_point_distance_sum_and_gradient value at x0:", f_point_distance_sum_and_gradient( x0 )[0] )
@@ -590,6 +611,9 @@ def optimize_nullspace_cayley(P, H, row_mats, deformed_vs, x0, strategy = None, 
 		# solution = scipy.optimize.minimize( f_point_distance_sum_and_gradient, x0, jac = True, method = 'CG', callback = show_progress, options={'disp':True} )
 		solution = scipy.optimize.minimize( f_point_distance_sum_and_gradient, x0, jac = True, method = 'BFGS', callback = show_progress, options={'maxiter':max_iter,'disp':True} )
 		# solution = scipy.optimize.minimize( f_point_distance_sum_and_gradient, x0, jac = True, callback = show_progress, options={'disp':True} )
+	elif strategy == 'hessian':
+		## Use the Hessian:
+		solution = scipy.optimize.minimize( f_point_distance_sum_and_gradient, x0, jac = True, hess = f_hess_numeric, method = 'Newton-CG', callback = show_progress, options={'maxiter':max_iter, 'disp':True} )
 	else:
 		raise RuntimeError( "Unknown strategy: " + str(strategy) )
 	
