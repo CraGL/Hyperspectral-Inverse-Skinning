@@ -74,15 +74,24 @@ def f_and_dfdp_and_dfdB(p, B, vbar, vprime):
 	
 	return functionValue, gradientp, gradientB 
 
+def repeated_block_diag_times_matrix( block, matrix ):
+	# return scipy.sparse.block_diag( [ block ]*( matrix.shape[0]//block.shape[1] ) ).dot( matrix )
+	# print( abs( scipy.sparse.block_diag( [ block ]*( matrix.shape[0]//block.shape[1] ) ).dot( matrix ) - numpy.dot( block, matrix.reshape( block.shape[1], -1, order='F' ) ).reshape( -1, matrix.shape[1], order='F' ) ).max() )
+	return np.dot( block, matrix.reshape( block.shape[1], -1, order='F' ) ).reshape( -1, matrix.shape[1], order='F' )
+
 def f_and_dfdp_and_dfdB_hand(p, B, vbar, vprime):
 	v = vbar
 	w = vprime
 	
 	## Speed this up! v is block diagonal.
 	# vB = np.dot( v, B )
-	vB = np.dot( v[0,:4], B.T.reshape( -1, 4 ).T ).reshape( B.shape[1], -1 ).T
+	# vB = np.dot( v[0,:4], B.T.reshape( -1, 4 ).T ).reshape( B.shape[1], -1 ).T
+	vB = repeated_block_diag_times_matrix( v[:1,:4], B )
+	# print( 'vB:', abs( vB - vB2 ).max() )
 	# vp = np.dot( v,p )
-	vp = np.dot( v[0,:4], p.reshape( -1, 4 ).T ).ravel()
+	# vp = np.dot( v[0,:4], p.reshape( -1, 4 ).T ).ravel()
+	vp = repeated_block_diag_times_matrix( v[:1,:4], p.reshape( -1,1 ) ).squeeze()
+	# print( 'vp:', abs( vp - vp2 ).max() )
 	
 	S = np.dot( vB.T, vB )
 	u = ( vp - w ).reshape(-1,1)
@@ -98,7 +107,9 @@ def f_and_dfdp_and_dfdB_hand(p, B, vbar, vprime):
 	E = ( M * M ).sum()
 	
 	# dE/dp = 2*v'*M
-	gradp = 2 * np.dot( v.T, M )
+	# gradp = 2 * np.dot( v.T, M )
+	gradp = 2 * repeated_block_diag_times_matrix( v[:1,:4].T, M )
+	# print( 'gradp:', abs( gradp - gradp2 ).max() )
 	
 	# dE/dB = - dE/dp * (u'*R)
 	gradB = np.dot( -gradp, np.dot( u.T, R ) )
