@@ -22,7 +22,7 @@ from __future__ import division, print_function, absolute_import
 	
 import numpy as np
  
-def f_and_dfdp_and_dfdB(p, B, vbar, vprime):
+def f_and_dfdp_and_dfdB(p, B, vbar, vprime, nullspace = False):
 	v = vbar
 	w = vprime
 	
@@ -47,6 +47,12 @@ def f_and_dfdp_and_dfdB(p, B, vbar, vprime):
 	assert(B_rows == p_rows == v_cols)
 	assert(B_cols)
 	assert(v_rows == w_rows)
+	
+	if nullspace:
+		vmag2 = np.dot( v[0,:4], v[0,:4] )
+		v = v / np.sqrt( vmag2 )
+		w = np.dot( v.T, w )
+		v = np.dot( v.T, v )
 
 	## 3p-by-handles = 3p-by-12p * 12p-by-handles
 	vB = np.dot(v, B)
@@ -79,18 +85,30 @@ def repeated_block_diag_times_matrix( block, matrix ):
 	# print( abs( scipy.sparse.block_diag( [ block ]*( matrix.shape[0]//block.shape[1] ) ).dot( matrix ) - numpy.dot( block, matrix.reshape( block.shape[1], -1, order='F' ) ).reshape( -1, matrix.shape[1], order='F' ) ).max() )
 	return np.dot( block, matrix.reshape( block.shape[1], -1, order='F' ) ).reshape( -1, matrix.shape[1], order='F' )
 
-def f_and_dfdp_and_dfdB_hand(p, B, vbar, vprime):
+def f_and_dfdp_and_dfdB_hand(p, B, vbar, vprime, nullspace = False):
 	v = vbar
 	w = vprime
+	
+	## Make v a 1-by-4 row matrix
+	v = v[:1,:4]
+	
+	if nullspace:
+		vmag2 = np.dot( v.squeeze(), v.squeeze() )
+		## Normalize v
+		v = v / np.sqrt( vmag2 )
+		## Multiply w on the left by v.T
+		w = repeated_block_diag_times_matrix( v.T, vprime.reshape(-1,1) ).squeeze()
+		## v becomes nullspace projection
+		v = np.dot( v.T, v )
 	
 	## Speed this up! v is block diagonal.
 	# vB = np.dot( v, B )
 	# vB = np.dot( v[0,:4], B.T.reshape( -1, 4 ).T ).reshape( B.shape[1], -1 ).T
-	vB = repeated_block_diag_times_matrix( v[:1,:4], B )
+	vB = repeated_block_diag_times_matrix( v, B )
 	# print( 'vB:', abs( vB - vB2 ).max() )
 	# vp = np.dot( v,p )
 	# vp = np.dot( v[0,:4], p.reshape( -1, 4 ).T ).ravel()
-	vp = repeated_block_diag_times_matrix( v[:1,:4], p.reshape( -1,1 ) ).squeeze()
+	vp = repeated_block_diag_times_matrix( v, p.reshape( -1,1 ) ).squeeze()
 	# print( 'vp:', abs( vp - vp2 ).max() )
 	
 	S = np.dot( vB.T, vB )
@@ -108,7 +126,7 @@ def f_and_dfdp_and_dfdB_hand(p, B, vbar, vprime):
 	
 	# dE/dp = 2*v'*M
 	# gradp = 2 * np.dot( v.T, M )
-	gradp = 2 * repeated_block_diag_times_matrix( v[:1,:4].T, M )
+	gradp = 2 * repeated_block_diag_times_matrix( v.T, M )
 	# print( 'gradp:', abs( gradp - gradp2 ).max() )
 	
 	# dE/dB = - dE/dp * (u'*R)
@@ -116,9 +134,15 @@ def f_and_dfdp_and_dfdB_hand(p, B, vbar, vprime):
 	
 	return E, gradp.squeeze(), gradB
 
-def fAndGB(p, B, vbar, vprime):
+def fAndGB(p, B, vbar, vprime, nullspace = False):
 	v = vbar
 	w = vprime
+	
+	if nullspace:
+		vmag2 = np.dot( v[0,:4], v[0,:4] )
+		v = v / np.sqrt( vmag2 )
+		w = np.dot( v.T, w )
+		v = np.dot( v.T, v )
 	
 	assert(type(B) == np.ndarray)
 	dim = B.shape
@@ -155,9 +179,15 @@ def fAndGB(p, B, vbar, vprime):
 
 	return functionValue, gradient
 
-def fAndGp(p, B, vbar, vprime):
+def fAndGp(p, B, vbar, vprime, nullspace = False):
 	v = vbar
 	w = vprime
+	
+	if nullspace:
+		vmag2 = np.dot( v[0,:4], v[0,:4] )
+		v = v / np.sqrt( vmag2 )
+		w = np.dot( v.T, w )
+		v = np.dot( v.T, v )
 	
 	assert(type(B) == np.ndarray)
 	dim = B.shape
@@ -189,17 +219,23 @@ def fAndGp(p, B, vbar, vprime):
 
 	return functionValue, gradient
 	
-def f_and_dfdp_and_dfdB_dumb( p, B, vbar, vprime ):
-	f, dp = fAndGp( p, B, vbar, vprime )
-	f2, dB = fAndGB( p, B, vbar, vprime )
+def f_and_dfdp_and_dfdB_dumb( p, B, vbar, vprime, nullspace = False ):
+	f, dp = fAndGp( p, B, vbar, vprime, nullspace = nullspace )
+	f2, dB = fAndGB( p, B, vbar, vprime, nullspace = nullspace )
 	
 	assert abs( f - f2 ) < 1e-10
 	
 	return f, dp, dB
 	
-def d2f_dp2_dumb( p, B, vbar, vprime ):
+def d2f_dp2_dumb( p, B, vbar, vprime, nullspace = False ):
 	v = vbar
 	w = vprime
+	
+	if nullspace:
+		vmag2 = np.dot( v[0,:4], v[0,:4] )
+		v = v / np.sqrt( vmag2 )
+		w = np.dot( v.T, w )
+		v = np.dot( v.T, v )
 
 	assert(type(B) == np.ndarray)
 	dim = B.shape
@@ -233,9 +269,15 @@ def d2f_dp2_dumb( p, B, vbar, vprime ):
 
 	return hessian
 	
-def fAndGpAndHp_fast(p, B, vbar, vprime):
+def fAndGpAndHp_fast(p, B, vbar, vprime, nullspace = False):
 	v = vbar
 	w = vprime
+	
+	if nullspace:
+		vmag2 = np.dot( v[0,:4], v[0,:4] )
+		v = v / np.sqrt( vmag2 )
+		w = np.dot( v.T, w )
+		v = np.dot( v.T, v )
 	
 	assert(type(B) == np.ndarray)
 	dim = B.shape
@@ -282,7 +324,7 @@ def generateRandomData():
 	assert 3*P >= handles
 	B = np.random.randn(12*P, handles)
 	p = np.random.randn(12*P)
-	v = np.kron( np.eye( 3*P ), np.append( np.random.randn(3), [1.] ) )
+	v = np.kron( np.eye( 3*P ), np.append( np.random.randn(3), [1.] ).reshape(1,-1) )
 	w = np.random.randn(3*P)
 	return B, p, v, w, P, handles
 
@@ -314,9 +356,11 @@ def unpack( X, poses ):
 	return point, B
 
 if __name__ == '__main__':
+	nullspace = True
+	print( "Using nullspace version:", nullspace )
 	B, p, v, w, poses, handles = generateRandomData()
-	functionValue, gradientp, gradientB = f_and_dfdp_and_dfdB(p, B, v, w)
-	functionValue_dumb, gradientp_dumb, gradientB_dumb = f_and_dfdp_and_dfdB_dumb(p, B, v, w)
+	functionValue, gradientp, gradientB = f_and_dfdp_and_dfdB( p, B, v, w, nullspace = nullspace )
+	functionValue_dumb, gradientp_dumb, gradientB_dumb = f_and_dfdp_and_dfdB_dumb( p, B, v, w, nullspace = nullspace )
 	
 	print('functionValue = ', functionValue)
 	print('gradient p = ', gradientp)
@@ -330,8 +374,8 @@ if __name__ == '__main__':
 	print( "gradient p matches if zero:", abs( gradientp - gradientp_dumb ).max() )
 	print( "gradient B matches if zero:", abs( gradientB - gradientB_dumb ).max() )
 	
-	f_fast, gp_fast, hp_fast = fAndGpAndHp_fast( p, B, v, w )
-	hp_dumb = d2f_dp2_dumb( p, B, v, w )
+	f_fast, gp_fast, hp_fast = fAndGpAndHp_fast( p, B, v, w, nullspace = nullspace )
+	hp_dumb = d2f_dp2_dumb( p, B, v, w, nullspace = nullspace )
 	
 	print('functionValue_fast = ', f_fast)
 	print('gradient p fast = ', gp_fast )
@@ -342,7 +386,7 @@ if __name__ == '__main__':
 	print( "gradient p matches if zero:", abs( gradientp - gp_fast ).max() )
 	print( "hess p matches if zero:", abs( hp_dumb - hp_fast ).max() )
 	
-	f_hand, gradp_hand, gradB_hand = f_and_dfdp_and_dfdB_hand(p, B, v, w)
+	f_hand, gradp_hand, gradB_hand = f_and_dfdp_and_dfdB_hand( p, B, v, w, nullspace = nullspace )
 	print( 'f hand = ', f_hand )
 	print( 'gradient p hand = ', gradp_hand )
 	print( 'gradient B hand = ', gradB_hand )
@@ -353,7 +397,7 @@ if __name__ == '__main__':
 	def f_gradf_packed( x ):
 		xp, xB = unpack( x, poses )
 		xp = xp.squeeze()
-		val, gradp, gradB = f_and_dfdp_and_dfdB( xp, xB, v, w )
+		val, gradp, gradB = f_and_dfdp_and_dfdB( xp, xB, v, w, nullspace = nullspace )
 		grad = pack( gradp, gradB )
 		return val, grad
 	import scipy.optimize
