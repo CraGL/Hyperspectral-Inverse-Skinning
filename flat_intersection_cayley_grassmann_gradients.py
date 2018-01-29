@@ -372,7 +372,8 @@ def generateRandomData():
     A = A_from_non_Cayley_B( B )
     print( "This should have", handles-1, "non-zeros:", np.linalg.svd( np.hstack([ B_from_Cayley_A( A ), B ]), compute_uv=False ) )
     p = np.random.randn(12*P)
-    v = np.random.randn(3*P, 12*P)
+    # v = np.random.randn(3*P, 12*P)
+    v = np.kron( np.eye( 3*P ), np.append( np.random.randn(3), [1.] ).reshape(1,-1) )
     w = np.random.randn(3*P)
     return p, A, v, w, P, handles
 
@@ -400,6 +401,7 @@ def main():
     print( 'gradient A:', gradA )
     print( 'hand gradient A:', gradA_hand )
     print( '|hand gradient A difference| max:', abs( gradA - gradA_hand ).max() )
+    print( "(It's only important that the check_grad() error below is zero.)" )
     
     x = pack( p, A, poses, handles )
     p2, A2 = unpack( x, poses, handles )

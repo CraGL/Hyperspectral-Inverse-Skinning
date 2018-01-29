@@ -303,7 +303,7 @@ def generateRandomData(P):
 	B = np.random.randn(12*P, handles)
 	p = np.random.randn(12*P)
 	# v = np.random.randn(3*P, 12*P)
-	v = np.kron( np.eye( 3*P ), np.append( np.random.randn(3), [1.] ) )
+	v = np.kron( np.eye( 3*P ), np.append( np.random.randn(3), [1.] ).reshape(1,-1) )
 	w = np.random.randn(3*P)
 	return B, p, v, w
 
