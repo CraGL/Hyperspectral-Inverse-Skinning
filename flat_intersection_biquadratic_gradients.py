@@ -33,6 +33,23 @@ T is a 3px3 matrix
 b is a 3p-vector
 v id a 3p-vector
 
+
+Another derivation for W and z that is general enough to handle the nullspace version.
+
+E = | A W z - R |^2 = M : M
+
+A = v.T v / |v|^2 (or v)
+R = v.T/|v| vprime (or vprime)
+
+dE = 2M : dM
+dM = A dW z + A W dz
+
+dE = 2M : ( A dW z + A W dz )
+   = 2 * A.T * M * z.T : dW + 2 * (A*W).T * M : dz
+   = 2 * A.T * (A W z - R ) * z.T : dW + 2 * (A*W).T * (A W z - R ) : dz
+   = 2 * [ A.T*A * W * z * z.T : dW - A.T * R * z.T : dW ]
+     + 2 * [ (A*W).T * (A W) z - (A*W).T * R ) : dz
+
 The generated code is provided"as is" without warranty of any kind.
 """
 
@@ -52,32 +69,50 @@ def unpack( x, poses, handles ):
 def pack( W, poses, handles ):
     return W.ravel()
 
-def quadratic_for_z( W, v, vprime ):
+def repeated_block_diag_times_matrix( block, matrix ):
+    # return scipy.sparse.block_diag( [ block ]*( matrix.shape[0]//block.shape[1] ) ).dot( matrix )
+    # print( abs( scipy.sparse.block_diag( [ block ]*( matrix.shape[0]//block.shape[1] ) ).dot( matrix ) - numpy.dot( block, matrix.reshape( block.shape[1], -1, order='F' ) ).reshape( -1, matrix.shape[1], order='F' ) ).max() )
+    return np.dot( block, matrix.reshape( block.shape[1], -1, order='F' ) ).reshape( -1, matrix.shape[1], order='F' )
+
+def quadratic_for_z( W, v, vprime, nullspace = False ):
     '''
     Given:
-    	W: The 12*P-by-handles array
-    	v: an array [ x y z 1 ]
-    	vprime: a 3*P array of all deformed poses
+        W: The 12*P-by-handles array
+        v: an array [ x y z 1 ]
+        vprime: a 3*P array of all deformed poses
     
     Returns a quadratic expression ( Q, L, C ) for the energy in terms of `z`:
         energy = np.dot( np.dot( z, Q ), z ) + np.dot( L, z ) + C
     '''
     
-    v = v.squeeze()
+    v = v.reshape(1,-1)
     vprime = vprime.squeeze()
     
+    if nullspace:
+        vmag2 = np.dot( v.squeeze(), v.squeeze() )
+        ## Normalize v
+        v = v / np.sqrt( vmag2 )
+        ## Multiply vprime on the left by v.T (v as a column vector)
+        vprime = repeated_block_diag_times_matrix( v.T, vprime.reshape(-1,1) ).squeeze()
+        ## v becomes nullspace projection
+        v = np.dot( v.T, v )
+    
     assert len( W.shape ) == 2
-    assert v.shape == (4,)
+    assert len( v.shape ) == 2
+    assert v.shape[0] == (4 if nullspace else 1)
+    assert v.shape[1] == 4
     assert len( vprime.shape ) == 1
     assert W.shape[0] % 12 == 0
     assert vprime.shape[0] % 3 == 0
-    assert vprime.shape[0]*4 == W.shape[0]
+    assert vprime.shape[0]*(1 if nullspace else 4) == W.shape[0]
     
-    # V = np.kron( np.identity(vprime.shape[0]), v.reshape(1,-1) )
+    # V = np.kron( np.identity(vprime.shape[0]), v )
     # VW = np.dot( V, W )
     # abs( np.dot( v, W.T.reshape( -1, 4 ).T ).reshape( W.shape[1], -1 ).T - V.dot(W) ).max()
     
-    VW = np.dot( v, W.T.reshape( -1, 4 ).T ).reshape( W.shape[1], -1 ).T
+    # VW = np.dot( v, W.T.reshape( -1, 4 ).T ).reshape( W.shape[1], -1 ).T
+    VW = repeated_block_diag_times_matrix( v, W )
+    # print( 'VW:', abs( VW-VW2 ).max() )
     
     Q = np.dot( VW.T, VW )
     L = -2.0*np.dot( vprime, VW )
@@ -85,8 +120,8 @@ def quadratic_for_z( W, v, vprime ):
     
     return Q, L, C
 
-def solve_for_z( W, v, vprime, return_energy = False, use_pseudoinverse = True, strategy = None, **kwargs ):
-    Q, L, C = quadratic_for_z( W, v, vprime )
+def solve_for_z( W, v, vprime, nullspace = False, return_energy = False, use_pseudoinverse = True, strategy = None, **kwargs ):
+    Q, L, C = quadratic_for_z( W, v, vprime, nullspace = nullspace )
     
     # sv = np.linalg.svd( Q, compute_uv = False )
     # smallest_singular_value = sv[-1]
@@ -173,7 +208,7 @@ def solve_for_z( W, v, vprime, return_energy = False, use_pseudoinverse = True, 
     else:
         return z, smallest_singular_value
 
-def quadratic_for_v( W, z, vprime ):
+def quadratic_for_v( W, z, vprime, nullspace = False ):
     '''
     Returns a quadratic expression ( Q, L, C ) for the energy in terms of the 3-vector
     `v`, the rest pose position which can be converted to V bar via:
@@ -184,6 +219,9 @@ def quadratic_for_v( W, z, vprime ):
     The quadratic expression returned is:
         energy = np.dot( np.dot( v[:3], Q ), v[:3] ) + np.dot( L, v[:3] ) + C
     '''
+    
+    if nullspace:
+        raise NotImplementedError( "solving for nullspace v is not implemented." )
     
     z = z.squeeze()
     vprime = vprime.squeeze()
@@ -209,8 +247,8 @@ def quadratic_for_v( W, z, vprime ):
     
     return Q, L, C
 
-def solve_for_v( W, z, vprime, return_energy = False, use_pseudoinverse = False ):
-    Q, L, C = quadratic_for_v( W, z, vprime )
+def solve_for_v( W, z, vprime, nullspace = False, return_energy = False, use_pseudoinverse = False ):
+    Q, L, C = quadratic_for_v( W, z, vprime, nullspace = nullspace )
     
     if use_pseudoinverse:
         v = np.dot( np.linalg.pinv(Q), -0.5*L )
@@ -231,7 +269,7 @@ def solve_for_v( W, z, vprime, return_energy = False, use_pseudoinverse = False 
     else:
         return V
 
-def linear_matrix_equation_for_W( v, vprime, z ):
+def linear_matrix_equation_for_W( v, vprime, z, nullspace = False ):
     '''
     Returns (A, B, Y) to compute the gradient of the energy in terms of W
     in the following linear matrix equation:
@@ -253,12 +291,22 @@ def linear_matrix_equation_for_W( v, vprime, z ):
     # A = V'*V = ( I_3poses kron [v 1] )'*( I_3poses kron [v 1] ) = ( I_3poses kron [v 1]' )*( I_3poses kron [v 1] ) = I_3poses kron ( [v 1]'*[v 1] )
     # B' = B = z*z' = z kron z' = z kron z'
     # A kron B' = ( I_3poses kron ( [v 1]'*[v 1] ) ) kron ( z kron z' ) = I_3poses kron( ( [v 1]'*[v 1] ) kron ( z*z' ) )
+    ## Reshape v into a row matrix
     v = v.reshape(1,-1)
-    A = np.outer( v.T, v ) #, np.dot( V.T, V )
+    if nullspace:
+        vmag2 = np.dot( v.squeeze(), v.squeeze() )
+        ## Normalize v
+        v = v / np.sqrt( vmag2 )
+        ## Multiply vprime on the left by v.T (v as a column vector)
+        vprime = repeated_block_diag_times_matrix( v.T, vprime.reshape(-1,1) )
+        ## v becomes nullspace projection
+        v = np.dot( v.T, v )
+    A = np.dot( v.T, v ) #, np.dot( V.T, V )
     B = np.dot( z, z.T )
     ## We can also get simplify the block diagonal V multiplication.
     # Y = np.dot( np.dot( V.T, -vprime ), z.T )
-    Y = np.dot( np.dot( (-v).T, vprime.T ).T.reshape(-1,1), z.T )
+    # Y = np.dot( np.dot( (-v).T, vprime.T ).T.reshape(-1,1), z.T )
+    Y = np.dot( repeated_block_diag_times_matrix( -v.T, vprime ), z.T )
     
     return A, B, Y
 
@@ -295,7 +343,7 @@ def solve_for_W( As, Bs, Ys, use_pseudoinverse = True, projection = None, **kwar
         # system += np.kron( A[1], B.T )
         rhs -= Y
     
-    return solve_for_W_with_system_rhs( system, rhs, use_pseudoinverse = use_pseudoinverse, projection = projection, **kwargs )
+    return solve_for_W_with_system( system, rhs, use_pseudoinverse = use_pseudoinverse, projection = projection, **kwargs )
 
 def solve_for_W_with_system( system, rhs, use_pseudoinverse = True, projection = None, **kwargs ):
     assert rhs.shape[0] % 12 == 0
@@ -416,32 +464,34 @@ def solve_for_W_with_system( system, rhs, use_pseudoinverse = True, projection =
     return W
 
 def generateRandomData( poses = None, handles = None ):
-    # np.random.seed(0)
+    np.random.seed(0)
     
     ## If this isn't true, the inv() in the energy will fail.
     if 3*poses < handles:
         print( "You'd better use the pseudoinverse or you'll get unpredictable results." )
     
     W = np.random.randn(12*poses, handles)
-    V = np.random.randn(3*poses, 12*poses)
+    v = np.append( np.random.randn(3), [1.] ).reshape(1,-1)
+    V = np.kron( np.eye( 3*poses ), v )
     vprime = np.random.randn(3*poses)
-    return W, V, vprime, poses, handles
+    return W, v, V, vprime, poses, handles
 
 if __name__ == '__main__':
-    use_pseudoinverse = False
+    use_pseudoinverse = True
+    nullspace = False
     
-    W, V, vprime, poses, handles = generateRandomData( poses = 1, handles = 5 )
+    W, v, V, vprime, poses, handles = generateRandomData( poses = 2, handles = 5 )
     
-    z, ssv, f = solve_for_z( W, V, vprime, return_energy = True, use_pseudoinverse = use_pseudoinverse )
+    z, ssv, f = solve_for_z( W, v, vprime, nullspace = nullspace, return_energy = True, use_pseudoinverse = use_pseudoinverse )
     
-    import flat_intersection_direct_gradients
-    f2, _, _ = flat_intersection_direct_gradients.fAndGpAndHp_fast( W[:,0], W[:,1:] - W[:,:1], V, vprime )
+    import flat_intersection_direct_gradients_nullspace as flat_intersection_direct_gradients
+    f2, _, _ = flat_intersection_direct_gradients.f_and_dfdp_and_dfdB_hand( W[:,0], W[:,1:] - W[:,:1], V, vprime, nullspace = nullspace )
     
     print( 'function value:', f )
     print( 'other function value:', f2 )
     print( '|function difference|:', abs( f - f2 ) )
     
-    A, B, Y = linear_matrix_equation_for_W( V, vprime, z )
+    A, B, Y = linear_matrix_equation_for_W( v, vprime, z, nullspace = nullspace )
     W_next = solve_for_W( [A], [B], [Y], use_pseudoinverse = use_pseudoinverse )
     print( 'W:', W )
     print( 'W from solve_for_W():', W_next )
