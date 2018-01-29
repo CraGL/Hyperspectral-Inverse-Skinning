@@ -273,11 +273,27 @@ def fAndGpAndHp_fast(p, B, vbar, vprime, nullspace = False):
 	v = vbar
 	w = vprime
 	
+	## Make v a 1-by-4 row matrix
+	v = v[:1,:4]
+	
 	if nullspace:
-		vmag2 = np.dot( v[0,:4], v[0,:4] )
+		vmag2 = np.dot( v.squeeze(), v.squeeze() )
+		## Normalize v
 		v = v / np.sqrt( vmag2 )
-		w = np.dot( v.T, w )
+		## Multiply w on the left by v.T
+		w = repeated_block_diag_times_matrix( v.T, vprime.reshape(-1,1) ).squeeze()
+		## v becomes nullspace projection
 		v = np.dot( v.T, v )
+	
+	## Speed this up! v is block diagonal.
+	# vB = np.dot( v, B )
+	# vB = np.dot( v[0,:4], B.T.reshape( -1, 4 ).T ).reshape( B.shape[1], -1 ).T
+	vB = repeated_block_diag_times_matrix( v, B )
+	# print( 'vB:', abs( vB - vB2 ).max() )
+	# vp = np.dot( v,p )
+	# vp = np.dot( v[0,:4], p.reshape( -1, 4 ).T ).ravel()
+	vp = repeated_block_diag_times_matrix( v, p.reshape( -1,1 ) ).squeeze()
+	# print( 'vp:', abs( vp - vp2 ).max() )
 	
 	assert(type(B) == np.ndarray)
 	dim = B.shape
@@ -297,14 +313,20 @@ def fAndGpAndHp_fast(p, B, vbar, vprime, nullspace = False):
 	dim = w.shape
 	assert(len(dim) == 1)
 	w_rows = dim[0]
-	assert(p_rows == v_cols == B_rows)
+	# assert(p_rows == v_cols == B_rows)
+	assert(p_rows == B_rows)
+	assert(p_rows % v_cols) == 0
 	assert(B_cols)
-	assert(w_rows == v_rows)
+	assert(w_rows % v_rows) == 0
 	
-	vB = np.dot( v, B )
+	## Speed this up! v is block diagonal.
+	# vB = np.dot( v, B )
+	vB = repeated_block_diag_times_matrix( v, B )
 	A = np.dot(np.dot(vB, np.linalg.inv(np.dot(vB.T,vB)) ), vB.T)
 	foo = np.eye( A.shape[0] ) - A
-	S = np.dot( foo, v )
+	# S = np.dot( foo, np.kron( np.eye( len(vprime) ), v ) )
+	S = repeated_block_diag_times_matrix( v.T, foo.T ).T
+	# print( "S:", abs( S-S2 ).max() )
 	r = np.dot( foo, w )
 	Q = np.dot( S.T, S )
 	L = np.dot( S.T, r )

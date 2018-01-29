@@ -174,7 +174,7 @@ def A_from_X( X, handles ):
     A = X[handles:,:handles]
     return A
 
-def f_and_dfdp_and_dfdA_matrixcalculus(p, A, v, w, handles):
+def f_and_dfdp_and_dfdA_matrixcalculus(p, A, v, w, handles, nullspace = False):
     print( "WARNING: This function computes dfdA incorrectly." )
     
     ## The A this function expects is X from:
@@ -232,6 +232,12 @@ def f_and_dfdp_and_dfdA_matrixcalculus(p, A, v, w, handles):
     assert(B_cols)
     assert(v_rows == w_rows)
     
+    if nullspace:
+        vmag2 = np.dot( v[0,:4], v[0,:4] )
+        v = v / np.sqrt( vmag2 )
+        w = np.dot( v.T, w )
+        v = np.dot( v.T, v )
+    
     T_0 = np.linalg.inv((I - A))
     T_1 = (A + I)
     T_01 = np.dot(T_0, T_1)
@@ -263,9 +269,15 @@ def f_and_dfdp_and_dfdA_matrixcalculus(p, A, v, w, handles):
 
     return functionValue, gradientp, A_from_X( gradientA, handles )
 
-def f_and_dfdp_and_dfdA_hand(p, A, vbar, vprime):
+def f_and_dfdp_and_dfdA_hand(p, A, vbar, vprime, nullspace = False):
 	V = vbar
 	w = vprime
+	
+	if nullspace:
+		vmag2 = np.dot( V[0,:4], V[0,:4] )
+		V = V / np.sqrt( vmag2 )
+		w = np.dot( V.T, w )
+		V = np.dot( V.T, V )
 	
 	## Matrices computing the Cayley transform to obtain B in our energy expression.
 	F = np.dot( A.T, A )
@@ -308,10 +320,16 @@ def f_and_dfdp_and_dfdA_hand(p, A, vbar, vprime):
 	
 	return E, gradp.squeeze(), gradA
 
-def f_and_dfdp_and_Hfp(p, A, v, w, handles):
+def f_and_dfdp_and_Hfp(p, A, v, w, handles, nullspace = False):
     B = B_from_Cayley_A( A, handles )
     # print( 'B_from_Cayley_A:', B.shape )
     # print( B )
+    
+    if nullspace:
+        vmag2 = np.dot( v[0,:4], v[0,:4] )
+        v = v / np.sqrt( vmag2 )
+        w = np.dot( v.T, w )
+        v = np.dot( v.T, v )
     
     assert(type(B) == np.ndarray)
     dim = B.shape
@@ -350,8 +368,8 @@ def f_and_dfdp_and_Hfp(p, A, v, w, handles):
     
     return functionValue, gradient, hessian
 
-def f_and_dfdp_and_dfdA( p, A, v, w, handles ):
-    f, gradp, gradA = f_and_dfdp_and_dfdA_hand( p, A, v, w )
+def f_and_dfdp_and_dfdA( p, A, v, w, handles, nullspace = False ):
+    f, gradp, gradA = f_and_dfdp_and_dfdA_hand( p, A, v, w, nullspace = nullspace )
     
     ## gradient p check (computed another way):
     ## This test passes.
@@ -380,13 +398,16 @@ def generateRandomData():
 def main():
     global SKIP_CHECKS
     
+    nullspace = False
+    print( "Using nullspace version:", nullspace )
+    
     SKIP_CHECKS = False
     p, A, v, w, poses, handles = generateRandomData()
     
-    f, gradp, gradA = f_and_dfdp_and_dfdA_matrixcalculus( p, A, v, w, handles )
-    f2, gradp2, hessp = f_and_dfdp_and_Hfp( p, A, v, w, handles )
+    f, gradp, gradA = f_and_dfdp_and_dfdA_matrixcalculus( p, A, v, w, handles, nullspace = nullspace )
+    f2, gradp2, hessp = f_and_dfdp_and_Hfp( p, A, v, w, handles, nullspace = nullspace )
     
-    f_hand, gradp_hand, gradA_hand = f_and_dfdp_and_dfdA_hand( p, A, v, w )
+    f_hand, gradp_hand, gradA_hand = f_and_dfdp_and_dfdA_hand( p, A, v, w, nullspace = nullspace )
     
     print( 'function value:', f )
     print( 'other function value:', f2 )
@@ -413,7 +434,7 @@ def main():
     
     def f_gradf_packed( x ):
         xp, xA = unpack( x, poses, handles )
-        val, gradp, gradA = f_and_dfdp_and_dfdA_hand( xp, xA, v, w )
+        val, gradp, gradA = f_and_dfdp_and_dfdA_hand( xp, xA, v, w, nullspace = nullspace )
         grad = pack( gradp, gradA, poses, handles )
         return val, grad
     import scipy.optimize
