@@ -15,21 +15,21 @@ method = 'block'
 #method = 'power'
 power = 5
 assert method in ('AndersonDuffin', 'block', 'power')
+print( "Method:", method )
 
 ## (1b) Generate data
 ## TODO: Zero energy test data.
 N = 100
 Q = 3*poses
-if method == 'block':
-    Q = 12*poses - Q
 np.random.seed(0)
 ## Create a bunch of orthonormal rows and a point (rhs)
 flats = [ ( np.random.random(( Q, 12*poses )), np.random.random(12*poses) ) for i in range(N) ]
 ## Orthonormalize the rows
 flats = [ ( np.linalg.svd( A, full_matrices=False )[2][:Q], a ) for A, a in flats ]
-## The block method needs different input.
+
+## The block method needs A to be the null space, not the row-space.
 if method == 'block':
-    flats = [ ( A.T, np.dot( A.T, a[:A.shape[0]] ) ) for A, a in flats ]
+    flats = [ ( np.linalg.svd( A, full_matrices=True )[2][Q:].T, a ) for A, a in flats ]
 
 # (2) Define the cost function (here using autograd.numpy)
 def cost(X):
@@ -58,8 +58,12 @@ def cost(X):
             ## Compute the projection onto the intersection of orthogonal spaces.
             ## B is a null space. A is a null space. The desired projection matrix
             ## is I - projection onto union of A and B.
+            ## We compute the projection onto the union of nullspaces as:
+            ##    [ A B ] ( [ A B ]' [ A B ] )^{-1} [ A B ]'
+            ## We can compute the inverse via these identities:
+            ##    https://math.stackexchange.com/questions/2489662/the-inverse-of-a-matrix-with-a-square-off-diagonal-matrix-partition/2493112#2493112
             ATB = np.dot( A.T, B )
-            UL = np.linalg.inv( np.eye(Q) - np.dot( ATB, ATB.T ) )
+            UL = np.linalg.inv( np.eye(A.shape[1]) - np.dot( ATB, ATB.T ) )
             LR = np.linalg.inv( np.eye(handles) - np.dot( ATB.T, ATB ) )
             UR = np.dot( -ATB, LR )
             LL = UR.T
@@ -75,7 +79,7 @@ def cost(X):
             ## Take the matrix to the power 2^(power-1)
             ## The error decreases exponentially in the power.
             ## See:
-            ## Projectors on intersections of subspaces (Adi Ben–Israel 2013 Contemporary Mathematics)
+            ## Projectors on intersections of subspaces (Adi Ben-Israel 2013 Contemporary Mathematics)
             ## http://benisrael.net/BEN-ISRAEL-NOV-30-13.pdf
             for i in range(power-1):
                 orthogonal_to_A_and_B = np.dot( orthogonal_to_A_and_B, orthogonal_to_A_and_B )
@@ -88,10 +92,22 @@ def cost(X):
 problem = Problem(manifold=manifold, cost=cost)
 
 # (3) Instantiate a Pymanopt solver
+solver_args = {}
 # solver = SteepestDescent()
-solver = TrustRegions()
-# solver = ConjugateGradient()
+
+# solver = TrustRegions()
+## Delta_bar = 100 made a huge difference (running without it printed a suggestion to do it).
+# solver_args = { 'Delta_bar': 100. }
+
+solver = ConjugateGradient()
 
 # let Pymanopt do the rest
-Xopt = solver.solve(problem)
+Xopt = solver.solve(problem, **solver_args)
 print(Xopt)
+
+print( "Final cost:", cost( Xopt ) )
+
+# Is zero in the solution flat?
+p, B = Xopt
+dist_to_origin = np.linalg.norm( np.dot( B.T, 0 - p ) )
+print( "Distance to the flat from the origin:", dist_to_origin )
