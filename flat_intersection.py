@@ -708,6 +708,7 @@ def optimize_approximated_quadratic(P, H, row_mats, deformed_vs, x0, f_eps = Non
 			
 			f = normalization * (np.dot(np.dot(pt.T,Q), pt) - 2*np.dot(pt.T,L) + C)
 			pt_new = np.linalg.solve(Q,L)
+			# pt_new = np.linalg.pinv(Q).dot(L)
 			f_new = normalization * (np.dot(np.dot(pt_new.T,Q), pt_new) - 2*np.dot(pt_new.T,L) + C)
 			
 			x = pack_shifted( pt_new, B, j )
@@ -1066,6 +1067,27 @@ def optimize_iterative_pca( P, H, row_mats, deformed_vs, x0, max_iter = None, st
 	
 	return converged, x
 
+def optimize_flag_mean( P, H, row_mats, deformed_vs, x0, strategy = None ):
+	
+	assert( len(row_mats) == len(deformed_vs) )
+
+	x = x0.copy()
+	print( "Computing B..." )
+	
+	## 1 Compute the flag mean.
+	flats = row_mats/np.sqrt((row_mats*row_mats).sum(axis=2))[...,np.newaxis]
+	B = np.linalg.svd( np.vstack( flats ).T, full_matrices = False )[0][:,:H-1]
+	
+	## 2 Compute the optimal p.
+	p0, B0 = unpack( x, P )
+	x = pack( p0, B )
+	print( "Computed B." )
+	error_recorder.add_error(x)
+	converged, x = optimize_approximated_quadratic( P, H, row_mats, deformed_vs, x, max_iter = 1 )
+	print( "Computed p." )
+	error_recorder.add_error(x)
+	return converged, x
+
 def optimize_laplacian( P, H, rest_mesh, deformed_vs, qs_data, qs_errors, qs_ssv, f_eps = None, x_eps = None, max_iter = None, f_zero_threshold = None, z_strategy = None ):
 	'''
 	Returns ( converged, final x ).
@@ -1339,11 +1361,11 @@ if __name__ == '__main__':
 	parser.add_argument('--ground-truth', '-GT', type=str, help='Ground truth data path.')
 	parser.add_argument('--recovery', '-R', type=float, help='Recovery test epsilon (default no recovery test).')
 	parser.add_argument('--strategy', '-S', type=str, choices = ['function', 'gradient', 'hessian', 'newton', 'mixed', 'grassmann', 'pinv', 'pinv+ssv:skip', 'pinv+ssv:weighted', 'ssv:skip', 'ssv:weighted', 'perfectp'], help='Strategy: function, gradient (default), hessian, newton, mixed, grassmann (for energy B only), pinv and ssv (for energy biquadratic only), perfectp (ipca only).')
-	parser.add_argument('--energy', '-E', type=str, default='B', choices = ['B', 'cayley', 'B+cayley', 'B+B', 'cayley+cayley', 'biquadratic', 'biquadratic+B', 'biquadratic+handles', 'laplacian', 'ipca'], help='Energy: B (default), cayley, B+cayley, B+B, cayley+cayley, biquadratic, biquadratic+B, biquadratic+handles, laplacian, iterative pca.')
+	parser.add_argument('--energy', '-E', type=str, default='B', choices = ['B', 'cayley', 'B+cayley', 'B+B', 'cayley+cayley', 'biquadratic', 'biquadratic+B', 'biquadratic+handles', 'laplacian', 'ipca', 'flag'], help='Energy: B (default), cayley, B+cayley, B+B, cayley+cayley, biquadratic, biquadratic+B, biquadratic+handles, laplacian, ipca (iterative PCA), flag (flag mean).')
 	## UPDATE: type=bool does not do what we think it does. bool("False") == True.
 	##		   For more, see https://stackoverflow.com/questions/15008758/parsing-boolean-values-with-argparse
 	def str2bool(s): return {'true': True, 'false': False}[s.lower()]
-	parser.add_argument('--nullspace', type=str2bool, default=False, help='Whether to solve using the nullspace rather than 3D energy (only affects "B" and "biquadratic" energy (default: False).')
+	parser.add_argument('--nullspace', type=str2bool, default=False, help='Whether to solve using the nullspace rather than 3D energy (only affects "B" and "biquadratic" and "cayley" energies (default: False).')
 	parser.add_argument('--solve-for-rest-pose', type=str2bool, default=False, help='Whether to solve for the rest pose (only affects "biquadratic" energy (default: False).')
 	parser.add_argument('--error', type=str2bool, default=False, help='Whether to compute transformation error and vertex error compared with ground truth.')
 	parser.add_argument('--zero', type=str2bool, default=False, help='Given ground truth, zero test.')
@@ -1538,6 +1560,8 @@ if __name__ == '__main__':
 			converged, x = optimize_laplacian( P, H, rest_mesh, deformed_vs, qs_data, qs_errors, qs_ssv, max_iter = args.max_iter, f_eps = args.f_eps, x_eps = args.x_eps, z_strategy = args.z_strategy )
 		elif args.energy == 'ipca':
 			converged, x = optimize_iterative_pca( P, H, all_R_mats, deformed_vs, x0, strategy = args.strategy, max_iter = args.max_iter, f_eps = args.f_eps, x_eps = args.x_eps, W_projection = args.W_projection, z_strategy = args.z_strategy )
+		elif args.energy == 'flag':
+			converged, x = optimize_flag_mean( P, H, all_R_mats, deformed_vs, x0, strategy = args.strategy )
 		else:
 			raise RuntimeError( "Unknown energy parameter: " + str(parser.energy) )
 		

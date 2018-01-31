@@ -9,7 +9,7 @@ SSD_RESULT="${ROOT_DIR}"/SSD_res/cheb11-2-output.txt
 
 INITIAL_GUESS_ARGS="--svd_threshold 1e-15 --transformation_threshold 1e-4 --version 0"
 # FLAT_INTERSECTION_ARGS="--energy biquadratic --W-projection normalize --x-eps 0.01 --f-eps 0 -GT ${OTHER_POSE_DIR} --error True --handles 11 --fancy-init ${OUTPUT_DIR}/local_subspace_recover.txt"
-FLAT_INTERSECTION_ARGS="--energy biquadratic -GT ${OTHER_POSE_DIR} --error True --handles 11 --fancy-init ${OUTPUT_DIR}/local_subspace_recover.txt"
+FLAT_INTERSECTION_ARGS="--energy biquadratic --nullspace True --f-eps 0 --x-eps 1e-4 -GT ${OTHER_POSE_DIR} --error True --handles 11 --fancy-init ${OUTPUT_DIR}/local_subspace_recover.txt"
 # SIMPLEX_HULL_ARGS="-R 0.01"
 SIMPLEX_HULL_ARGS="--method qp-major"
 
