@@ -7,33 +7,41 @@ from pymanopt.solvers import SteepestDescent, TrustRegions, ConjugateGradient
 # (1) Instantiate a manifold
 poses = 10
 handles = 10
+# p, B
 manifold = Product( ( Euclidean(12*poses), Grassmann(12*poses, handles) ) )
 
-# (2) Define the cost function (here using autograd.numpy)
-N = 1000
+#method = 'AndersonDuffin'
+method = 'block'
+#method = 'power'
+power = 5
+assert method in ('AndersonDuffin', 'block', 'power')
+
+## (1b) Generate data
+## TODO: Zero energy test data.
+N = 100
 Q = 3*poses
-AndersonDuffin = True
-if not AndersonDuffin:
+if method == 'block':
     Q = 12*poses - Q
 np.random.seed(0)
-## Make orthonormal flats as a nullspace and a point.
-flats = [ ( np.random.random(( Q, 12*poses )), np.random.random(Q if AndersonDuffin else 12*poses) ) for i in range(N) ]
+## Create a bunch of orthonormal rows and a point (rhs)
+flats = [ ( np.random.random(( Q, 12*poses )), np.random.random(12*poses) ) for i in range(N) ]
+## Orthonormalize the rows
 flats = [ ( np.linalg.svd( A, full_matrices=False )[2][:Q], a ) for A, a in flats ]
-if AndersonDuffin:
-    flats = [ ( A, np.dot( A.T, a ) ) for A, a in flats ]
-else:
-    flats = [ ( A.T, a ) for A, a in flats ]
+## The block method needs different input.
+if method == 'block':
+    flats = [ ( A.T, np.dot( A.T, a[:A.shape[0]] ) ) for A, a in flats ]
 
+# (2) Define the cost function (here using autograd.numpy)
 def cost(X):
     p,B = X
     sum = 0.
     
-    if AndersonDuffin:
+    if method in ('AndersonDuffin', 'power'):
         I = np.eye(12*poses)
         P_Bortho = (I - np.dot( B, B.T ) )
     
     for A,a in flats:
-        if AndersonDuffin:
+        if method == 'AndersonDuffin':
             ## The Anderson-Duffin formula
             ## https://mathoverflow.net/questions/108177/intersection-of-subspaces
             P_Aortho = np.dot( A.T, A )
@@ -46,7 +54,7 @@ def cost(X):
                 # print( np.linalg.svd( P_Bortho + P_Aortho, compute_uv = False ) )
             ## This should be pinv() not inv().
             orthogonal_to_A_and_B = np.dot( 2.*P_Bortho, np.dot( np.linalg.inv( P_Bortho + P_Aortho ), P_Aortho ) )
-        else:
+        elif method == 'block':
             ## Compute the projection onto the intersection of orthogonal spaces.
             ## B is a null space. A is a null space. The desired projection matrix
             ## is I - projection onto union of A and B.
@@ -61,6 +69,16 @@ def cost(X):
             
             parallel_to_A_or_B = np.dot( left, A.T ) + np.dot( right, B.T )
             orthogonal_to_A_and_B = np.eye(12*poses) - parallel_to_A_or_B
+        elif method == 'power':
+            P_Aortho = np.dot( A.T, A )
+            orthogonal_to_A_and_B = np.dot( P_Aortho, P_Bortho )
+            ## Take the matrix to the power 2^(power-1)
+            ## The error decreases exponentially in the power.
+            ## See:
+            ## Projectors on intersections of subspaces (Adi Ben–Israel 2013 Contemporary Mathematics)
+            ## http://benisrael.net/BEN-ISRAEL-NOV-30-13.pdf
+            for i in range(power-1):
+                orthogonal_to_A_and_B = np.dot( orthogonal_to_A_and_B, orthogonal_to_A_and_B )
         
         diff = np.dot( orthogonal_to_A_and_B, p - a )
         e = np.dot( diff, diff )
