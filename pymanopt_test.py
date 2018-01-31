@@ -97,7 +97,7 @@ solver_args = {}
 
 # solver = TrustRegions()
 ## Delta_bar = 100 made a huge difference (running without it printed a suggestion to do it).
-# solver_args = { 'Delta_bar': 100. }
+# solver_args = { 'Delta_bar': 1000. }
 
 solver = ConjugateGradient()
 
