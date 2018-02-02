@@ -320,8 +320,8 @@ def optimize_nullspace_directly(P, H, row_mats, deformed_vs, x0, strategy = None
 	
 	## To make function values comparable, we need to normalize.
 	normalization = normalization_factor_from_row_mats( row_mats )
-	# print( "===== Turning off function value normalization; watch termination thresholds! =====" )
-	# normalization = 1.
+	print( "===== Turning off function value normalization; watch termination thresholds! =====" )
+	normalization = 1.
 	
 	if nullspace is None:
 		nullspace = False
@@ -537,8 +537,8 @@ def optimize_nullspace_cayley(P, H, row_mats, deformed_vs, x0, strategy = None, 
 
 	## To make function values comparable, we need to normalize.
 	normalization = normalization_factor_from_row_mats( row_mats )
-	# print( "===== Turning off function value normalization; watch termination thresholds! =====" )
-	# normalization = 1.
+	print( "===== Turning off function value normalization; watch termination thresholds! =====" )
+	normalization = 1.
 	
 	if nullspace is None:
 		nullspace = False
