@@ -1018,6 +1018,8 @@ def optimize_iterative_pca( P, H, row_mats, deformed_vs, x0, max_iter = None, st
 	from space_mapper import SpaceMapper
 	converged = False
 	
+	import flat_metrics
+	
 	iterations = 0
 	try:
 		while True:
@@ -1044,14 +1046,18 @@ def optimize_iterative_pca( P, H, row_mats, deformed_vs, x0, max_iter = None, st
 				# Q[i] = np.dot( np.linalg.pinv(lh), rh)[:12*P]
 		
 			mapper = SpaceMapper.Uncorrellated_Space( Q, dimension = B.shape[1] )
-			pt = mapper.Xavg_
-			B = mapper.V_[:H-1]
-			x = pack( pt.T, B.T )
+			pt = mapper.Xavg_.T
+			B = mapper.V_[:H-1].T
+			pt_canonical = flat_metrics.canonical_point( pt, B )
+			print( "|pt_canonical - pt|:", np.linalg.norm( pt - pt_canonical ) )
+			pt = pt_canonical
+			x = pack( pt, B )
 			if strategy == 'perfectp':
 				_, x = optimize_approximated_quadratic( P, H, row_mats, deformed_vs, x, max_iter = 1 )
 			error_recorder.add_error(x)
 			print( "|p - p0|:", np.linalg.norm( pt.ravel() - unpack( x0,P )[0].ravel() ) )
-			print( "B angles with B0|:", ( B.T * unpack( x0,P )[1] ).sum(0) )
+			print( "B angles with B0:", ( B * unpack( x0,P )[1] ).sum(0) )
+			print( "B angles with B0 (principal angles):", flat_metrics.principal_angles( B, unpack( x0,P )[1] ) )
 			print( "|x - x0|:", np.linalg.norm( x - x0 ) )
 			print( "max( x - x0 ):", abs( x - x0 ).max() )
 			if np.allclose( x, x0 ):

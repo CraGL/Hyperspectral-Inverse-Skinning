@@ -27,6 +27,7 @@ def cost(X):
     sum = 0.
     
     for (A,a), z in zip( flats, zs ):
+        # a = np.zeros(a.shape)
         diff = np.dot( A, p + np.dot( B, z ) - a )
         e = np.dot( diff, diff )
         sum += e
@@ -37,8 +38,8 @@ problem = Problem(manifold=manifold, cost=cost)
 # (3) Instantiate a Pymanopt solver
 solver_args = {}
 # solver = SteepestDescent()
-# solver = ConjugateGradient()
-solver = TrustRegions()
+solver = ConjugateGradient()
+# solver = TrustRegions()
 ## Delta_bar = 100 made a huge difference (running without it printed a suggestion to do it).
 # solver_args = { 'Delta_bar': 1000. }
 

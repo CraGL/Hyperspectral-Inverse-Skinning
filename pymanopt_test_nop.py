@@ -128,7 +128,9 @@ def cost(X):
         sum_Ca += Ca
         sum_aCa += aCa
     
-    e = sum_aCa + np.dot( sum_Ca.T, np.dot( np.linalg.inv( sum_C ), sum_Ca ) )
+    # e = sum_aCa - np.dot( sum_Ca.T, np.dot( np.linalg.inv( sum_C ), sum_Ca ) )
+    e = sum_aCa
+    # e = - np.dot( sum_Ca.T, np.dot( np.linalg.inv( sum_C ), sum_Ca ) )
     return e
 
 problem = Problem(manifold=manifold, cost=cost)
@@ -139,7 +141,7 @@ solver_args = {}
 
 # solver = TrustRegions()
 ## Delta_bar = 100 made a huge difference (running without it printed a suggestion to do it).
-# solver_args = { 'Delta_bar': 1000. }
+# solver_args = { 'Delta_bar': 30. }
 
 solver = ConjugateGradient()
 

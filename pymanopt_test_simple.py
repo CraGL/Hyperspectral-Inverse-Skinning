@@ -26,6 +26,7 @@ def cost(X):
     sum = 0.
     
     for A,a in flats:
+        # a = np.zeros(a.shape)
         AB = np.dot( A, B )
         z = np.dot( np.linalg.inv( np.dot( AB.T, AB ) ), -np.dot( AB.T, np.dot( A, p - a ) ) )
         diff = np.dot( A, p + np.dot( B, z ) - a )
@@ -41,7 +42,7 @@ solver_args = {}
 # solver = ConjugateGradient()
 solver = TrustRegions()
 ## Delta_bar = 100 made a huge difference (running without it printed a suggestion to do it).
-solver_args = { 'Delta_bar': 10000. }
+solver_args = { 'Delta_bar': 100. }
 
 # let Pymanopt do the rest
 Xopt = solver.solve(problem, **solver_args)

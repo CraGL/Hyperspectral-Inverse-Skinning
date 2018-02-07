@@ -41,6 +41,8 @@ def cost(X):
         P_Bortho = (I - np.dot( B, B.T ) )
     
     for A,a in flats:
+        # a = np.zeros(a.shape)
+        
         if method == 'AndersonDuffin':
             ## The Anderson-Duffin formula
             ## https://mathoverflow.net/questions/108177/intersection-of-subspaces
