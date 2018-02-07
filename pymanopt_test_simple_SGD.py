@@ -2,7 +2,7 @@ import autograd.numpy as np
 
 from pymanopt.manifolds import Stiefel, Grassmann, Euclidean, Product
 from pymanopt import Problem
-from pymanopt.solvers import SteepestDescent, TrustRegions, ConjugateGradient, ParticleSwarm
+from pymanopt.solvers import SteepestDescent, TrustRegions, ConjugateGradient
 
 # (1) Instantiate a manifold
 poses = 10
@@ -20,12 +20,16 @@ flats = [ ( np.random.random(( Q, 12*poses )), np.random.random(12*poses) ) for 
 ## Orthonormalize the rows
 flats = [ ( np.linalg.svd( A, full_matrices=False )[2][:Q], a ) for A, a in flats ]
 
+## Stochastic Gradient Descent (SGD)
+all_indices = np.arange( N )
+BATCH_SIZE = 10
+
 # (2) Define the cost function (here using autograd.numpy)
 def cost(X):
     p,B = X
     sum = 0.
     
-    for A,a in flats:
+    for A,a in flats_batch:
         # a = np.zeros(a.shape)
         AB = np.dot( A, B )
         z = np.dot( np.linalg.inv( np.dot( AB.T, AB ) ), -np.dot( AB.T, np.dot( A, p - a ) ) )
@@ -38,16 +42,27 @@ problem = Problem(manifold=manifold, cost=cost)
 
 # (3) Instantiate a Pymanopt solver
 solver_args = {}
-# solver = SteepestDescent()
-# solver = ConjugateGradient()
-solver = TrustRegions()
+# solver = SteepestDescent( maxiter = 10 )
+# solver_args = { 'maxiter': 1 }
+solver = ConjugateGradient( maxiter = 10 )
+# solver = TrustRegions()
 ## Delta_bar = 100 made a huge difference (running without it printed a suggestion to do it).
-solver_args = { 'Delta_bar': 100. }
-# solver = ParticleSwarm()
+# solver_args = { 'Delta_bar': 100. }
 
 # let Pymanopt do the rest
-Xopt = solver.solve(problem, **solver_args)
-# print(Xopt)
+Xopt = None
+for iteration in range(1,10001):
+    np.random.shuffle( all_indices )
+    ## Every 100 iterations try the whole problem.
+    if iteration % 100 == 0:
+        flats_batch = flats
+    else:
+        flats_batch = [ flats[i] for i in all_indices[:BATCH_SIZE] ]
+    
+    print( "Starting batch iteration:", iteration )
+    solver_args['x'] = Xopt
+    Xopt = solver.solve(problem, **solver_args)
+    # print(Xopt)
 
 print( "Final cost:", cost( Xopt ) )
 
