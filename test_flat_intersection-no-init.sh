@@ -8,7 +8,7 @@ MAXITER=2
 
 INITIAL_GUESS_ARGS="--svd_threshold 1e-15 --transformation_threshold 1e-4 --version 0"
 
-for REST_POSE in $(basename "${MODEL_DIR}"/cow*.obj)
+for REST_POSE in $(basename "${MODEL_DIR}"/cheb*.obj)
 do
 	name="${REST_POSE%$OBJ_SUFF}"
 	POSES_DIR="${MODEL_DIR}/${name}"
