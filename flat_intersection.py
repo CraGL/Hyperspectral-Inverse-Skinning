@@ -320,8 +320,8 @@ def optimize_nullspace_directly(P, H, row_mats, deformed_vs, x0, strategy = None
 	
 	## To make function values comparable, we need to normalize.
 	normalization = normalization_factor_from_row_mats( row_mats )
-	# print( "===== Turning off function value normalization; watch termination thresholds! =====" )
-	# normalization = 1.
+	print( "===== Turning off function value normalization; watch termination thresholds! =====" )
+	normalization = 1.
 	
 	if nullspace is None:
 		nullspace = False
@@ -546,8 +546,8 @@ def optimize_nullspace_cayley(P, H, row_mats, deformed_vs, x0, strategy = None, 
 
 	## To make function values comparable, we need to normalize.
 	normalization = normalization_factor_from_row_mats( row_mats )
-	# print( "===== Turning off function value normalization; watch termination thresholds! =====" )
-	# normalization = 1.
+	print( "===== Turning off function value normalization; watch termination thresholds! =====" )
+	normalization = 1.
 	
 	if nullspace is None:
 		nullspace = False
@@ -1027,6 +1027,8 @@ def optimize_iterative_pca( P, H, row_mats, deformed_vs, x0, max_iter = None, st
 	from space_mapper import SpaceMapper
 	converged = False
 	
+	import flat_metrics
+	
 	iterations = 0
 	try:
 		while True:
@@ -1053,14 +1055,18 @@ def optimize_iterative_pca( P, H, row_mats, deformed_vs, x0, max_iter = None, st
 				# Q[i] = np.dot( np.linalg.pinv(lh), rh)[:12*P]
 		
 			mapper = SpaceMapper.Uncorrellated_Space( Q, dimension = B.shape[1] )
-			pt = mapper.Xavg_
-			B = mapper.V_[:H-1]
-			x = pack( pt.T, B.T )
+			pt = mapper.Xavg_.T
+			B = mapper.V_[:H-1].T
+			pt_canonical = flat_metrics.canonical_point( pt, B )
+			print( "|pt_canonical - pt|:", np.linalg.norm( pt - pt_canonical ) )
+			pt = pt_canonical
+			x = pack( pt, B )
 			if strategy == 'perfectp':
 				_, x = optimize_approximated_quadratic( P, H, row_mats, deformed_vs, x, max_iter = 1 )
 			error_recorder.add_error(x)
 			print( "|p - p0|:", np.linalg.norm( pt.ravel() - unpack( x0,P )[0].ravel() ) )
-			print( "B angles with B0|:", ( B.T * unpack( x0,P )[1] ).sum(0) )
+			print( "B angles with B0:", ( B * unpack( x0,P )[1] ).sum(0) )
+			print( "B angles with B0 (principal angles):", flat_metrics.principal_angles( B, unpack( x0,P )[1] ) )
 			print( "|x - x0|:", np.linalg.norm( x - x0 ) )
 			print( "max( x - x0 ):", abs( x - x0 ).max() )
 			if np.allclose( x, x0 ):
@@ -1142,7 +1148,22 @@ def optimize_laplacian( P, H, rest_mesh, deformed_vs, qs_data, qs_errors, qs_ssv
 	## This never changes. Precompute it.
 	E_data = laplacian.quadratic_for_E_data( vs, deformed_vs )
 	num_vertices = len( vs )
-	neighbors = [ np.asarray( rest_mesh.vertex_vertex_neighbors(i) ) for i in range(num_vertices) ]
+	
+	# neighbors_strategy = 'one-ring'
+	neighbors_strategy = 'random'
+	if neighbors_strategy == 'one-ring':
+		neighbors = [ np.asarray( rest_mesh.vertex_vertex_neighbors(i) ) for i in range(num_vertices) ]
+	elif neighbors_strategy == 'random':
+		all_indices = np.arange( num_vertices )
+		neighbors = []
+		num_random_neighs = 2*H
+		for i in range( num_vertices ):
+			all_but_i = np.array(list(set(all_indices) - set([i])))
+			np.random.shuffle( all_but_i )
+			neighbors.append( all_but_i[:num_random_neighs].copy() )
+	else:
+		raise RuntimeError( "Unknown laplacian neighbors: %s" % neighbors_strategy )
+	
 	poses = P
 	
 	## We should have an initial guess transformation for each point.

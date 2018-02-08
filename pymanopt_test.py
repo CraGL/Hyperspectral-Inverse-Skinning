@@ -41,6 +41,8 @@ def cost(X):
         P_Bortho = (I - np.dot( B, B.T ) )
     
     for A,a in flats:
+        # a = np.zeros(a.shape)
+        
         if method == 'AndersonDuffin':
             ## The Anderson-Duffin formula
             ## https://mathoverflow.net/questions/108177/intersection-of-subspaces
@@ -109,5 +111,7 @@ print( "Final cost:", cost( Xopt ) )
 
 # Is zero in the solution flat?
 p, B = Xopt
-dist_to_origin = np.linalg.norm( np.dot( B.T, 0 - p ) )
+import flat_metrics
+p_closest_to_origin = flat_metrics.canonical_point( p, B )
+dist_to_origin = np.linalg.norm( p_closest_to_origin )
 print( "Distance to the flat from the origin:", dist_to_origin )
