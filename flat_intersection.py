@@ -1139,7 +1139,22 @@ def optimize_laplacian( P, H, rest_mesh, deformed_vs, qs_data, qs_errors, qs_ssv
 	## This never changes. Precompute it.
 	E_data = laplacian.quadratic_for_E_data( vs, deformed_vs )
 	num_vertices = len( vs )
-	neighbors = [ np.asarray( rest_mesh.vertex_vertex_neighbors(i) ) for i in range(num_vertices) ]
+	
+	# neighbors_strategy = 'one-ring'
+	neighbors_strategy = 'random'
+	if neighbors_strategy == 'one-ring':
+		neighbors = [ np.asarray( rest_mesh.vertex_vertex_neighbors(i) ) for i in range(num_vertices) ]
+	elif neighbors_strategy == 'random':
+		all_indices = np.arange( num_vertices )
+		neighbors = []
+		num_random_neighs = 2*H
+		for i in range( num_vertices ):
+			all_but_i = np.array(list(set(all_indices) - set([i])))
+			np.random.shuffle( all_but_i )
+			neighbors.append( all_but_i[:num_random_neighs].copy() )
+	else:
+		raise RuntimeError( "Unknown laplacian neighbors: %s" % neighbors_strategy )
+	
 	poses = P
 	
 	## We should have an initial guess transformation for each point.

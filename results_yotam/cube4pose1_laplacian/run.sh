@@ -3,8 +3,8 @@
 OUTPUT_DIR=.
 ROOT_DIR="../.."
 
-REST_POSE="${ROOT_DIR}"/models/cube4/cube.obj
-OTHER_POSE_DIR="${ROOT_DIR}"/models/cube4/poses-1
+REST_POSE="${ROOT_DIR}"/models/cube.obj
+OTHER_POSE_DIR="${ROOT_DIR}"/models/cube
 
 INITIAL_GUESS_ARGS="--version 0 --print-all True"
 FLAT_INTERSECTION_ARGS="--energy laplacian --f-eps 0 --x-eps 0.01 -GT "${OTHER_POSE_DIR}" --error True --handles 4 --fancy-init "${OUTPUT_DIR}"/local_subspace_recover.txt --fancy-init-errors "${OUTPUT_DIR}"/local_subspace_recover_errors.txt --fancy-init-ssv "${OUTPUT_DIR}"/local_subspace_recover_ssv.txt"
