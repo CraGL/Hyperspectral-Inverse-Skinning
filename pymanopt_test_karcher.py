@@ -16,7 +16,7 @@ handles = 5
 lines = True
 if lines:
     dim = 3
-    Q = 1
+    Q = 2
     handles = 1
 
 N = 200
@@ -45,6 +45,9 @@ elif test_data == 'line':
 elif test_data == 'random':
     ## This is the default.
     pass
+elif test_data == 'cube':
+    assert dim == 3
+    assert Q == 2
 else:
     raise RuntimeError( "Unknown test data request" )
 
