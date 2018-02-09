@@ -523,6 +523,15 @@ def optimize_nullspace_directly(P, H, row_mats, deformed_vs, x0, strategy = None
 			x = solution.x
 			## Only break if we converge and ran just a few iterations.
 			if solution.success and solution.nit < MIN_NONLINEAR_ITER: break
+	elif strategy == 'basinhopping':
+		## Find the global minimum using the basin-hopping algorithm
+		from scipy.optimize import basinhopping
+		kwargs = {"method":"L-BFGS-B", "jac":True}
+		def show_grogress_basinhopping(x, f, accept):
+			show_progress(x)
+			
+		solution = basinhopping(f_point_distance_sum_and_gradient, x0, minimizer_kwargs=kwargs, callback=show_grogress_basinhopping, niter=max_iter, disp=True)
+		print(solution)
 	else:
 		raise RuntimeError( "Unknown strategy: " + str(strategy) )
 	
@@ -1274,10 +1283,7 @@ def optimize_laplacian( P, H, rest_mesh, deformed_vs, qs_data, qs_errors, qs_ssv
 			print( "=> E_total (after solving for Ts):", E_data_val + E_local_val )
 			print( "=> E_total (weighted, after solving for Ts):", f )
 			
-			print( "Function value:", f )
-			
-			
-			
+			print( "Function value:", f )	
 			
 			print( "Ts singular values:", np.linalg.svd( Ts, compute_uv = False ) )
 			
@@ -1381,7 +1387,7 @@ if __name__ == '__main__':
 	parser.add_argument('--handles', '-H', type=int, help='Number of handles.')
 	parser.add_argument('--ground-truth', '-GT', type=str, help='Ground truth data path.')
 	parser.add_argument('--recovery', '-R', type=float, help='Recovery test epsilon (default no recovery test).')
-	parser.add_argument('--strategy', '-S', type=str, choices = ['function', 'gradient', 'hessian', 'newton', 'mixed', 'grassmann', 'pinv', 'pinv+ssv:skip', 'pinv+ssv:weighted', 'ssv:skip', 'ssv:weighted', 'perfectp'], help='Strategy: function, gradient (default), hessian, newton, mixed, grassmann (for energy B only), pinv and ssv (for energy biquadratic only), perfectp (ipca only).')
+	parser.add_argument('--strategy', '-S', type=str, choices = ['function', 'gradient', 'hessian', 'newton', 'mixed', 'grassmann', 'pinv', 'pinv+ssv:skip', 'pinv+ssv:weighted', 'ssv:skip', 'ssv:weighted', 'perfectp', 'basinhopping'], help='Strategy: function, gradient (default), hessian, newton, mixed, grassmann (for energy B only), basinhopping (for energy B only), pinv and ssv (for energy biquadratic only), perfectp (ipca only).')
 	parser.add_argument('--energy', '-E', type=str, default='B', choices = ['B', 'cayley', 'B+cayley', 'B+B', 'cayley+cayley', 'biquadratic', 'biquadratic+B', 'biquadratic+handles', 'laplacian', 'ipca', 'flag'], help='Energy: B (default), cayley, B+cayley, B+B, cayley+cayley, biquadratic, biquadratic+B, biquadratic+handles, laplacian, ipca (iterative PCA), flag (flag mean).')
 	## UPDATE: type=bool does not do what we think it does. bool("False") == True.
 	##		   For more, see https://stackoverflow.com/questions/15008758/parsing-boolean-values-with-argparse
