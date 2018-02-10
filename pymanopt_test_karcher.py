@@ -27,6 +27,7 @@ from pprint import pprint
 print( "args:" )
 pprint( args )
 print( "Re-run with:" )
+import sys
 try:
     import shlex
     print( ' '.join([ shlex.quote( a ) for a in sys.argv ]) )
@@ -43,7 +44,6 @@ if args.poses is not None: poses = args.poses
 if args.dim is not None: dim = args.dim
 if args.ortho is not None: Q = args.ortho
 if args.handles is not None: handles = args.handles
-optimize_from = args.optimize_from
 
 ## Lines in 3D
 if args.lines:
@@ -92,8 +92,8 @@ print( "ambient dimension:", dim )
 print( "number of given flats:", N )
 print( "given flat orthogonal dimension:", Q )
 print( "affine subspace dimension:", handles )
-print( "use optimization to improve the centroid:", optimize_from )
-print( "test data:", test_data )
+print( "use optimization to improve the centroid:", args.optimize_from )
+print( "test data:", args.test_data )
 print( "optimization cost function:", "simple" )
 print( "manifold:", "E^%s x Grassmann( %s, %s )" % ( dim, dim, handles ) )
 print( "====================================================" )
@@ -143,16 +143,16 @@ p_closest_to_origin = flat_metrics.canonical_point( p, B )
 dist_to_origin = np.linalg.norm( p_closest_to_origin )
 print( "Distance to the flat from the origin:", dist_to_origin )
 
-if optimize_from is not None:
+if args.optimize_from is not None:
     solver = TrustRegions()
-    if optimize_from == 'centroid':
+    if args.optimize_from == 'centroid':
         print( "Optimizing the Karcher mean with the simple original cost function." )
         Xopt2 = solver.solve(problem, x=Xopt)
-    elif optimize_from == 'random':
+    elif args.optimize_from == 'random':
         print( "Optimizing from random with the simple original cost function." )
         Xopt2 = solver.solve(problem)
     else:
-        raise RuntimeError( "Unknown --optimize-from parameter: %s" % optimize_from )
+        raise RuntimeError( "Unknown --optimize-from parameter: %s" % args.optimize_from )
     print( "Final cost:", cost( Xopt2 ) )
     
     if args.optimize_p:
