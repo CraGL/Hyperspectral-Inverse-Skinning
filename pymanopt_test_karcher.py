@@ -118,6 +118,7 @@ def cost(X):
         p = s*S
     elif args.manifold == 'graff':
         B = X[:-1]/X[-1:]
+        # B = X[:-1]
     else: raise RuntimeError
     
     sum = 0.
@@ -135,6 +136,7 @@ def cost(X):
             z = np.dot(
                     np.linalg.inv(
                         np.dot( AB.T, AB ) + weight * np.ones( ( B.shape[1], B.shape[1] ) )
+                        # np.dot( AB.T, AB ) + weight * np.outer( X[-1], X[-1] )
                         ),
                     np.dot( AB.T, np.dot( A, a ) ) + weight * np.ones( B.shape[1] )
                     )
