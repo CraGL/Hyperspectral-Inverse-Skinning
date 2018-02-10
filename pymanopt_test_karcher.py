@@ -18,8 +18,8 @@ parser.add_argument('--optimize-from', type=str, default = "centroid", choices =
 ##		   For more, see https://stackoverflow.com/questions/15008758/parsing-boolean-values-with-argparse
 str2bool_choices = {'true': True, 'yes': True, 'false': False, 'no': False}
 def str2bool(s): return str2bool_choices[s.lower()]
-parser.add_argument('--lines', type=str2bool, default = False, choices = list(str2bool_choices.keys()), help = 'Shorthand for --dim 3 --ortho 2 --handles 1.')
-parser.add_argument('--optimize-p', type=str2bool, default = True, choices = list(str2bool_choices.keys()), help = 'Whether or not to optimize p.')
+parser.add_argument('--lines', type=str2bool, default = False, help = 'Shorthand for --dim 3 --ortho 2 --handles 1.')
+parser.add_argument('--optimize-p', type=str2bool, default = True, help = 'Whether or not to optimize p.')
 args = parser.parse_args()
 
 ## Print the arguments.
@@ -59,6 +59,7 @@ if args.optimize_p:
 else:
     manifold = Grassmann(dim, handles)
     p = np.zeros(dim)
+    pg = p
 
 ## (1b) Generate data
 ## TODO: Zero energy test data.
@@ -94,6 +95,7 @@ print( "given flat orthogonal dimension:", Q )
 print( "affine subspace dimension:", handles )
 print( "use optimization to improve the centroid:", args.optimize_from )
 print( "test data:", args.test_data )
+print( "optimize p:", args.optimize_p )
 print( "optimization cost function:", "simple" )
 print( "manifold:", "E^%s x Grassmann( %s, %s )" % ( dim, dim, handles ) )
 print( "====================================================" )
@@ -104,6 +106,7 @@ def cost(X):
         p,B = X
     else:
         B = X
+        p = pg
     sum = 0.
     
     for A,a in flats:
@@ -124,7 +127,10 @@ def cost(X):
 problem = Problem(manifold=manifold, cost=cost)
 
 from pymanopt_karcher_mean import compute_centroid
-centroid = compute_centroid( manifold, [ ( a, A.T ) for A, a in flats ] )
+if args.optimize_p:
+    centroid = compute_centroid( manifold, [ ( a, A.T ) for A, a in flats ] )
+else:
+    centroid = compute_centroid( manifold, [ A.T for A, a in flats ] )
 Xopt = centroid
 
 print( "Final cost:", cost( Xopt ) )
