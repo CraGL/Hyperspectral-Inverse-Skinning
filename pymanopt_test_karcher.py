@@ -61,10 +61,31 @@ N = 200
 
 if args.manifold == 'pB':
     manifold = Product( [ Euclidean(dim), Grassmann(dim, handles) ] )
+    def pB_from_X( X ):
+        p, B = X
+        return p,B
+    def X_from_pB( p, B ):
+        return [ p, B ]
 elif args.manifold == 'ssB':
     manifold = Product( [ Euclidean(1), Sphere(dim), Grassmann(dim, handles) ] )
+    def pB_from_X( X ):
+        s, S, B = X
+        p = s*S
+        return p, B
+    def X_from_pB( p, B ):
+        return [ np.linalg.norm(p), p/np.linalg.norm(p), B ]
 elif args.manifold == 'graff':
     manifold = Grassmann(dim+1, handles+1)
+    def pB_from_X( X ):
+        B = X[:-1]/X[-1:]
+        p = B[:,:1]
+        B = B[:,1:] - p
+        p = p.squeeze()
+        return p, B
+    def X_from_pB( p, B ):
+        X = np.append( np.hstack([ p.reshape(-1,1), p.reshape(-1,1) + B ]), np.ones((1,B.shape[1]+1)), axis = 0 )
+        X = flat_metrics.orthonormalize( X )
+        return X
 else:
     raise RuntimeError( "Unknown problem manifold: %s" % args.manifold )
 
@@ -111,11 +132,8 @@ print( "====================================================" )
 
 # (2) Define the cost function (here using autograd.numpy)
 def cost(X):
-    if args.manifold == 'pB':
-        p,B = X
-    elif args.manifold == 'ssB':
-        s, S, B = X
-        p = s*S
+    if args.manifold in ('pB','ssB'):
+        p,B = pB_from_X( X )
     elif args.manifold == 'graff':
         B = X[:-1]/X[-1:]
         # B = X[:-1]
@@ -168,6 +186,9 @@ if args.mean == 'karcher':
 elif args.mean == 'projection':
     from pymanopt_karcher_mean import compute_projection_mean as compute_mean
 
+
+## I think this packing isn't what we want for graff manifold.
+# centroid = compute_mean( manifold, [ X_from_pB( a, A.T ) for A, a in flats ] )
 if args.manifold == 'pB':
     centroid = compute_mean( manifold, [ ( a, A.T ) for A, a in flats ] )
 elif args.manifold == 'ssB':
@@ -183,17 +204,7 @@ Xopt = centroid
 print( "Final cost:", cost( Xopt ) )
 
 # Is zero in the solution flat?
-if args.manifold == 'pB':
-    p,B = Xopt
-elif args.manifold == 'ssB':
-    s, S, B = Xopt
-    p = s*S
-elif args.manifold == 'graff':
-    B = Xopt[:-1]/Xopt[-1:]
-    p = B[:,:1]
-    B = B[:,1:] - p
-    p = p.squeeze()
-else: raise RuntimeError
+p,B = pB_from_X( Xopt )
 print( 'p.T:' )
 print( p.T )
 print( 'B.T:' )
@@ -213,13 +224,7 @@ if args.optimize_from is not None or args.load is not None:
         loaded = np.load( args.load )
         p = loaded['p']
         B = loaded['B']
-        if args.manifold == 'pB':
-            Xopt = [p,B]
-        elif args.manifold == 'ssB':
-            Xopt = [ np.linalg.norm(p), p/np.linalg.norm(p), B ]
-        elif args.manifold == 'graff':
-            Xopt = np.append( np.hstack([ p.reshape(-1,1), p.reshape(-1,1) + B ]), np.ones((1,B.shape[1]+1)), axis = 0 )
-            Xopt = flat_metrics.orthonormalize( Xopt )
+        Xopt = X_from_pB( p, B )
         
         print( "Optimizing the initial guess with the simple original cost function." )
         solver = ConjugateGradient()
@@ -235,16 +240,7 @@ if args.optimize_from is not None or args.load is not None:
         raise RuntimeError( "Unknown --optimize-from parameter: %s" % args.optimize_from )
     print( "Final cost:", cost( Xopt2 ) )
     
-    if args.manifold == 'pB':
-        p2,B2 = Xopt2
-    elif args.manifold == 'ssB':
-        s2, S2, B2 = Xopt2
-        p2 = s2*S2
-    elif args.manifold == 'graff':
-        B2 = Xopt2[:-1]/Xopt2[-1:]
-        p2 = B2[:,:1]
-        B2 = B2[:,1:] - p2
-        p2 = p2.squeeze()
+    p2,B2 = pB_from_X( Xopt2 )
     print( 'p2.T:' )
     print( p2.T )
     print( 'B2.T:' )
