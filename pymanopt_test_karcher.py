@@ -12,6 +12,7 @@ parser.add_argument('--poses', '-P', type=int, help='Number of poses.')
 parser.add_argument('--dim', type=int, help='Ambient dimension.')
 parser.add_argument('--ortho', type=int, help='Given flats\' orthogonal dimesion.')
 parser.add_argument('--handles', '-H', type=int, help = 'Number of handles.')
+parser.add_argument('--mean', type=str, default = 'karcher', choices = ['karcher', 'projection'], help = 'Type of mean.')
 parser.add_argument('--test-data', type=str, default = 'random', choices = ['random', 'zero', 'line', 'cube'], help = 'What test data to generate. zero means all flats pass through the origin. lines means there is a line passing through all flats. cube means the edges of a hypercube are specified as lines.')
 parser.add_argument('--optimize-from', type=str, default = "centroid", choices = [ "random", "centroid" ], help ='What optimization to run (if specified). Choices are "random" and "centroid".')
 ## UPDATE: type=bool does not do what we think it does. bool("False") == True.
@@ -95,6 +96,7 @@ print( "given flat orthogonal dimension:", Q )
 print( "affine subspace dimension:", handles )
 print( "use optimization to improve the centroid:", args.optimize_from )
 print( "test data:", args.test_data )
+print( "mean:", args.mean )
 print( "optimize p:", args.optimize_p )
 print( "optimization cost function:", "simple" )
 print( "manifold:", "E^%s x Grassmann( %s, %s )" % ( dim, dim, handles ) )
@@ -126,11 +128,15 @@ def cost(X):
 
 problem = Problem(manifold=manifold, cost=cost)
 
-from pymanopt_karcher_mean import compute_centroid
+if args.mean == 'karcher':
+    from pymanopt_karcher_mean import compute_centroid as compute_mean
+elif args.mean == 'projection':
+    from pymanopt_karcher_mean import compute_projection_mean as compute_mean
+
 if args.optimize_p:
-    centroid = compute_centroid( manifold, [ ( a, A.T ) for A, a in flats ] )
+    centroid = compute_mean( manifold, [ ( a, A.T ) for A, a in flats ] )
 else:
-    centroid = compute_centroid( manifold, [ A.T for A, a in flats ] )
+    centroid = compute_mean( manifold, [ A.T for A, a in flats ] )
 Xopt = centroid
 
 print( "Final cost:", cost( Xopt ) )
