@@ -1,0 +1,110 @@
+Current best:
+
+# Random flats
+
+python3 pymanopt_test_karcher.py --optimize-from centroid --manifold pB
+(better than optimize from random)
+====================================================
+ambient dimension: 120
+number of given flats: 200
+given flat orthogonal dimension: 30
+affine subspace dimension: 5
+use optimization to improve the centroid: True
+test data: random
+optimization cost function: simple
+manifold: E^120 x Grassmann( 120, 5 )
+====================================================
+acc       k:    76     num_inner:    18     f: +2.598658e+02   |grad|: 1.761838e+00   reached target residual-kappa (linear)
+Terminated - max time reached after 76 iterations.
+Final cost: 259.865813193
+Distance to the flat from the origin: 5.43308033762
+
+
+python3 pymanopt_test_karcher.py --manifold graff --optimize-from centroid
+(better than optimize from random or optimize from saved pB centroid output)
+====================================================
+ambient dimension: 120
+number of given flats: 200
+given flat orthogonal dimension: 30
+affine subspace dimension: 5
+use optimization to improve the centroid: centroid
+load optimization initial guess from a file: None
+test data: random
+mean: karcher
+manifold: graff
+optimization cost function: simple
+manifold: E^120 x Grassmann( 120, 5 )
+====================================================
+acc       k:   106     num_inner:    97     f: +2.609108e+02   |grad|: 1.157142e-04   reached target residual-theta (superlinear)
+Terminated - max time reached after 106 iterations.
+Final cost: 260.910781554
+Distance to the flat from the origin: 5.43663670807
+
+pymanopt_test_karcher.py --manifold graff --optimize-from random
+====================================================
+ambient dimension: 120
+number of given flats: 200
+given flat orthogonal dimension: 30
+affine subspace dimension: 5
+use optimization to improve the centroid: random
+load optimization initial guess from a file: None
+test data: random
+mean: karcher
+manifold: graff
+optimization cost function: simple
+manifold: E^120 x Grassmann( 120, 5 )
+====================================================
+REJ TR-   k:    71     num_inner:   318     f: +2.617582e+02   |grad|: 4.595286e-06   reached target residual-theta (superlinear)
+Terminated - max time reached after 71 iterations.
+Final cost: 261.758242733
+Distance to the flat from the origin: 5.4307429023
+
+---
+
+# Random lines
+
+pymanopt_test_karcher.py --manifold pB --optimize-from centroid --lines yes
+====================================================
+ambient dimension: 3
+number of given flats: 200
+given flat orthogonal dimension: 2
+affine subspace dimension: 1
+use optimization to improve the centroid: centroid
+load optimization initial guess from a file: None
+test data: random
+mean: karcher
+manifold: pB
+optimization cost function: simple
+manifold: E^3 x Grassmann( 3, 1 )
+====================================================
+acc       k:     9     num_inner:     3     f: +1.631681e+01   |grad|: 1.242780e-07   reached target residual-theta (superlinear)
+Terminated - min grad norm reached after 9 iterations, 40.47 seconds.
+Final cost: 16.3168098644
+p2.T:
+[ 0.56214087  0.46485883  0.51619574]
+B2.T:
+[[-0.99141507 -0.09930668 -0.08505498]]
+Distance to the flat from the origin: 0.615994070361
+
+pymanopt_test_karcher.py --manifold graff --optimize-from centroid --lines yes
+====================================================
+ambient dimension: 3
+number of given flats: 200
+given flat orthogonal dimension: 2
+affine subspace dimension: 1
+use optimization to improve the centroid: centroid
+load optimization initial guess from a file: None
+test data: random
+mean: karcher
+manifold: graff
+optimization cost function: simple
+manifold: E^3 x Grassmann( 3, 1 )
+====================================================
+acc       k:    13     num_inner:     3     f: +1.631674e+01   |grad|: 2.628522e-08   reached target residual-theta (superlinear)
+Terminated - min grad norm reached after 13 iterations, 21.97 seconds.
+Final cost: 16.3167372344
+p2.T:
+[-1.63739677  0.24456344  0.32752156]
+B2.T:
+[[ 2.42814899  0.24319249  0.20828396]]
+Distance to the flat from the origin: 0.616004829414
