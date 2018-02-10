@@ -171,7 +171,9 @@ if args.manifold == 'pB':
 elif args.manifold == 'ssB':
     centroid = compute_mean( manifold, [ ( np.linalg.norm(a), a/np.linalg.norm(a), A.T ) for A, a in flats ] )
 elif args.manifold == 'graff':
-    centroid = compute_mean( manifold, [ flat_metrics.orthonormalize( np.hstack( [ A, np.dot( A, a ).reshape(-1,1) ] ).T ) for A, a in flats ] )
+    ## https://en.wikipedia.org/wiki/Affine_Grassmannian_(manifold)
+    ## The orthogonal space next to -rhs
+    centroid = compute_mean( manifold, [ flat_metrics.orthonormalize( np.hstack( [ A, -np.dot( A, a ).reshape(-1,1) ] ).T ) for A, a in flats ] )
 else: raise RuntimeError
 
 Xopt = centroid

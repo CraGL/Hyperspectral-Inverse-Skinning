@@ -108,3 +108,106 @@ p2.T:
 B2.T:
 [[ 2.42814899  0.24319249  0.20828396]]
 Distance to the flat from the origin: 0.616004829414
+
+---
+
+# Random lines through the origin
+
+pymanopt_test_karcher.py --manifold pB --optimize-from centroid --lines yes --test-data zero
+====================================================
+ambient dimension: 3
+number of given flats: 200
+given flat orthogonal dimension: 2
+affine subspace dimension: 1
+use optimization to improve the centroid: centroid
+load optimization initial guess from a file: None
+test data: zero
+mean: karcher
+manifold: pB
+optimization cost function: simple
+manifold: E^3 x Grassmann( 3, 1 )
+====================================================
+acc       k:     1     num_inner:     1     f: +2.844149e-53   |grad|: 1.009433e-25   reached target residual-theta (superlinear)
+Terminated - min grad norm reached after 1 iterations, 3.20 seconds.
+Final cost: 2.84414941974e-53
+p2.T:
+[  3.13755302e-13   3.36043952e-13   3.10135503e-13]
+B2.T:
+[[-0.56575946 -0.60595006 -0.55923229]]
+Distance to the flat from the origin: 5.36685212702e-28
+
+pymanopt_test_karcher.py --manifold graff --optimize-from centroid --lines yes --test-data zero
+====================================================
+ambient dimension: 3
+number of given flats: 200
+given flat orthogonal dimension: 2
+affine subspace dimension: 1
+use optimization to improve the centroid: centroid
+load optimization initial guess from a file: None
+test data: zero
+mean: karcher
+manifold: graff
+optimization cost function: simple
+manifold: E^3 x Grassmann( 3, 1 )
+====================================================
+acc       k:     2     num_inner:     1     f: +1.290133e-33   |grad|: 2.830478e-09   reached target residual-kappa (linear)
+Terminated - min grad norm reached after 2 iterations, 2.24 seconds.
+Final cost: 1.29013324133e-33
+p2.T:
+[ -7.30781601e+23  -4.02190956e+23   7.55083062e+23]
+B2.T:
+[[  2.88280202e+24   3.10295649e+24   2.76622544e+24]]
+Distance to the flat from the origin: 1.0969616088e+24
+(the origin is degenerate for graff; infinitely many solutions)
+
+---
+
+# Random lines along a line
+
+pymanopt_test_karcher.py --manifold pB --optimize-from centroid --lines yes --test-data line
+The solution should have slope: 0.57735026919
+====================================================
+ambient dimension: 3
+number of given flats: 200
+given flat orthogonal dimension: 2
+affine subspace dimension: 1
+use optimization to improve the centroid: centroid
+load optimization initial guess from a file: None
+test data: line
+mean: karcher
+manifold: pB
+optimization cost function: simple
+manifold: E^3 x Grassmann( 3, 1 )
+====================================================
+acc       k:     3     num_inner:     3     f: +1.588895e-23   |grad|: 7.289263e-09   reached target residual-theta (superlinear)
+Terminated - min grad norm reached after 3 iterations, 11.00 seconds.
+Final cost: 1.58889451666e-23
+p2.T:
+[ 99.49999992  99.49999992  99.49999992]
+B2.T:
+[[-0.57735027 -0.57735027 -0.57735027]]
+Distance to the flat from the origin: 6.44521405232e-13
+
+pymanopt_test_karcher.py --manifold graff --optimize-from centroid --lines yes --test-data line
+The solution should have slope: 0.57735026919
+====================================================
+ambient dimension: 3
+number of given flats: 200
+given flat orthogonal dimension: 2
+affine subspace dimension: 1
+use optimization to improve the centroid: centroid
+load optimization initial guess from a file: None
+test data: line
+mean: karcher
+manifold: graff
+optimization cost function: simple
+manifold: E^3 x Grassmann( 3, 1 )
+====================================================
+acc       k:    10     num_inner:     3     f: +2.195053e-17   |grad|: 3.877735e-09   reached target residual-theta (superlinear)
+Terminated - min grad norm reached after 10 iterations, 10.67 seconds.
+Final cost: 2.19505278765e-17
+p2.T:
+[-1.28665512 -1.28665512 -1.28665512]
+B2.T:
+[[ 1.5457248  1.5457248  1.5457248]]
+Distance to the flat from the origin: 8.07158863223e-14
