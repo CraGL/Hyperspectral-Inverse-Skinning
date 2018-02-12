@@ -79,7 +79,16 @@ elif args.manifold == 'ssB':
 elif args.manifold == 'graff':
     manifold = Grassmann(dim+1, handles+1)
     def pB_from_X( X ):
-        B = X[:-1]/X[-1:]
+        if abs(X[:-1]).min() < 1e-10:
+            ## I expect that in this case, one of the columns is: [ 0 ... 0 1 ]
+            ## and the others are [ ... 0 ].
+            ## This corresponds to a flat through the origin, and we can simply ignore
+            ## the bottom row.
+            import pdb
+            pdb.set_trace()
+            B = X[:-1]
+        else:
+            B = X[:-1]/X[-1:]
         p = B[:,:1]
         B = B[:,1:] - p
         # This B won't be orthonormal, unlike the other methods. Orthonormalize.
