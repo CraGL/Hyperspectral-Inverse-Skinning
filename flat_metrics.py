@@ -60,6 +60,56 @@ def canonical_point( p, B ):
     # p_closest = p - B.dot( linalg.pinv( B.T.dot( B ) ).dot( B.T.dot(p) ) )
     return p_closest
 
+def optimal_p_given_B_for_flats_ortho( B, flats ):
+    '''
+    Given:
+        B: A (not necessarily orthonormal) matrix whose columns are directions in the ambient space R^n.
+        flats: A sequence of ( matrix, vector ) pairs ( A, a ) defining flats implicitly via A*x = a for x in R^n.
+    Returns:
+        p: The point p in R^n for argmin_{p,z} sum_{A,a in flats} |A(p+Bz-a)|^2, (aka a point through which the explicit flat p + Bz should pass).
+    '''
+    
+    ## E = |A(p+Bz-a)|^2 = M:M
+    ## dE = 2M : dM
+    ## dM = A dp + AB dz
+    ## dE = 2M:A dp + 2M:A B dz
+    ## dE = 2 A' M : dp + 2 B' A' M : dz
+    ## dE/dz = 2 B' A' M = 2 B' A' (Ap + ABz - Aa) = 0
+    ##      <=> 2 B' A' A B z = -2 B'A'(Ap-Aa)
+    ##      <=> z = -inv(B' A' A B) B'A'(Ap-Aa)
+    ## => M = Ap-Aa - AB inv(B' A' A B) B'A'(Ap-Aa)
+    ##      = ( I - AB inv(B' A' A B) B'A' ) (Ap-Aa)
+    ## Q = ( I - AB inv(B' A' A B) B'A' )
+    ## Q is a projection matrix, so QQ = Q and Q' = Q
+    ## M = Q (Ap-Aa)
+    ## dM = Q A dp
+    ## dE = 2M : dM = 2M : Q A dp
+    ##    = 2 A' Q M : dp
+    ## dE/dp = 0 = 2 A' Q M = 2 A' Q Q ( Ap-Aa ) = 2 A' Q A ( p - a )
+    ##      <=> sum_i ( 2 A' Q A ) p = sum_i( 2 A' Q A a )
+    
+    assert len( flats ) > 0
+    
+    n = flats[0][0].shape[1]
+    
+    system = zeros( (n,n) )
+    rhs = zeros( n )
+    
+    for A, a in flats:
+        AB = dot( A, B )
+        ## If A can have fewer rows than B has columns, then we need lstsq() to be safe.
+        Q = -dot( AB, linalg.lstsq( dot( AB.T, AB ), AB.T )[0] )
+        Q[diag_indices_from(Q)] += 1
+        AQA = dot( A.T, dot( Q, A ) )
+        system += AQA
+        rhs += dot( AQA, a )
+    
+    ## The smallest singular value is always small, because any point on the flat
+    ## is just as good as any other. Use lstsq() to find the smallest norm solution.
+    # assert linalg.norm( system, ord = -2 ) < 1e-5
+    p = linalg.lstsq( system, rhs )[0]
+    return p
+
 def test_principal_angles():
     A = array([[1,0,0]]).T
     B = array([[0,1,0]]).T
@@ -111,10 +161,22 @@ def test_orthonormalize():
 def test_canonical_point():
     p_closest = canonical_point( [1,1,0], array([[1,0,0],[0,1,0]]).T )
     numpy.testing.assert_allclose( p_closest, zeros(3) )
-    
+
+def test_optimal_p_given_B_for_flats_ortho():
+    dim = 5
+    ortho_dim = 2
+    p_truth = random.random(dim)
+    flats = [ ( random.random((ortho_dim,dim)), p_truth ) for i in range(10) ]
+    ## Make sure B dimension is <= ortho_dim dimension
+    B = random.random((dim,2))
+    p_best = optimal_p_given_B_for_flats_ortho( B, flats )
+    numpy.testing.assert_allclose( p_best, p_truth )
+
 def main():
+    print( "Debug the following by running: nosetests --pdb flat_metrics.py" )
     import nose
     nose.runmodule()
+    # test_optimal_p_given_B_for_flats_ortho()
 
 if __name__ == '__main__':
     main()
