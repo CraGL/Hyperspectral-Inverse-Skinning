@@ -1057,11 +1057,18 @@ def optimize_iterative_pca( P, H, row_mats, deformed_vs, x0, max_iter = None, st
 			mapper = SpaceMapper.Uncorrellated_Space( Q, dimension = B.shape[1] )
 			pt = mapper.Xavg_.T
 			B = mapper.V_[:H-1].T
+			## A canonical p (for convergence testing without tangential drift):
 			pt_canonical = flat_metrics.canonical_point( pt, B )
+			## The best p (also has no tangential drift):
+			if strategy == 'perfectp':
+				## This minimizes the flat distance.
+				pt_canonical = flat_metrics.optimal_p_given_B_for_flats_ortho( B, [ ( A/(np.linalg.norm(A[0])), np.dot( A.T/(np.linalg.norm(A[0])), a.ravel()/(np.linalg.norm(A[0])) ) ) for A, a in zip( row_mats, deformed_vs ) ] )
 			print( "|pt_canonical - pt|:", np.linalg.norm( pt - pt_canonical ) )
 			pt = pt_canonical
 			x = pack( pt, B )
 			if strategy == 'perfectp':
+				## This minimizes the 3D distance. It gives a slightly better p for the 3D error
+				## than flat_metrics.optimal_p_given_B_for_flats_ortho().
 				_, x = optimize_approximated_quadratic( P, H, row_mats, deformed_vs, x, max_iter = 1 )
 			error_recorder.add_error(x)
 			print( "|p - p0|:", np.linalg.norm( pt.ravel() - unpack( x0,P )[0].ravel() ) )

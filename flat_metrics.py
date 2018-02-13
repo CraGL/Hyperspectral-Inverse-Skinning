@@ -64,7 +64,7 @@ def optimal_p_given_B_for_flats_ortho( B, flats ):
     '''
     Given:
         B: A (not necessarily orthonormal) matrix whose columns are directions in the ambient space R^n.
-        flats: A sequence of ( matrix, vector ) pairs ( A, a ) defining flats implicitly via A*x = a for x in R^n.
+        flats: A sequence of ( matrix, vector ) pairs ( A, a ) defining flats implicitly via A*(x-a)=0 for x in R^n.
     Returns:
         p: The point p in R^n for argmin_{p,z} sum_{A,a in flats} |A(p+Bz-a)|^2, (aka a point through which the explicit flat p + Bz should pass).
     '''
