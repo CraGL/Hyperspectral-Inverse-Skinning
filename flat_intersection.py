@@ -716,7 +716,8 @@ def optimize_approximated_quadratic(P, H, row_mats, deformed_vs, x0, f_eps = Non
 				C += np.dot(r_i.T, r_i)
 			
 			f = normalization * (np.dot(np.dot(pt.T,Q), pt) - 2*np.dot(pt.T,L) + C)
-			pt_new = np.linalg.solve(Q,L)
+			## This should be ambiguous, so use lstsq() (or pinv())
+			pt_new = np.linalg.lstsq(Q,L)[0]
 			# pt_new = np.linalg.pinv(Q).dot(L)
 			f_new = normalization * (np.dot(np.dot(pt_new.T,Q), pt_new) - 2*np.dot(pt_new.T,L) + C)
 			
@@ -1057,26 +1058,33 @@ def optimize_iterative_pca( P, H, row_mats, deformed_vs, x0, max_iter = None, st
 			mapper = SpaceMapper.Uncorrellated_Space( Q, dimension = B.shape[1] )
 			pt = mapper.Xavg_.T
 			B = mapper.V_[:H-1].T
-			## A canonical p (for convergence testing without tangential drift):
-			pt_canonical = flat_metrics.canonical_point( pt, B )
-			## The best p (also has no tangential drift):
+			
 			if strategy == 'perfectp':
-				## This minimizes the flat distance.
-				pt_canonical = flat_metrics.optimal_p_given_B_for_flats_ortho( B, [ ( A/(np.linalg.norm(A[0])), np.dot( A.T/(np.linalg.norm(A[0])), a.ravel()/(np.linalg.norm(A[0])) ) ) for A, a in zip( row_mats, deformed_vs ) ] )
-			print( "|pt_canonical - pt|:", np.linalg.norm( pt - pt_canonical ) )
-			pt = pt_canonical
-			x = pack( pt, B )
-			if strategy == 'perfectp':
+				## This minimizes the 12P-dimensional flat distance.
+				# pt_perfect = flat_metrics.optimal_p_given_B_for_flats_ortho( B, [ ( A/(np.linalg.norm(A[0])), np.dot( A.T/(np.linalg.norm(A[0])), a.ravel()/(np.linalg.norm(A[0])) ) ) for A, a in zip( row_mats, deformed_vs ) ] )
 				## This minimizes the 3D distance. It gives a slightly better p for the 3D error
 				## than flat_metrics.optimal_p_given_B_for_flats_ortho().
-				_, x = optimize_approximated_quadratic( P, H, row_mats, deformed_vs, x, max_iter = 1 )
+				pt_perfect = unpack( optimize_approximated_quadratic( P, H, row_mats, deformed_vs, pack( pt, B ), max_iter = 1 )[1], P )[0].ravel()
+				print( "|p - p_perfect|:", np.linalg.norm( pt - pt_perfect ) )
+				pt = pt_perfect
+			
+			## A canonical p (for convergence testing without tangential drift):
+			pt_canonical = flat_metrics.canonical_point( pt, B )
+			print( "|p - p_canonical|:", np.linalg.norm( pt - pt_canonical ) )
+			pt = pt_canonical
+			x = pack( pt, B )
 			error_recorder.add_error(x)
-			print( "|p - p0|:", np.linalg.norm( pt.ravel() - unpack( x0,P )[0].ravel() ) )
-			print( "B angles with B0:", ( B * unpack( x0,P )[1] ).sum(0) )
-			print( "B angles with B0 (principal angles):", flat_metrics.principal_angles( B, unpack( x0,P )[1] ) )
+			p_diff = np.linalg.norm( pt.ravel() - unpack( x0,P )[0].ravel() )
+			print( "|p - p0|:", p_diff )
+			## This is wrong:
+			# print( "B angles with B0:", ( B * unpack( x0,P )[1] ).sum(0) )
+			## This is right:
+			B_diff = flat_metrics.principal_angles( B, unpack( x0,P )[1] )
+			print( "B angles with B0 (principal angles):", B_diff )
 			print( "|x - x0|:", np.linalg.norm( x - x0 ) )
 			print( "max( x - x0 ):", abs( x - x0 ).max() )
-			if np.allclose( x, x0 ):
+			# if np.allclose( x, x0 ):
+			if np.allclose( p_diff, 0 ) and np.allclose( B_diff, np.ones( B_diff.shape ) ):
 				print( "Terminated under threshold after iterations:", iterations )
 				converged = True
 				break
