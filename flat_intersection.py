@@ -1079,8 +1079,8 @@ def optimize_iterative_pca( P, H, row_mats, deformed_vs, x0, max_iter = None, st
 			## This is wrong:
 			# print( "B angles with B0:", ( B * unpack( x0,P )[1] ).sum(0) )
 			## This is right:
-			B_diff = flat_metrics.principal_angles( B, unpack( x0,P )[1] )
-			print( "B angles with B0 (principal angles):", B_diff )
+			B_diff = flat_metrics.principal_cosangles( B, unpack( x0,P )[1] )
+			print( "B angles with B0 (principal cosine angles):", B_diff )
 			print( "|x - x0|:", np.linalg.norm( x - x0 ) )
 			print( "max( x - x0 ):", abs( x - x0 ).max() )
 			# if np.allclose( x, x0 ):

@@ -3,7 +3,7 @@ from __future__ import division, print_function
 import numpy
 from numpy import *
 
-def principal_angles( A, B, orthonormal = False ):
+def principal_cosangles( A, B, orthonormal = False ):
     '''
     Given:
         A: A matrix whose columns are directions in the ambient space
@@ -15,7 +15,26 @@ def principal_angles( A, B, orthonormal = False ):
     if not orthonormal:
         A = orthonormalize( A )
         B = orthonormalize( B )
-    return linalg.svd( A.T.dot( B ), compute_uv = False )
+    principal_angles = linalg.svd( A.T.dot( B ), compute_uv = False )
+    ## Any dimension mis-match should produce zero singular values.
+    principal_angles = append(
+        principal_angles,
+        zeros(max(A.shape[1],B.shape[1])-min(A.shape[1],B.shape[1]))
+        )
+    return principal_angles
+
+def principal_angles( A, B, orthonormal = False ):
+    '''
+    Given:
+        A: A matrix whose columns are directions in the ambient space
+        B: A matrix whose columns are directions in the ambient space
+    Returns:
+        The 1D array of principal angles (in radians) between A and B
+    '''
+    cosangles = principal_cosangles( A, B, orthonormal )
+    ## Clip because acos() hates values epsilon outside [-1,1].
+    angles = arccos( cosangles.clip(-1,1) )
+    return angles
 
 def orthonormalize( A, threshold = None ):
     '''
@@ -114,25 +133,38 @@ def test_principal_angles():
     A = array([[1,0,0]]).T
     B = array([[0,1,0]]).T
     angles = principal_angles( A, B, orthonormal = True )
-    numpy.testing.assert_allclose( angles, zeros(1) )
+    numpy.testing.assert_allclose( angles, pi/2*ones(1) )
+    cosangles = principal_cosangles( A, B, orthonormal = True )
+    numpy.testing.assert_allclose( cosangles, zeros(1) )
+    
     ## Check if orthonormalization is working.
     angles = principal_angles( 2*A, -10*B )
-    numpy.testing.assert_allclose( angles, zeros(1) )
+    numpy.testing.assert_allclose( angles, pi/2*ones(1) )
+    cosangles = principal_cosangles( 2*A, -10*B )
+    numpy.testing.assert_allclose( cosangles, zeros(1) )
     
+    ## When one flat has more dimensions than the other, there should be more 90-degree
+    ## angles returned.
     A = array([[1,0,0],[0,0,1]]).T
     B = array([[0,1,0]]).T
     angles = principal_angles( A, B )
-    numpy.testing.assert_allclose( angles, zeros(1) )
+    numpy.testing.assert_allclose( angles, pi/2*ones(2) )
+    cosangles = principal_cosangles( A, B )
+    numpy.testing.assert_allclose( cosangles, zeros(2) )
     
     A = array([[1,1,0]]).T
     B = array([[1,0,0]]).T
     angles = principal_angles( A, B )
-    numpy.testing.assert_allclose( angles, (1/sqrt(2))*ones(1) )
+    numpy.testing.assert_allclose( angles, pi/4*ones(1) )
+    cosangles = principal_cosangles( A, B )
+    numpy.testing.assert_allclose( cosangles, (1/sqrt(2))*ones(1) )
     
     A = array([[1,0,0],[0,0,1]]).T
     B = array([[1,1,0]]).T
     angles = principal_angles( A, B )
-    numpy.testing.assert_allclose( angles, cos(pi/4)*ones(1) )
+    numpy.testing.assert_allclose( angles, [ pi/4, pi/2 ] )
+    cosangles = principal_cosangles( A, B )
+    numpy.testing.assert_allclose( cosangles, [ cos(pi/4), 0 ] )
 
 def test_orthonormalize():
     A = identity(3)
