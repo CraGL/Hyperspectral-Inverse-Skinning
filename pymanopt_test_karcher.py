@@ -1,3 +1,4 @@
+import autograd
 import autograd.numpy as np
 np.set_printoptions( linewidth = 2000 )
 
@@ -27,6 +28,8 @@ parser.add_argument('--save', type=str, help = 'If specified, saves p and B to f
 parser.add_argument('--load', type=str, help = 'If specified, loads p and B from the file name as the initial guess for optimization.')
 parser.add_argument('--lines', type=str2bool, default = False, help = 'Shorthand for --dim 3 --ortho 2 --handles 1.')
 parser.add_argument('--centroid-best-p', type=str2bool, default = False, help ='Whether or not to improve the centroid guess with the optimal p (default: False, because it seems to harm optimization).')
+parser.add_argument('--flats-are-vertices', type=str2bool, default = False, help ='Whether or not to assume flats are I kron [x y z 1].')
+parser.add_argument('--recovery', type=float, help ='Recovery test magnitude.')
 args = parser.parse_args()
 
 ## Print the arguments.
@@ -93,6 +96,7 @@ else:
     import scipy.io
     test_data = scipy.io.loadmat( args.test_data )
     flats = [ ( A, a ) for A, a in zip( test_data['A'], test_data['a_full'] ) ]
+    # flats = flats[:2]
     N = len( flats )
     dim = flats[0][0].shape[1]
     assert dim % 12 == 0
@@ -155,10 +159,17 @@ print( "optimization cost function:", "simple" )
 print( "manifold:", "E^%s x Grassmann( %s, %s )" % ( dim, dim, handles ) )
 print( "====================================================" )
 
+def repeated_block_diag_times_matrix( block, matrix ):
+    # return scipy.sparse.block_diag( [ block ]*( matrix.shape[0]//block.shape[1] ) ).dot( matrix )
+    # print( abs( scipy.sparse.block_diag( [ block ]*( matrix.shape[0]//block.shape[1] ) ).dot( matrix ) - numpy.dot( block, matrix.reshape( block.shape[1], -1, order='F' ) ).reshape( -1, matrix.shape[1], order='F' ) ).max() )
+    return np.dot( block, matrix.reshape( block.shape[1], -1, order='F' ) ).reshape( -1, matrix.shape[1], order='F' )
+
 # (2) Define the cost function (here using autograd.numpy)
 def cost(X):
     if args.manifold in ('pB','ssB'):
         p,B = pB_from_X( X )
+        ## For type checking, I want everything to be a matrix.
+        p = p.reshape(-1,1)
     elif args.manifold == 'graff':
         ## graff_div False works so much better!
         graff_div = False
@@ -170,28 +181,36 @@ def cost(X):
         else:
             B = X[:-1]
             Qaffine = np.outer( X[-1], X[-1] )
-            RHSaffine = X[-1]
+            RHSaffine = X[-1].reshape(-1,1)
     else: raise RuntimeError
     
     sum = 0.
     
     for A,a in flats:
-        # a = np.zeros(a.shape)
-        AB = np.dot( A, B )
+        def Adot( rhs ):
+            if args.flats_are_vertices:
+                return repeated_block_diag_times_matrix( A[:1,:4], rhs )
+            else:
+                return np.dot( A, rhs )
+        
+        ## For type checking, I want everything to be a matrix.
+        a = a.reshape(-1,1)
+        
+        AB = Adot( B )
         
         if args.manifold in ('pB','ssB'):
-            z = np.dot( np.linalg.inv( np.dot( AB.T, AB ) ), -np.dot( AB.T, np.dot( A, p - a ) ) )
-            diff = np.dot( A, p + np.dot( B, z ) - a )
+            z = np.dot( np.linalg.inv( np.dot( AB.T, AB ) ), -np.dot( AB.T, Adot( p - a ) ) )
+            diff = Adot( p + np.dot( B, z ) - a )
         elif args.manifold == 'graff':
             ## Impose the z sum-to-one constraint via a large penalty.
             z = np.dot(
                     np.linalg.inv( np.dot( AB.T, AB ) + weight_affine * Qaffine ),
-                    np.dot( AB.T, np.dot( A, a ) ) + weight_affine * RHSaffine
+                    np.dot( AB.T, Adot( a ) ) + weight_affine * RHSaffine
                     )
-            diff = np.dot( A, np.dot( B, z ) - a )
+            diff = Adot( np.dot( B, z ) - a )
         else: raise RuntimeError
         
-        e = np.dot( diff, diff )
+        e = np.dot( diff.squeeze(), diff.squeeze() )
         # e = np.sqrt(e)
         sum += e
     
@@ -211,15 +230,26 @@ if args.manifold == 'graff':
         RHSaffine = X[-1].reshape(-1,1)
         f = RHSaffine
         
-        # print( "Manual gradient" )
+        print( "Manual gradient" )
         grad = np.zeros(X.shape)
         
         for A,a in flats:
+            def Adot( rhs ):
+                if args.flats_are_vertices:
+                    return repeated_block_diag_times_matrix( A[:1,:4], rhs )
+                else:
+                    return np.dot( A, rhs )
+            def ATdot( rhs ):
+                if args.flats_are_vertices:
+                    return repeated_block_diag_times_matrix( A[:1,:4].T, rhs )
+                else:
+                    return np.dot( A.T, rhs )
+            
             ## For type checking, I want everything to be a matrix.
             a = a.reshape(-1,1)
-            Aa = np.dot( A, a )
-            AB = np.dot( A, B )
-            AtAB = np.dot( A.T, AB )
+            Aa = Adot( a )
+            AB = Adot( B )
+            AtAB = ATdot( AB )
             
             ## Impose the z sum-to-one constraint via a large penalty.
             Sinv = np.linalg.inv( np.dot( AB.T, AB ) + weight_affine * Qaffine )
@@ -233,15 +263,24 @@ if args.manifold == 'graff':
             SBAM = np.dot( np.dot( Sinv, AB.T ), M )
             SBAMRtS = np.dot( SBAM, RtS )
             
+            
             ## gradB
-            grad[:-1] += 2.*np.dot( np.dot( A.T, M ), RtS )
+            grad[:-1] += 2.*np.dot( ATdot( M ), RtS )
             grad[:-1] += -2.*np.dot( SBAMRtS, AtAB.T ).T
             grad[:-1] += -2.*np.dot( AtAB, SBAMRtS )
-            grad[:-1] += 2.*np.dot( SBAM, np.dot( Aa.T, A ) ).T
+            grad[:-1] += 2.*np.dot( SBAM, ATdot( Aa ).T ).T
             ## grad bottom row
             grad[-1:] += -2.*weight_affine*np.dot( SBAMRtS, f ).T
             grad[-1:] += -2.*weight_affine*np.dot( f.T, SBAMRtS )
             grad[-1:] += 2.*weight_affine*SBAM.T
+            
+            
+            '''
+            grad = grad + 2.*np.vstack([
+                np.dot( ATdot( M ), RtS ) - np.dot( SBAMRtS, AtAB.T ).T - np.dot( AtAB, SBAMRtS ) + np.dot( SBAM, ATdot( Aa ).T ).T,
+                -weight_affine*np.dot( SBAMRtS, f ).T - weight_affine*np.dot( f.T, SBAMRtS ) + weight_affine*SBAM.T
+                ])
+            '''
         
         return grad
     ## It is correct.
@@ -254,6 +293,14 @@ if args.manifold == 'graff':
         from autograd import grad
         print( "max |Autograd - manual gradient|:", np.abs( grad( cost )( Xrand ) - gradient( Xrand ) ).max() )
     problem = Problem(manifold=manifold, cost=cost, grad=gradient)
+    '''
+    def hessian_product(x,v):
+        import hessian
+        H = hessian.hessian2D( x, grad = gradient )
+        return np.tensordot( H, v, np.ndim(v) )
+    # problem = Problem(manifold=manifold, cost=cost, grad=gradient, hess=lambda x, v: autograd.jacobian( gradient )(x).dot(v))
+    problem = Problem(manifold=manifold, cost=cost, grad=gradient, hess=hessian_product)
+    '''
 else:
     problem = Problem(manifold=manifold, cost=cost)
 
@@ -345,8 +392,9 @@ if args.optimize_from is not None or args.load is not None:
         p = loaded['p']
         B = loaded['B']
         Xopt = X_from_pB( p, B )
-        print( "Adding noise" )
-        Xopt += np.random.random( Xopt.shape )*.0001
+        if args.recovery is not None:
+            print( "Adding noise" )
+            Xopt += np.random.random( Xopt.shape )*args.recovery
         
         print( "Optimizing the initial guess with the simple original cost function." )
         Xopt2 = solver.solve(problem, x=Xopt)
