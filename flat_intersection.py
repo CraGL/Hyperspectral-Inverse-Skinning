@@ -844,6 +844,15 @@ def optimize_biquadratic( P, H, rest_vs, deformed_vs, x0, solve_for_rest_pose = 
 		B = W[:,1:] - pt
 		return pack( pt, B )
 	
+	canonical = True
+	
+	import flat_metrics
+	def W_to_graff( W ):
+		return flat_metrics.orthonormalize( np.vstack([ W, np.ones((1,W.shape[1])) ]) )
+	def W_from_graff( Wgraff ):
+		W = Wgraff[:-1] / Wgraff[-1:]
+		return W
+	
 	## Verify that we can unpack and re-pack shifted without changing anything.
 	assert abs( pack_W( unpack_W( np.arange(36), 1 ) ) - np.arange(36) ).max() < 1e-10
 	
@@ -890,7 +899,11 @@ def optimize_biquadratic( P, H, rest_vs, deformed_vs, x0, solve_for_rest_pose = 
 		z_neighbor_weight = 0.01
 	
 	f_prev = None
+	
 	W_prev = unpack_W( x0.copy(), P )
+	## Convert W to canonical form by converting in and out of the Graff manifold.
+	if canonical: W_prev = W_from_graff( W_to_graff( W_prev ) )
+	
 	W = W_prev.copy() ## In case we terminate immediately.
 	iterations = 0
 	converged = False
@@ -973,6 +986,10 @@ def optimize_biquadratic( P, H, rest_vs, deformed_vs, x0, solve_for_rest_pose = 
 			
 			## 4
 			W = biquadratic.solve_for_W_with_system( W_system, W_rhs, use_pseudoinverse = use_pseudoinverse, projection = W_projection, first_column = first_column )
+			
+			## Convert W to canonical form by converting in and out of the Graff manifold.
+			if canonical: W = W_from_graff( W_to_graff( W ) )
+			
 			f *= normalization / weights
 			print( "Function value:", f )
 			
@@ -1002,7 +1019,12 @@ def optimize_biquadratic( P, H, rest_vs, deformed_vs, x0, solve_for_rest_pose = 
 			x_change_max = abs( W_prev - W ).max()
 			print( "x change (norm):", x_change_norm )
 			print( "x change (max):", x_change_max )
+			cosangles = flat_metrics.principal_cosangles( W_to_graff( W_prev ), W_to_graff( W ), orthonormal = canonical )
+			print( "cosine of principal angles:", cosangles )
+			print( "| cos principal angles - 1 |", np.linalg.norm( cosangles - 1. ) )
 			x_change = x_change_norm
+			if canonical:
+				x_change = np.linalg.norm( cosangles - 1. )
 			if x_change < x_eps:
 				print( "Variables change too small, terminating:", x_change )
 				converged = True
