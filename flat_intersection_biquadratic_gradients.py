@@ -413,7 +413,8 @@ def solve_for_W_with_system( system, rhs, use_pseudoinverse = True, projection =
         W = np.hstack(W).T.reshape( 12*poses, handles )
     elif use_pseudoinverse:
         # W1 = np.dot( np.linalg.pinv(system_big), rhs.ravel() ).reshape( 12*poses, handles )
-        W = np.dot( np.linalg.pinv(system), rhs.reshape( -1, system.shape[0] ).T ).T.reshape( 12*poses, handles )
+        # W = np.dot( np.linalg.pinv(system), rhs.reshape( -1, system.shape[0] ).T ).T.reshape( 12*poses, handles )
+        W = np.linalg.lstsq( system, rhs.reshape( -1, system.shape[0] ).T )[0].T.reshape( 12*poses, handles )
         # print( "pinv block difference:", abs( W - W1 ).max() )
     else:
         # W1 = np.linalg.solve( system_big, rhs.ravel() ).reshape( 12*poses, handles )
@@ -426,6 +427,7 @@ def solve_for_W_with_system( system, rhs, use_pseudoinverse = True, projection =
         ## So we can use scipy.linalg.solve() which can take advantage of that fact.
         import scipy.linalg
         W = scipy.linalg.solve( system, rhs.reshape( -1, system.shape[0] ).T, sym_pos = True ).T.reshape( 12*poses, handles )
+        # W = np.linalg.lstsq( system, rhs.reshape( -1, system.shape[0] ).T )[0].T.reshape( 12*poses, handles )
         # print( "solve block difference:", abs( W - W1 ).max() )
     
     ## Normalize the columns of W.

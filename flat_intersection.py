@@ -304,6 +304,22 @@ def zero_energy_test(base_dir):
 #	
 #	return gt_bones
 
+def save_to_matlab( filename, row_mats, deformed_vs, p, B ):
+	import scipy.io
+	scipy.io.savemat( filename,
+		{
+			'A': row_mats,
+			## Reduced dimension point.
+			'a_ortho': deformed_vs.reshape(deformed_vs.shape[0],-1),
+			'a_full': [ row_mat.T.dot(vp.ravel())/(row_mat[0]**2).sum() for row_mat, vp in zip( row_mats, deformed_vs ) ],
+			'p': p,
+			'B': B
+		},
+		do_compression = True, oned_as = 'column'
+		)
+	print( "Saved to MATLAB format:", filename )
+	print( "[Test with: python3 save_to_matlab_test.py", filename, "]" )
+
 def normalization_factor_from_row_mats( row_mats ):
 	## To make function values comparable, we need to normalize.
 	xyzs = np.asarray([ row_mat[0,:3] for row_mat in row_mats ])
@@ -342,7 +358,7 @@ def optimize_nullspace_directly(P, H, row_mats, deformed_vs, x0, strategy = None
 				num_underconstrained += 1
 				# z = np.dot( np.linalg.pinv(lh), rh )
 				## Solve still works better without complaining. I guess it's not zero enough.
-				z = np.linalg.solve(lh, rh)
+				z = np.linalg.lstsq(lh, rh)[0]
 			else:
 				z = np.linalg.solve(lh, rh)
 			z = z.reshape(-1,1)
@@ -1423,6 +1439,8 @@ if __name__ == '__main__':
 	parser.add_argument('--csv-path', '--CSV', type=str, help='csv file which save objective values.')
 	parser.add_argument('--handle-threshold', type=int, default=1, help='RMS threshold to determine proper number of handles.')
 	parser.add_argument('--forced-init', type=str2bool, default=False, help='Whether to use the same initial guess.')
+	parser.add_argument('--save-matlab-initial', type=str, help='Path to save input flats and initial guess to matlab format.')
+	parser.add_argument('--save-matlab-result', type=str, help='Path to save input flats and optimization output to matlab format.')
 	
 	args = parser.parse_args()
 	H = args.handles
@@ -1545,6 +1563,9 @@ if __name__ == '__main__':
 		if 3*P < B.shape[1]:
 			print( "Warning: Not enough poses for the handles without pseudoinverse in the energy." )
 		
+		if args.save_matlab_initial:
+			save_to_matlab( args.save_matlab_initial, all_R_mats, deformed_vs, unpack( x0, P )[0], unpack( x0, P )[1] )
+		
 		if args.energy == 'B':
 			# converged, x = optimize(P, H, all_R_mats, deformed_vs, x0)
 			converged, x = optimize_nullspace_directly(P, H, all_R_mats, deformed_vs, x0, strategy = args.strategy, max_iter = args.max_iter, nullspace = args.nullspace )
@@ -1646,6 +1667,9 @@ if __name__ == '__main__':
 	print( "Number of bones:", H )		
 	print( "Time for solving(minutes): ", (time.time() - start_time)/60 )
 	print( "Final vertex error RMS is:", vertex_error(rest_vs, rev_vertex_trans, deformed_vs ) )
+
+	if args.save_matlab_result:
+		save_to_matlab( args.save_matlab_initial, all_R_mats, deformed_vs, unpack( x, P )[0], unpack( x, P )[1] )
 
 	output_folder = args.output
 #	if output_folder is not None:

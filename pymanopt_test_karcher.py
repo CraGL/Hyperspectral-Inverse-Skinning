@@ -19,8 +19,8 @@ parser.add_argument('--dim', type=int, help='Ambient dimension.')
 parser.add_argument('--ortho', type=int, help='Given flats\' orthogonal dimesion.')
 parser.add_argument('--handles', '-H', type=int, help = 'Number of handles.')
 parser.add_argument('--mean', type=str, default = 'karcher', choices = ['karcher', 'projection'], help = 'Type of mean.')
-parser.add_argument('--test-data', type=str, default = 'random', choices = ['random', 'zero', 'line', 'cube'], help = 'What test data to generate. zero means all flats pass through the origin. lines means there is a line passing through all flats. cube means the edges of a hypercube are specified as lines.')
-parser.add_argument('--optimize-from', type=str, choices = [ "random", "centroid" ], help ='What optimization to run (if specified). Choices are "random" and "centroid".')
+parser.add_argument('--test-data', type=str, default = 'random', help = 'What test data to generate. "zero" means all flats pass through the origin. "lines" means there is a line passing through all flats. "cube" means the edges of a hypercube are specified as lines. Anything else is taken as a file path.')
+parser.add_argument('--optimize-from', type=str, default = 'random', choices = [ "random", "centroid" ], help ='What optimization to run (if specified). Choices are "random" and "centroid". --load overrides this.')
 parser.add_argument('--optimize-solver', type=str, default = "trust", choices = [ "trust", "steepest", "conjugate", "nelder", "particle" ], help ='What optimization solver to use (default "trust" region).')
 parser.add_argument('--manifold', type=str, default = 'pB', choices = [ 'pB', 'ssB', 'graff' ], help = 'The manifold to optimize over. Choices are pB (point and nullspace), graff (affine nullspace), ssB (scalar, sphere, and nullspace).')
 parser.add_argument('--save', type=str, help = 'If specified, saves p and B to file name.')
@@ -41,7 +41,7 @@ try:
 except:
     print( ' '.join( sys.argv ) )
 
-# (1) Instantiate a manifold
+# (1) Instantiate a manifold and some data
 poses = 10
 dim = 12*poses
 Q = 3*poses
@@ -60,6 +60,44 @@ if args.lines:
 
 N = 200
 # p, B
+
+## (1b) Generate data
+## TODO: Zero energy test data.
+np.random.seed(0)
+## Create a bunch of orthonormal rows and a point (rhs)
+flats = [ ( np.random.random(( Q, dim )), np.random.random(dim) ) for i in range(N) ]
+## Orthonormalize the rows
+flats = [ ( np.linalg.svd( A, full_matrices=False )[2][:Q], a ) for A, a in flats ]
+
+if args.test_data == 'zero':
+    ## With a known solution at zero:
+    flats = [ ( A, np.zeros(a.shape) ) for A, a in flats ]
+elif args.test_data == 'line':
+    ## With a known solution along a line:
+    flats = [ ( A, i*np.ones(a.shape) ) for i, ( A, a ) in enumerate( flats ) ]
+    print( "The solution should have slope:", 1./np.sqrt(dim) )
+elif args.test_data == 'random':
+    ## This is the default.
+    pass
+elif args.test_data == 'cube':
+    assert dim == 3
+    assert Q == 2
+    flats = []
+    # flats.append( ( np.array([
+    raise NotImplementedError
+else:
+    import os
+    if not os.path.exists( args.test_data ):
+        raise RuntimeError( "Unknown test data: %s" % args.test_data )
+    
+    import scipy.io
+    test_data = scipy.io.loadmat( args.test_data )
+    flats = [ ( A, a ) for A, a in zip( test_data['A'], test_data['a_full'] ) ]
+    N = len( flats )
+    dim = flats[0][0].shape[1]
+    assert dim % 12 == 0
+    poses = dim // 12
+    Q = flats[0][0].shape[0]
 
 if args.manifold == 'pB':
     manifold = Product( [ Euclidean(dim), Grassmann(dim, handles) ] )
@@ -101,33 +139,6 @@ elif args.manifold == 'graff':
         return X
 else:
     raise RuntimeError( "Unknown problem manifold: %s" % args.manifold )
-
-## (1b) Generate data
-## TODO: Zero energy test data.
-np.random.seed(0)
-## Create a bunch of orthonormal rows and a point (rhs)
-flats = [ ( np.random.random(( Q, dim )), np.random.random(dim) ) for i in range(N) ]
-## Orthonormalize the rows
-flats = [ ( np.linalg.svd( A, full_matrices=False )[2][:Q], a ) for A, a in flats ]
-
-if args.test_data == 'zero':
-    ## With a known solution at zero:
-    flats = [ ( A, np.zeros(a.shape) ) for A, a in flats ]
-elif args.test_data == 'line':
-    ## With a known solution along a line:
-    flats = [ ( A, i*np.ones(a.shape) ) for i, ( A, a ) in enumerate( flats ) ]
-    print( "The solution should have slope:", 1./np.sqrt(dim) )
-elif args.test_data == 'random':
-    ## This is the default.
-    pass
-elif args.test_data == 'cube':
-    assert dim == 3
-    assert Q == 2
-    flats = []
-    # flats.append( ( np.array([
-    raise NotImplementedError
-else:
-    raise RuntimeError( "Unknown test data: %s" % args.test_data )
 
 print( "====================================================" )
 print( "ambient dimension:", dim )
@@ -190,74 +201,131 @@ def cost(X):
     
     return sum
 
-problem = Problem(manifold=manifold, cost=cost)
+if args.manifold == 'graff':
+    print( "Using manually computed gradient." )
+    def gradient(X):
+        B = X[:-1]
+        weight_affine = 1e3
+        Qaffine = np.outer( X[-1], X[-1] )
+        ## For type checking, I want everything to be a matrix.
+        RHSaffine = X[-1].reshape(-1,1)
+        f = RHSaffine
+        
+        # print( "Manual gradient" )
+        grad = np.zeros(X.shape)
+        
+        for A,a in flats:
+            ## For type checking, I want everything to be a matrix.
+            a = a.reshape(-1,1)
+            Aa = np.dot( A, a )
+            AB = np.dot( A, B )
+            AtAB = np.dot( A.T, AB )
+            
+            ## Impose the z sum-to-one constraint via a large penalty.
+            Sinv = np.linalg.inv( np.dot( AB.T, AB ) + weight_affine * Qaffine )
+            R = np.dot( AB.T, Aa ) + weight_affine * RHSaffine
+            # R' Sinv
+            RtS = np.dot( R.T, Sinv )
+            # The energy is M:M.
+            z = np.dot( Sinv, R )
+            M = np.dot( A, np.dot( B, z ) ) - Aa
+            # Sinv B' A' M
+            SBAM = np.dot( np.dot( Sinv, AB.T ), M )
+            SBAMRtS = np.dot( SBAM, RtS )
+            
+            ## gradB
+            grad[:-1] += 2.*np.dot( np.dot( A.T, M ), RtS )
+            grad[:-1] += -2.*np.dot( SBAMRtS, AtAB.T ).T
+            grad[:-1] += -2.*np.dot( AtAB, SBAMRtS )
+            grad[:-1] += 2.*np.dot( SBAM, np.dot( Aa.T, A ) ).T
+            ## grad bottom row
+            grad[-1:] += -2.*weight_affine*np.dot( SBAMRtS, f ).T
+            grad[-1:] += -2.*weight_affine*np.dot( f.T, SBAMRtS )
+            grad[-1:] += 2.*weight_affine*SBAM.T
+        
+        return grad
+    ## It is correct.
+    check_grad = False
+    if check_grad:
+        import scipy.optimize
+        Xrand = np.random.random((dim+1, handles))
+        grad_err = scipy.optimize.check_grad( lambda x: cost(x.reshape(dim+1,handles)), lambda x: gradient(x.reshape(dim+1,handles)).ravel(), Xrand.ravel() )
+        print( "Manual gradient error:", grad_err )
+        from autograd import grad
+        print( "max |Autograd - manual gradient|:", np.abs( grad( cost )( Xrand ) - gradient( Xrand ) ).max() )
+    problem = Problem(manifold=manifold, cost=cost, grad=gradient)
+else:
+    problem = Problem(manifold=manifold, cost=cost)
 
-## Compute the handle-dimensional centroid of the orthogonal space,
-## the point on the handle-dimensional manifold whose principal angles to all
-## the orthogonal spaces is smallest.
-## That should be directions along which the flats are most separated.
-## A flat parallel to those dimensions can reduce the distance a lot.
+## Compute a centroid initial guess.
+if args.optimize_from == 'centroid':
+    ## Compute the handle-dimensional centroid of the orthogonal space,
+    ## the point on the handle-dimensional manifold whose principal angles to all
+    ## the orthogonal spaces is smallest.
+    ## That should be directions along which the flats are most separated.
+    ## A flat parallel to those dimensions can reduce the distance a lot.
+    
+    ## The geodesic centroid. Is a good starting guess.
+    if args.mean == 'karcher':
+        from pymanopt_karcher_mean import compute_centroid as compute_mean
+    ## Projection distance doesn't work very well.
+    elif args.mean == 'projection':
+        from pymanopt_karcher_mean import compute_projection_mean as compute_mean
+    
+    
+    ## I think this packing isn't what we want for graff manifold.
+    # centroid = compute_mean( manifold, [ X_from_pB( a, A.T ) for A, a in flats ] )
+    if args.manifold == 'pB':
+        centroid = compute_mean( manifold, [ ( a, A.T ) for A, a in flats ] )
+    elif args.manifold == 'ssB':
+        centroid = compute_mean( manifold, [ ( np.linalg.norm(a), a/np.linalg.norm(a), A.T ) for A, a in flats ] )
+    elif args.manifold == 'graff':
+        ## https://en.wikipedia.org/wiki/Affine_Grassmannian_(manifold)
+        ## The orthogonal space next to -rhs
+        ## UPDATE: Zero here is averaging just linear subspaces.
+        ##         It gets lower error on random tests than the right thing (-A*a) or the wrong thing (A*a).
+        ##         It also gets lower error than pB centroid.
+        ##         Perhaps because we are on a higher dimensional manifold, so we get to use translation?
+        ##         But it makes the trust region solver struggle a lot.
+        ## UPDATE 2: I believe the centroid will keep the zeros in the last coordinate intact.
+        ##           That's degenerate, because we intersect the columns with last coordinate = 0 <=> divide by it.
+        ## TODO Q: Do we preserve orthogonality if we take some directions and put a 1 as the last column?
+        ## A: No. Consider two 1D spaces (so orthonormalization is just normalization), v1 and v2.
+        ##    Since they are orthogonal, v1.v2 = 0. Then extending them with a 1 and normalizing gives us:
+        ##    [v1 1].[v2 1]/(|[v1 1]|*|[v2 1]|) = ( 0 + 1 )/( sqrt(1 + 1)*sqrt(1 + 1) ) = 1/2.
+        centroid = compute_mean( manifold, [ flat_metrics.orthonormalize( np.hstack( [ A, -0*np.dot( A, a ).reshape(-1,1) ] ).T ) for A, a in flats ] )
+        ## Let's put an epsilon as the last coordinate to keep the optimization from exploding.
+        print( "last coordinates:", centroid[-1] )
+        centroid[-1] = 1e-4
+    else: raise RuntimeError
+    
+    Xopt = centroid
+    
+    print( "Final cost:", cost( Xopt ) )
+    
+    # Is zero in the solution flat?
+    p,B = pB_from_X( Xopt )
+    print( 'p.T:' )
+    print( p.T )
+    print( 'B.T:' )
+    print( B.T )
+    p_closest_to_origin = flat_metrics.canonical_point( p, B )
+    dist_to_origin = np.linalg.norm( p_closest_to_origin )
+    print( "Distance to the flat from the origin:", dist_to_origin )
+    p_best = flat_metrics.optimal_p_given_B_for_flats_ortho( B, flats )
+    print( '|p - p_best|:', np.linalg.norm( p_closest_to_origin - p_best ) )
+    print( 'p_best.T:', p_best.T )
+    if args.centroid_best_p:
+        ## Pass this p along (and pack it back into Xopt)
+        print( "Adopting the best p" )
+        p = p_best
+        Xopt = X_from_pB( p, B )
+    
+    if args.save is not None:
+        np.savez_compressed( args.save, p = p_closest_to_origin, B = B )
+        print( "Saved:", args.save )
 
-## The geodesic centroid. Is a good starting guess.
-if args.mean == 'karcher':
-    from pymanopt_karcher_mean import compute_centroid as compute_mean
-## Projection distance doesn't work very well.
-elif args.mean == 'projection':
-    from pymanopt_karcher_mean import compute_projection_mean as compute_mean
-
-
-## I think this packing isn't what we want for graff manifold.
-# centroid = compute_mean( manifold, [ X_from_pB( a, A.T ) for A, a in flats ] )
-if args.manifold == 'pB':
-    centroid = compute_mean( manifold, [ ( a, A.T ) for A, a in flats ] )
-elif args.manifold == 'ssB':
-    centroid = compute_mean( manifold, [ ( np.linalg.norm(a), a/np.linalg.norm(a), A.T ) for A, a in flats ] )
-elif args.manifold == 'graff':
-    ## https://en.wikipedia.org/wiki/Affine_Grassmannian_(manifold)
-    ## The orthogonal space next to -rhs
-    ## UPDATE: Zero here is averaging just linear subspaces.
-    ##         It gets lower error on random tests than the right thing (-A*a) or the wrong thing (A*a).
-    ##         It also gets lower error than pB centroid.
-    ##         Perhaps because we are on a higher dimensional manifold, so we get to use translation?
-    ##         But it makes the trust region solver struggle a lot.
-    ## UPDATE 2: I believe the centroid will keep the zeros in the last coordinate intact.
-    ##           That's degenerate, because we intersect the columns with last coordinate = 0 <=> divide by it.
-    ## TODO Q: Do we preserve orthogonality if we take some directions and put a 1 as the last column?
-    ## A: No. Consider two 1D spaces (so orthonormalization is just normalization), v1 and v2.
-    ##    Since they are orthogonal, v1.v2 = 0. Then extending them with a 1 and normalizing gives us:
-    ##    [v1 1].[v2 1]/(|[v1 1]|*|[v2 1]|) = ( 0 + 1 )/( sqrt(1 + 1)*sqrt(1 + 1) ) = 1/2.
-    centroid = compute_mean( manifold, [ flat_metrics.orthonormalize( np.hstack( [ A, -0*np.dot( A, a ).reshape(-1,1) ] ).T ) for A, a in flats ] )
-    ## Let's put an epsilon as the last coordinate to keep the optimization from exploding.
-    print( "last coordinates:", centroid[-1] )
-    centroid[-1] = 1e-4
-else: raise RuntimeError
-
-Xopt = centroid
-
-print( "Final cost:", cost( Xopt ) )
-
-# Is zero in the solution flat?
-p,B = pB_from_X( Xopt )
-print( 'p.T:' )
-print( p.T )
-print( 'B.T:' )
-print( B.T )
-p_closest_to_origin = flat_metrics.canonical_point( p, B )
-dist_to_origin = np.linalg.norm( p_closest_to_origin )
-print( "Distance to the flat from the origin:", dist_to_origin )
-p_best = flat_metrics.optimal_p_given_B_for_flats_ortho( B, flats )
-print( '|p - p_best|:', np.linalg.norm( p_closest_to_origin - p_best ) )
-print( 'p_best.T:', p_best.T )
-if args.centroid_best_p:
-    ## Pass this p along (and pack it back into Xopt)
-    print( "Adopting the best p" )
-    p = p_best
-    Xopt = X_from_pB( p, B )
-
-if args.save is not None:
-    np.savez_compressed( args.save, p = p_closest_to_origin, B = B )
-    print( "Saved:", args.save )
-
+## Run optimization.
 if args.optimize_from is not None or args.load is not None:
     if args.optimize_solver == 'trust':
         solver = TrustRegions()
@@ -277,6 +345,8 @@ if args.optimize_from is not None or args.load is not None:
         p = loaded['p']
         B = loaded['B']
         Xopt = X_from_pB( p, B )
+        print( "Adding noise" )
+        Xopt += np.random.random( Xopt.shape )*.0001
         
         print( "Optimizing the initial guess with the simple original cost function." )
         Xopt2 = solver.solve(problem, x=Xopt)
