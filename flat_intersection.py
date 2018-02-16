@@ -1062,6 +1062,10 @@ def optimize_iterative_pca( P, H, row_mats, deformed_vs, x0, max_iter = None, st
 	lh = np.zeros((15*P, 15*P))
 	rh = np.zeros(15*P)
 	Q = np.zeros( ( len( row_mats ), 12*P ) )
+	if strategy == 'momentum':
+		## This strategy performs worse.
+		import flat_intersection_biquadratic_gradients as biquadratic
+		Y = np.zeros( ( len( row_mats ), 12*P ) )
 	
 	from space_mapper import SpaceMapper
 	converged = False
@@ -1092,8 +1096,16 @@ def optimize_iterative_pca( P, H, row_mats, deformed_vs, x0, max_iter = None, st
 				## Solve for the new 12*P transformation for the vertex
 				Q[i] = np.linalg.solve(lh, rh)[:12*P]
 				# Q[i] = np.dot( np.linalg.pinv(lh), rh)[:12*P]
-		
-			mapper = SpaceMapper.Uncorrellated_Space( Q, dimension = B.shape[1] )
+				
+				if strategy == 'momentum':
+					v = vbar[0,:4]
+					z, ssv = biquadratic.solve_for_z( np.hstack([ pt.reshape(-1,1), pt+B ]), v, deformed_vs[i].ravel(), nullspace = True, return_energy = False, use_pseudoinverse = True )
+					Y[i] = np.dot( np.hstack([ pt.reshape(-1,1), pt+B ]), z.ravel() )
+			
+			if strategy == 'momentum':
+				mapper = SpaceMapper.Uncorrellated_Space( np.vstack([ Q, Y ]), dimension = B.shape[1] )
+			else:
+				mapper = SpaceMapper.Uncorrellated_Space( Q, dimension = B.shape[1] )
 			pt = mapper.Xavg_.T
 			B = mapper.V_[:H-1].T
 			
@@ -1440,7 +1452,7 @@ if __name__ == '__main__':
 	parser.add_argument('--handles', '-H', type=int, help='Number of handles.')
 	parser.add_argument('--ground-truth', '-GT', type=str, help='Ground truth data path.')
 	parser.add_argument('--recovery', '-R', type=float, help='Recovery test epsilon (default no recovery test).')
-	parser.add_argument('--strategy', '-S', type=str, choices = ['function', 'gradient', 'hessian', 'newton', 'mixed', 'grassmann', 'pinv', 'pinv+ssv:skip', 'pinv+ssv:weighted', 'ssv:skip', 'ssv:weighted', 'perfectp', 'basinhopping'], help='Strategy: function, gradient (default), hessian, newton, mixed, grassmann (for energy B only), basinhopping (for energy B only), pinv and ssv (for energy biquadratic only), perfectp (ipca only).')
+	parser.add_argument('--strategy', '-S', type=str, choices = ['function', 'gradient', 'hessian', 'newton', 'mixed', 'grassmann', 'pinv', 'pinv+ssv:skip', 'pinv+ssv:weighted', 'ssv:skip', 'ssv:weighted', 'perfectp', 'momentum', 'basinhopping'], help='Strategy: function, gradient (default), hessian, newton, mixed, grassmann (for energy B only), basinhopping (for energy B only), pinv and ssv (for energy biquadratic only), perfectp and momentum (ipca only).')
 	parser.add_argument('--energy', '-E', type=str, default='B', choices = ['B', 'cayley', 'B+cayley', 'B+B', 'cayley+cayley', 'biquadratic', 'biquadratic+B', 'biquadratic+handles', 'laplacian', 'ipca', 'flag'], help='Energy: B (default), cayley, B+cayley, B+B, cayley+cayley, biquadratic, biquadratic+B, biquadratic+handles, laplacian, ipca (iterative PCA), flag (flag mean).')
 	## UPDATE: type=bool does not do what we think it does. bool("False") == True.
 	##		   For more, see https://stackoverflow.com/questions/15008758/parsing-boolean-values-with-argparse
