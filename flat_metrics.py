@@ -205,9 +205,9 @@ def test_optimal_p_given_B_for_flats_ortho():
     numpy.testing.assert_allclose( p_best, p_truth )
 
 def main():
-    print( "Debug the following by running: nosetests --pdb flat_metrics.py" )
-    import nose
-    nose.runmodule()
+    print( "Debug the following by running: python -m pytest --pdb flat_metrics.py" )
+    import pytest
+    pytest.main([__file__])
     # test_optimal_p_given_B_for_flats_ortho()
 
 if __name__ == '__main__':
