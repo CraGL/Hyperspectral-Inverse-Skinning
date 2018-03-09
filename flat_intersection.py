@@ -1517,8 +1517,7 @@ if __name__ == '__main__':
 	subset = args.subset
 	if subset>0:
 		import random
-		N = len(rest_vs)
-		indices = range(N)
+		indices = range(len(rest_vs))
 		random.shuffle(indices)
 		indices = indices[:subset]
 		rest_vs = rest_vs[indices]
@@ -1722,12 +1721,20 @@ if __name__ == '__main__':
 				else:					lower_h = curr_h
 			H = upper_h
 		else:
-			H = MAX_H			
+			H = MAX_H
 
 	rev_vertex_trans = solve_for_H( H )
-	print( "Number of bones:", H )		
-	print( "Time for solving(minutes): ", (time.time() - start_time)/60 )
-	print( "Final vertex error RMS is:", vertex_error(rest_vs, rev_vertex_trans, deformed_vs ) )
+	if(len(rest_vs)<len(rest_vs_original)):
+		max_error = 0
+		for i in range(100):
+			rev_vertex_trans = solve_for_H( H )
+			max_error = max(max_error, vertex_error(rest_vs, rev_vertex_trans, deformed_vs))
+			print(i)
+		print( "Max vertex error RMS is:", max_error )
+	else:	
+		print( "Number of bones:", H )		
+		print( "Time for solving(minutes): ", (time.time() - start_time)/60 )
+		print( "Final vertex error RMS is:", vertex_error(rest_vs, rev_vertex_trans, deformed_vs ) )
 
 	if args.save_matlab_result:
 		save_to_matlab( args.save_matlab_initial, all_R_mats, deformed_vs, unpack( x, P )[0], unpack( x, P )[1] )
