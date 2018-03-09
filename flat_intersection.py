@@ -1484,7 +1484,7 @@ if __name__ == '__main__':
 	parser.add_argument('--save-matlab-initial', type=str, help='Path to save input flats and initial guess to matlab format.')
 	parser.add_argument('--save-matlab-result', type=str, help='Path to save input flats and optimization output to matlab format.')
 	parser.add_argument('--seed', type=int, default=0, help='initial seed.')
-	parser.add_argument('--patch', type=int, help='random number of vertices')
+	parser.add_argument('--subset', type=int, default=-1, help='random number of vertices')
 	
 	args = parser.parse_args()
 	H = args.handles
@@ -1501,6 +1501,8 @@ if __name__ == '__main__':
 	print( "The name for the OBJ is:", OBJ_name )
 	rest_mesh = TriMesh.FromOBJ_FileName( args.rest_pose )
 	rest_vs = np.array( rest_mesh.vs )
+	subset = args.subset
+	if subset<0:	subset=len(rest_vs)
 	
 	pose_paths = glob.glob(args.pose_folder + "/*.obj")
 	pose_paths.sort()
