@@ -172,7 +172,8 @@ def solve_for_z( W, v, vprime, nullspace = False, return_energy = False, use_pse
             )['x'] ).squeeze()
         # print( 'z:', z )
     elif use_pseudoinverse:
-        z = np.dot( np.linalg.pinv(Qbig), rhs )[:-1]
+        # z = np.dot( np.linalg.pinv(Qbig), rhs )[:-1]
+        z = np.linalg.lstsq( Qbig, rhs )[0][:-1]
     else:
         z = np.linalg.solve( Qbig, rhs )[:-1]
     
@@ -196,7 +197,7 @@ def solve_for_z( W, v, vprime, nullspace = False, return_energy = False, use_pse
             Qbig[ tuple(np.tile( biggest_z_indices.reshape(1,-1), (2,1) )) ] = 1.
             ## Re-solve.
             if use_pseudoinverse:
-                z = np.dot( np.linalg.pinv(Qbig), rhs )[:-1]
+                z = np.linalg.lstsq( Qbig, rhs )[0][:-1]
             else:
                 z = np.linalg.solve( Qbig, rhs )[:-1]
     
@@ -253,7 +254,8 @@ def solve_for_v( W, z, vprime, nullspace = False, return_energy = False, use_pse
     Q, L, C = quadratic_for_v( W, z, vprime, nullspace = nullspace )
     
     if use_pseudoinverse:
-        v = np.dot( np.linalg.pinv(Q), -0.5*L )
+        # v = np.dot( np.linalg.pinv(Q), -0.5*L )
+        v = np.linalg.lstsq( Q, -0.5*L )[0]
     else:
         v = np.linalg.solve( Q, -0.5*L )
     
