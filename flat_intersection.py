@@ -1081,7 +1081,14 @@ def optimize_iterative_pca( P, H, row_mats, deformed_vs, x0, max_iter = None, st
 			pt, B = unpack(x,P)
 		
 			## Upper left of system
-			BBT = np.eye(12*P) - np.dot(B, np.dot( np.linalg.pinv(np.dot(B.T,B)), B.T))
+			## Basic version:
+ 			# BBT = np.eye(12*P) - np.dot(B, np.dot( np.linalg.pinv(np.dot(B.T,B)), B.T))
+			## Optimized version:
+			# BBT = np.eye(12*P) - np.dot(B, np.linalg.pinv(B))
+			## Optimized version with optimized identity.
+			BBT = -np.dot(B, np.linalg.pinv(B))
+			BBT[ np.diag_indices_from( BBT ) ] += 1.0
+			
 			lh[:12*P, :12*P] = BBT
 		
 			for i in range( len(row_mats) ): 
@@ -1144,6 +1151,7 @@ def optimize_iterative_pca( P, H, row_mats, deformed_vs, x0, max_iter = None, st
 			x0 = x.copy()
 	except KeyboardInterrupt:
 		print( "Terminated by KeyboardInterrupt." )
+	error_recorder.save_error()
 	
 	return converged, x
 
@@ -1475,6 +1483,8 @@ if __name__ == '__main__':
 	parser.add_argument('--forced-init', type=str2bool, default=False, help='Whether to use the same initial guess.')
 	parser.add_argument('--save-matlab-initial', type=str, help='Path to save input flats and initial guess to matlab format.')
 	parser.add_argument('--save-matlab-result', type=str, help='Path to save input flats and optimization output to matlab format.')
+	parser.add_argument('--seed', type=int, default=0, help='initial seed.')
+	parser.add_argument('--patch', type=int, help='random number of vertices')
 	
 	args = parser.parse_args()
 	H = args.handles
@@ -1482,6 +1492,7 @@ if __name__ == '__main__':
 	recovery_test = args.recovery
 	error_test = args.error
 	zero_test = args.zero
+	SEED = args.seed
 	if error_test:	assert( ground_truth_path is not None and "Error test needs ground truth path." )
 	if zero_test:	assert( ground_truth_path is not None and "Zero energy test or zero test need ground truth path." )
 	
@@ -1557,7 +1568,7 @@ if __name__ == '__main__':
 			x0 = pack( pt, B )
 			## Recovery test
 			if recovery_test is not None:
-				np.random.seed(0)
+				np.random.seed(SEED)
 				x0 += recovery_test*np.random.rand(12*P*H)
 		
 			print( "There are", len(gt_bones), "ground truth bones." )
@@ -1565,7 +1576,7 @@ if __name__ == '__main__':
 
 		else:
 			print("#handles: ", H)
-			if error_test or args.forced_init:		np.random.seed(0)
+			if error_test or args.forced_init:		np.random.seed(SEED)
 			
 			x0 = np.random.rand(H*12*P)
 			
