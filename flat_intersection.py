@@ -1497,8 +1497,11 @@ if __name__ == '__main__':
 	error_test = args.error
 	zero_test = args.zero
 	SEED = args.seed
+	subset = args.subset
 	if error_test:	assert( ground_truth_path is not None and "Error test needs ground truth path." )
 	if zero_test:	assert( ground_truth_path is not None and "Zero energy test or zero test need ground truth path." )
+	if ground_truth_path is not None:
+		gt_bones, gt_vertices = zero_energy_test(ground_truth_path)
 	
 	fancy_init_path = args.fancy_init
 	OBJ_name = os.path.splitext(os.path.basename(args.rest_pose))[0]
@@ -1512,23 +1515,48 @@ if __name__ == '__main__':
 	pose_name = os.path.basename( args.pose_folder )
 	print( "The name for pose folder is:", pose_name )
 	deformed_vs = np.array( [TriMesh.FromOBJ_FileName( path ).vs for path in pose_paths] )
-	deformed_vs_original = deformed_vs.copy()
-	
-	subset = args.subset
-	if subset>0:
-		import random
-		indices = range(len(rest_vs))
-		random.shuffle(indices)
-		indices = indices[:subset]
-		rest_vs = rest_vs[indices]
-		deformed_vs = deformed_vs[:,indices]
-	
-	## build flats
-	print( "Building flats" )
 	assert( len(deformed_vs.shape) == 3 )
 	P, N = deformed_vs.shape[0], deformed_vs.shape[1]
 	deformed_vs = np.swapaxes(deformed_vs, 0, 1).reshape(N, P, 3)
-	all_rights = deformed_vs.copy()
+	deformed_vs_original = deformed_vs.copy()
+	
+	def build_R_mats(rest_vs, deformed_vs):
+		all_R_mats = []
+		## build flats
+		print( "Building flats" )
+		if args.energy != 'biquadratic':
+			all_rights = deformed_vs.copy()
+			all_flats = []
+			for i, pos in enumerate(rest_vs):
+				left_m = np.zeros((3*P, 12*P))
+				unit_left_m = left_m.copy()
+				pos_h = np.ones(4)
+				pos_h[:3] = pos
+				nm = np.linalg.norm( pos_h )
+				for j in range(P):
+					for k in range(3):
+						unit_left_m[j*3+k, j*12+k*4:j*12+k*4+4] = pos_h/nm
+						left_m	   [j*3+k, j*12+k*4:j*12+k*4+4] = pos_h
+				
+				all_rights[i] /= nm
+				assert( np.allclose( np.dot(unit_left_m, unit_left_m.T), np.eye(3*P) ) )
+				all_flats.append(unit_left_m)
+				all_R_mats.append(left_m)
+			all_flats = np.array( all_flats )
+			all_R_mats = np.array( all_R_mats )
+		
+			print( "The rank of the stack of all pose row matrices is: ", np.linalg.matrix_rank( np.vstack( all_flats ) ) )
+		else:
+			all_R_mats = np.append( rest_vs, np.ones( ( len( rest_vs ), 1 ) ), axis = 1 )
+			return all_R_mats
+	all_R_mats = build_R_mats(rest_vs, deformed_vs)
+	
+	def random_subset(num, rest_vs, deformed_vs, all_R_mats):
+		import random
+		indices = range(len(rest_vs))
+		random.shuffle(indices)
+		indices = indices[:num]
+		return rest_vs[indices], deformed_vs[indices], all_R_mats[indices]
 	
 	## build global error recorder
 	error_recorder.energy = args.energy
@@ -1539,38 +1567,8 @@ if __name__ == '__main__':
 	error_recorder.z_strategy = args.z_strategy
 	error_recorder.csv_path = args.csv_path
 	error_recorder.ground_truth = args.ground_truth
-	
-	if args.energy != 'biquadratic':
-		all_flats = []
-		all_R_mats = []
-		for i, pos in enumerate(rest_vs):
-			left_m = np.zeros((3*P, 12*P))
-			unit_left_m = left_m.copy()
-			pos_h = np.ones(4)
-			pos_h[:3] = pos
-			nm = np.linalg.norm( pos_h )
-			for j in range(P):
-				for k in range(3):
-					unit_left_m[j*3+k, j*12+k*4:j*12+k*4+4] = pos_h/nm
-					left_m	   [j*3+k, j*12+k*4:j*12+k*4+4] = pos_h
-				
-			all_rights[i] /= nm
-			assert( np.allclose( np.dot(unit_left_m, unit_left_m.T), np.eye(3*P) ) )
-			all_flats.append(unit_left_m)
-			all_R_mats.append(left_m)
-		all_flats = np.array( all_flats )
-		all_R_mats = np.array( all_R_mats )
-		
-		print( "The rank of the stack of all pose row matrices is: ", np.linalg.matrix_rank( np.vstack( all_flats ) ) )
-	else:
-		all_R_mats = np.append( rest_vs, np.ones( ( len( rest_vs ), 1 ) ), axis = 1 )
-	
-	start_time = time.time()
-	
-	if ground_truth_path is not None:
-		gt_bones, gt_vertices = zero_energy_test(ground_truth_path)
 			
-	def solve_for_H( H ):
+	def solve_for_H( H, rest_vs, deformed_vs, all_R_mats ):
 		x = None
 		x0 = None
 		## 0 energy test
@@ -1698,7 +1696,7 @@ if __name__ == '__main__':
 #		if ground_truth_path is None and converged:
 #			print("Converged at handle #", H)
 #			break
-			
+	
 	if H is None:
 		upper_h = 16
 		lower_h = 1
@@ -1723,38 +1721,35 @@ if __name__ == '__main__':
 		else:
 			H = MAX_H
 
-	rev_vertex_trans = solve_for_H( H )
-	if(len(rest_vs)<len(rest_vs_original)):
+	if(subset>0):
 		max_error = 0
-		for i in range(100):
-			rev_vertex_trans = solve_for_H( H )
+		for i in range(500):
+			rest_vs, deformed_vs, subset_R_mats = random_subset(subset, rest_vs_original, deformed_vs_original, all_R_mats)
+			rev_vertex_trans = solve_for_H( H, rest_vs, deformed_vs, subset_R_mats)
 			max_error = max(max_error, vertex_error(rest_vs, rev_vertex_trans, deformed_vs))
 			print(i)
 		print( "Max vertex error RMS is:", max_error )
-	else:	
+	else:
+		start_time = time.time()			
+		rev_vertex_trans = solve_for_H( H, rest_vs, deformed_vs, all_R_mats )
 		print( "Number of bones:", H )		
 		print( "Time for solving(minutes): ", (time.time() - start_time)/60 )
 		print( "Final vertex error RMS is:", vertex_error(rest_vs, rev_vertex_trans, deformed_vs ) )
+		if args.save_matlab_result:
+			save_to_matlab( args.save_matlab_initial, all_R_mats, deformed_vs, unpack( x, P )[0], unpack( x, P )[1] )
 
-	if args.save_matlab_result:
-		save_to_matlab( args.save_matlab_initial, all_R_mats, deformed_vs, unpack( x, P )[0], unpack( x, P )[1] )
-
-	output_folder = args.output
-#	if output_folder is not None:
-#		curr_folder = os.path.abspath(".")
-#		assert os.path.basename(curr_folder) == "InverseSkinning"
-#		output_folder = os.path.join( "results", OBJ_name, + pose_name )
+		output_folder = args.output
 	
-	if output_folder is not None:
-		if not os.path.exists(output_folder):
-			os.makedirs(output_folder)
+		if output_folder is not None:
+			if not os.path.exists(output_folder):
+				os.makedirs(output_folder)
 	
-		H = int(rev_vertex_trans.shape[1]/12)
-		for i in range(H):
-			per_pose_transformtion = rev_vertex_trans[:,i*12:(1+i)*12]
-			per_pose_transformtion = per_pose_transformtion.reshape(-1,3,4)
-			per_pose_transformtion = np.swapaxes(per_pose_transformtion, 1, 2).reshape(-1,12)
-			output_path = os.path.join( output_folder, str(i+1) + ".DMAT" )
-			format_loader.write_DMAT( output_path, per_pose_transformtion )
+			H = int(rev_vertex_trans.shape[1]/12)
+			for i in range(H):
+				per_pose_transformtion = rev_vertex_trans[:,i*12:(1+i)*12]
+				per_pose_transformtion = per_pose_transformtion.reshape(-1,3,4)
+				per_pose_transformtion = np.swapaxes(per_pose_transformtion, 1, 2).reshape(-1,12)
+				output_path = os.path.join( output_folder, str(i+1) + ".DMAT" )
+				format_loader.write_DMAT( output_path, per_pose_transformtion )
 	
 	
