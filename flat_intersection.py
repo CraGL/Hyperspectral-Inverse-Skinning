@@ -358,7 +358,7 @@ def optimize_nullspace_directly(P, H, row_mats, deformed_vs, x0, strategy = None
 				num_underconstrained += 1
 				# z = np.dot( np.linalg.pinv(lh), rh )
 				## Solve still works better without complaining. I guess it's not zero enough.
-				z = np.linalg.lstsq(lh, rh)[0]
+				z = np.linalg.lstsq(lh, rh, rcond=None)[0]
 			else:
 				z = np.linalg.solve(lh, rh)
 			z = z.reshape(-1,1)
@@ -733,7 +733,7 @@ def optimize_approximated_quadratic(P, H, row_mats, deformed_vs, x0, f_eps = Non
 			
 			f = normalization * (np.dot(np.dot(pt.T,Q), pt) - 2*np.dot(pt.T,L) + C)
 			## This should be ambiguous, so use lstsq() (or pinv())
-			pt_new = np.linalg.lstsq(Q,L)[0]
+			pt_new = np.linalg.lstsq(Q,L, rcond=None)[0]
 			# pt_new = np.linalg.pinv(Q).dot(L)
 			f_new = normalization * (np.dot(np.dot(pt_new.T,Q), pt_new) - 2*np.dot(pt_new.T,L) + C)
 			

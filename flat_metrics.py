@@ -117,7 +117,7 @@ def optimal_p_given_B_for_flats_ortho( B, flats ):
     for A, a in flats:
         AB = dot( A, B )
         ## If A can have fewer rows than B has columns, then we need lstsq() to be safe.
-        Q = -dot( AB, linalg.lstsq( dot( AB.T, AB ), AB.T )[0] )
+        Q = -dot( AB, linalg.lstsq( dot( AB.T, AB ), AB.T, rcond=None )[0] )
         Q[diag_indices_from(Q)] += 1
         AQA = dot( A.T, dot( Q, A ) )
         system += AQA
@@ -126,7 +126,7 @@ def optimal_p_given_B_for_flats_ortho( B, flats ):
     ## The smallest singular value is always small, because any point on the flat
     ## is just as good as any other. Use lstsq() to find the smallest norm solution.
     # assert linalg.norm( system, ord = -2 ) < 1e-5
-    p = linalg.lstsq( system, rhs )[0]
+    p = linalg.lstsq( system, rhs, rcond=None )[0]
     return p
 
 def test_principal_angles():
