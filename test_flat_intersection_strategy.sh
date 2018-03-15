@@ -18,9 +18,12 @@ do
 	H=${test_dir#$name-}
 	for SEED in `seq 0 0`
 	do
-		FLAT_INTERSECTION_ARGS_BIQUADRATIC="--energy biquadratic --forced-init True --seed $SEED --CSV ${OUTPUT_DIR}/${test_dir}_sparse4_${SEED}.csv --strategy pinv+ssv:weighted --z-strategy sparse4 --max-iter ${MAXITER} --f-eps 0 --handles ${H}"
-		echo python -u flat_intersection.py "${REST_POSE}" "${POSES_DIR}" ${FLAT_INTERSECTION_ARGS_BIQUADRATIC} 2>&1 | tee -i "${OUTPUT_DIR}"/flat_intersection_biquadratic.out
+		FLAT_INTERSECTION_ARGS_BIQUADRATIC="--energy biquadratic --forced-init True --subset 100 --CSV ${OUTPUT_DIR}/${test_dir}_biquadratic_100.csv --strategy pinv+ssv:weighted --max-iter ${MAXITER} --f-eps 0 --handles ${H}"
+		echo python -m pdb flat_intersection.py "${REST_POSE}" "${POSES_DIR}" ${FLAT_INTERSECTION_ARGS_BIQUADRATIC} 2>&1 | tee -i "${OUTPUT_DIR}"/flat_intersection_biquadratic.out
 
+# 		FLAT_INTERSECTION_ARGS_BIQUADRATIC="--energy biquadratic --forced-init True --seed $SEED --CSV ${OUTPUT_DIR}/${test_dir}_sparse4_${SEED}.csv --strategy pinv+ssv:weighted --z-strategy sparse4 --max-iter ${MAXITER} --f-eps 0 --handles ${H}"
+# 		echo python -u flat_intersection.py "${REST_POSE}" "${POSES_DIR}" ${FLAT_INTERSECTION_ARGS_BIQUADRATIC} 2>&1 | tee -i "${OUTPUT_DIR}"/flat_intersection_biquadratic.out
+# 
 # 		FLAT_INTERSECTION_ARGS_BIQUADRATIC="--energy biquadratic --forced-init True --seed $SEED --CSV ${OUTPUT_DIR}/${test_dir}_biquadratic_${SEED}.csv --strategy pinv+ssv:weighted --max-iter ${MAXITER} --f-eps 0 --handles ${H}"
 # 		python -u flat_intersection.py "${REST_POSE}" "${POSES_DIR}" ${FLAT_INTERSECTION_ARGS_BIQUADRATIC} 2>&1 | tee -i "${OUTPUT_DIR}"/flat_intersection_biquadratic.out
 # 

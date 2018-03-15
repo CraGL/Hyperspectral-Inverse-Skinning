@@ -1505,14 +1505,23 @@ if __name__ == '__main__':
 	print( "The name for the OBJ is:", OBJ_name )
 	rest_mesh = TriMesh.FromOBJ_FileName( args.rest_pose )
 	rest_vs = np.array( rest_mesh.vs )
-	subset = args.subset
-	if subset<0:	subset=len(rest_vs)
+	rest_vs_original = rest_vs.copy()
 	
 	pose_paths = glob.glob(args.pose_folder + "/*.obj")
 	pose_paths.sort()
 	pose_name = os.path.basename( args.pose_folder )
 	print( "The name for pose folder is:", pose_name )
 	deformed_vs = np.array( [TriMesh.FromOBJ_FileName( path ).vs for path in pose_paths] )
+	deformed_vs_original = deformed_vs.copy()
+	
+	subset = args.subset
+	if subset>0:
+		import random
+		indices = range(len(rest_vs))
+		random.shuffle(indices)
+		indices = indices[:subset]
+		rest_vs = rest_vs[indices]
+		deformed_vs = deformed_vs[:,indices]
 	
 	## build flats
 	print( "Building flats" )
@@ -1712,12 +1721,20 @@ if __name__ == '__main__':
 				else:					lower_h = curr_h
 			H = upper_h
 		else:
-			H = MAX_H			
+			H = MAX_H
 
 	rev_vertex_trans = solve_for_H( H )
-	print( "Number of bones:", H )		
-	print( "Time for solving(minutes): ", (time.time() - start_time)/60 )
-	print( "Final vertex error RMS is:", vertex_error(rest_vs, rev_vertex_trans, deformed_vs ) )
+	if(len(rest_vs)<len(rest_vs_original)):
+		max_error = 0
+		for i in range(100):
+			rev_vertex_trans = solve_for_H( H )
+			max_error = max(max_error, vertex_error(rest_vs, rev_vertex_trans, deformed_vs))
+			print(i)
+		print( "Max vertex error RMS is:", max_error )
+	else:	
+		print( "Number of bones:", H )		
+		print( "Time for solving(minutes): ", (time.time() - start_time)/60 )
+		print( "Final vertex error RMS is:", vertex_error(rest_vs, rev_vertex_trans, deformed_vs ) )
 
 	if args.save_matlab_result:
 		save_to_matlab( args.save_matlab_initial, all_R_mats, deformed_vs, unpack( x, P )[0], unpack( x, P )[1] )
