@@ -1488,7 +1488,7 @@ if __name__ == '__main__':
 	parser.add_argument('--save-matlab-result', type=str, help='Path to save input flats and optimization output to matlab format.')
 	parser.add_argument('--seed', type=int, default=0, help='initial seed.')
 	parser.add_argument('--subset', type=int, default=-1, help='random number of vertices')
-	parser.add_argument('--basinhopping', type=int, default=1, help='basinhopping algorithm to jump out of local minima with random step.')
+	parser.add_argument('--basinhopping', type=int, default=0, help='basinhopping algorithm to jump out of local minima with random step.')
 	
 	args = parser.parse_args()
 	H = args.handles
@@ -1698,26 +1698,30 @@ if __name__ == '__main__':
 			return err
 		
 		## basinhopping
-		local_minima = {}
-		def print_fun(x, f, accepted):
-			local_minima[f] = x
-			print("at minimum %.4f accepted %d" % (f, int(accepted)))
+		if hop_times > 0:
+			local_minima = {}
+			def print_fun(x, f, accepted):
+				local_minima[f] = x
+				print("at minimum %.4f accepted %d" % (f, int(accepted)))
 			
-		from scipy.optimize import OptimizeResult
-		def noop_min(fun, x0, args, **options):
-			return OptimizeResult(x=x0, fun=fun(x0), success=True, nfev=1)
+			from scipy.optimize import OptimizeResult
+			def noop_min(fun, x0, args, **options):
+				return OptimizeResult(x=x0, fun=fun(x0), success=True, nfev=1)
 		
-		from scipy.optimize import basinhopping
-		np.random.seed(0)
-		ans = basinhopping(func, x0, minimizer_kwargs=dict(method=noop_min), niter=hop_times, callback=print_fun)
-		print(ans)
+			from scipy.optimize import basinhopping
+			np.random.seed(0)
+			ans = basinhopping(func, x0, minimizer_kwargs=dict(method=noop_min), niter=hop_times, callback=print_fun)
+			print(ans)
 
-		## recover transformation
-		print("all local minima")
-		for f in local_minima.iterkeys():
-			print(f)
+			## recover transformation
+			print("all local minima")
+			for f in local_minima.iterkeys():
+				print(f)
 		
-		x = solve_x( ans.x )
+			x = solve_x( ans.x )
+		else:
+			x = solve_x( x0 )
+			
 		rev_vertex_trans = per_vertex_transformation(x, P, rest_vs, deformed_vs, z_strategy = args.z_strategy, nullspace=args.nullspace)
 		
 		if error_test:
