@@ -34,11 +34,13 @@ def plot(all_data):
 		line2, = plt.plot(x, y[2], c=cmap[2], lw=2, label='Grassmann(2.2min)')
 		line0, = plt.plot(x, y[0], c=cmap[0], lw=2, label='Alternating(1.5min)')
 		line3, = plt.plot(x, y[3], c=cmap[3], lw=2, label='IPCA(2.1min)')
+		line4, = plt.plot(x, y[4], c=cmap[4], lw=2, label='basinhopping(2.0min)')
 		plt.plot(x, y[0], 'o', c=cmap[0])
 		plt.plot(x, y[1], 'o', c=cmap[1])
 		plt.plot(x, y[2], 'o', c=cmap[2])
 		plt.plot(x, y[3], 'o', c=cmap[3])
-			
+		plt.plot(x, y[4], 'o', c=cmap[4])
+		
 		plt.legend( title=name+' with '+handles+' handles', loc='upper right', bbox_to_anchor=(1,1), ncol=1, fontsize='medium')
 # 	plt.ylim(ymin=0, ymax=30)
 #	plt.xlim(xmin=1)
@@ -63,5 +65,6 @@ if __name__ == '__main__':
 		data_file_b = os.path.join( folder, name+'_b.csv' )
 		data_file_cayley = os.path.join( folder, name+'_cayley.csv' )
 		data_file_ipca = os.path.join( folder, name+'_ipca.csv' )
-		all_data[name] = [np.loadtxt(data_file_biquadratic, delimiter=','), np.loadtxt(data_file_b, delimiter=','), np.loadtxt(data_file_cayley, delimiter=','), np.loadtxt(data_file_ipca, delimiter=',')]
+		data_file_hop = os.path.join( folder, name+'_basinhopping.csv' )
+		all_data[name] = [np.loadtxt(data_file_biquadratic, delimiter=','), np.loadtxt(data_file_b, delimiter=','), np.loadtxt(data_file_cayley, delimiter=','), np.loadtxt(data_file_ipca, delimiter=','), np.loadtxt(data_file_hop, delimiter=',')[:21]]
 	plot(all_data)

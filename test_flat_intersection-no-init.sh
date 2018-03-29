@@ -4,11 +4,11 @@ ROOT_DIR="../.."
 MODEL_DIR="./models"
 RES_DIR="./results-no-init"
 OBJ_SUFF=".obj"
-MAXITER=1000
+MAXITER=100
 
 INITIAL_GUESS_ARGS="--svd_threshold 1e-15 --transformation_threshold 1e-4 --version 0"
 
-for REST_POSE in $(basename "${MODEL_DIR}"/*.obj)
+for REST_POSE in $(basename "${MODEL_DIR}"/cheb*.obj)
 do
 	name="${REST_POSE%$OBJ_SUFF}"
 	POSES_DIR="${MODEL_DIR}/${name}"
@@ -18,9 +18,9 @@ do
 		H=${test_dir#$name-}
 		
 		GT_DIR="${MODEL_DIR}/${name}"
-		FLAT_INTERSECTION_ARGS_NO_INIT="--energy ipca --CSV ${OUTPUT_DIR}/${test_dir}_no_init.csv --max-iter ${MAXITER} --f-eps 0 --handles ${H} --strategy pinv+ssv:weighted"
-		echo python -u flat_intersection.py "${MODEL_DIR}"/"${REST_POSE}" "${POSES_DIR}" ${FLAT_INTERSECTION_ARGS_NO_INIT} --output "${OUTPUT_DIR}" 2>&1 | tee -i "${OUTPUT_DIR}"/flat_intersection_no_init.out
-		python -u flat_intersection.py "${MODEL_DIR}"/"${REST_POSE}" "${POSES_DIR}" ${FLAT_INTERSECTION_ARGS_NO_INIT} --output "${OUTPUT_DIR}" 2>&1 | tee -i "${OUTPUT_DIR}"/flat_intersection_no_init.out
+		FLAT_INTERSECTION_ARGS_NO_INIT="--energy biquadratic --CSV ${OUTPUT_DIR}/${test_dir}_no_init.csv --max-iter ${MAXITER} --f-eps 0 --handles ${H} --strategy pinv+ssv:weighted"
+		echo python3 -u flat_intersection.py "${MODEL_DIR}"/"${REST_POSE}" "${POSES_DIR}" ${FLAT_INTERSECTION_ARGS_NO_INIT} --output "${OUTPUT_DIR}" 2>&1 | tee -i "${OUTPUT_DIR}"/flat_intersection_no_init.out
+		python3 -u flat_intersection.py "${MODEL_DIR}"/"${REST_POSE}" "${POSES_DIR}" ${FLAT_INTERSECTION_ARGS_NO_INIT} --output "${OUTPUT_DIR}" 2>&1 | tee -i "${OUTPUT_DIR}"/flat_intersection_no_init.out
 		
 # 		python -m pdb compare_per_vertex_transformation.py "${GT_DIR}" "${OUTPUT_DIR}"
 		

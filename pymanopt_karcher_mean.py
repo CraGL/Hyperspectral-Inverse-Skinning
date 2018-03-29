@@ -33,7 +33,7 @@ def compute_centroid(man, x):
     # solver = SteepestDescent(maxiter=150)
     solver = ConjugateGradient(maxiter=1000,mingradnorm=1e-10,minstepsize=1e-15)
     problem = Problem(man, cost=objective, grad=gradient, verbosity=2)
-    return solver.solve(problem)
+	return solver.solve(problem)
 
 def _is_seq( seq_or_one ):
     import autograd.builtins

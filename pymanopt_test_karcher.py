@@ -105,6 +105,7 @@ else:
 
 if args.manifold == 'pB':
     manifold = Product( [ Euclidean(dim), Grassmann(dim, handles) ] )
+    # manifold = Grassmann(dim, handles)
     def pB_from_X( X ):
         p, B = X
         return p,B
@@ -166,6 +167,9 @@ def repeated_block_diag_times_matrix( block, matrix ):
 
 # (2) Define the cost function (here using autograd.numpy)
 def cost(X):
+	## Does this ever get called?
+	# if type(X) == np.ndarray: callback( X )
+	
     if args.manifold in ('pB','ssB'):
         p,B = pB_from_X( X )
         ## For type checking, I want everything to be a matrix.
@@ -219,6 +223,17 @@ def cost(X):
     # sum += 1e-5 * np.dot( p,p )
     
     return sum
+
+def callback( X ):
+	## p is the point on the line
+	## B is a one-column vector parallel to the line
+	p,B = pB_from_X( X )
+	print( "callback:" )
+	print( p )
+	print( B )
+	from plot_visualization import draw_3d_line
+	draw_3d_line( p, B )
+	# draw( [ ( point_on_flat, cross( ortho_dirs.T[0], ortho_dirs.T[1] ) ) for ortho_dirs, point_on_flat in flats ], ( p, B ) )
 
 if args.manifold == 'graff':
     print( "Using manually computed gradient." )
@@ -404,7 +419,7 @@ if args.optimize_from is not None or args.load is not None:
         Xopt2 = solver.solve(problem, x=Xopt)
     elif args.optimize_from == 'random':
         print( "Optimizing from random with the simple original cost function." )
-        Xopt2 = solver.solve(problem)
+        Xopt2 = solver.solve(problem, callback=callback)
     else:
         raise RuntimeError( "Unknown --optimize-from parameter: %s" % args.optimize_from )
     print( "Final cost:", cost( Xopt2 ) )

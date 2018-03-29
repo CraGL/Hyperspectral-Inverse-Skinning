@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <title>skinning demo</title>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+        <style>
+            body {
+                font-family: Monospace;
+                background-color: #f0f0f0;
+                margin: 0px;
+                overflow: hidden;
+            }
+            
+            #gui {
+                position: absolute;
+                top: 0;
+                left: 0;
+                
+                padding-top: 10px;
+                padding-left: 10px;
+                text-align: left;
+                height: 100px;
+                /*
+                Setting display to inline-block instead of width 100% so that
+                mouse events fall through to the THREE.js view to the right of the contents.
+                */
+                display: inline-block;
+            }
+            #title {
+                /* border-bottom: 1px solid #000; */
+                text-decoration: underline;
+            }
+            
+            .control_group
+            {
+                /* border-top: 1px dotted #000; */
+                padding: 5px;
+            }
+            
+            .control_group_last
+            {
+                /* border-bottom: 1px dotted #000; */
+            }
+            
+            .clearfix
+            {
+                clear: both;
+            }
+            
+            .small
+            {
+                font-size: 80%;
+            }
+            
+            .small-link
+            {
+                text-decoration: underline;
+                font-size: 80%;
+                cursor: pointer;
+            }
+        </style>
+    </head>
+    <body>
+        
+        <div id="gui">
+        <div id="title">THREE.js + HTML GUI</div>
+        
+        <div>
+            <form id="variables" action="">
+            <div class="control_group">
+            Mouse:<br>
+                <label for="mouse_add_handles"><input type="radio" name="mouse_mode" value="mouse_add_handles" id="mouse_add_handles" checked="checked">Add Handles</label><br>
+                <label for="mouse_manipulate_handles"><input type="radio" name="mouse_mode" value="mouse_manipulate_handles" id="mouse_manipulate_handles">Manipulate Handles<br><span class="small">(shift-drag for rotation, alt-drag for scale)</span></label>
+            </div>
+            <div class="control_group">
+                <input type="button" value="Clear handles" id="clear_handles">
+                <input type="button" value="Reset transforms" id="reset_transforms">
+            </div>
+            <div class="control_group">
+            Handle presets:<br>
+                <span class="small-link handle_preset" id="woody_one"  data-handle-preset="[ 691 ]">woody one</span>
+                <span class="small-link handle_preset" id="woody_five" data-handle-preset="[183, 344, 536, 406, 282]">woody five</span>
+                <span class="small-link handle_preset" id="circle_one" data-handle-preset="[ 91 ]">circle one</span>
+                <span class="small-link handle_preset" id="circle_two" data-handle-preset="[ 20, 150 ]">circle two</span>
+            </div>
+            <div class="control_group">
+                OBJ file URL:
+                <span class="small-link URL" id="obj_URL_woody" for="obj_URL" href="examples/woody-norm.obj">woody</span>
+                <span class="small-link URL" id="obj_URL_circle" for="obj_URL" href="examples/simple-uvs.obj">circle</span>
+                <br>
+                <input type="text" name="obj_URL" value="" id="obj_URL" size=50 />
+                <br />
+                Texture map URL:
+                <span class="small-link URL" id="texture_map_URL_wood" for="texture_map_URL" href="examples/woody.png">wood</span>
+                <span class="small-link URL" id="texture_map_URL_grid" for="texture_map_URL" href="examples/uv_grid.jpg">grid</span>
+                <span class="small-link URL" id="texture_map_URL_white" for="texture_map_URL" href="examples/white.png">white</span>
+                <br>
+                <input type="text" name="texture_map_URL" value="" id="texture_map_URL" size=50 />
+            </div>
+            <div class="control_group">
+            Visualize weights for handle:
+                <select name="visualize_weights" id="visualize_weights">
+                <option value="off" selected="selected">Off</option>
+                </select>
+            </div>
+            <div class="control_group control_group_last">
+            Solver mode:
+                <select name="solver_mode" id="solver_mode">
+                <option value="bounded" selected="selected">Bounded dense</option>
+                <option value="bounded-brand-chen">Bounded Brand-Chen</option>
+                <option value="unbounded">Unbounded</option>
+                </select>
+            </div>
+            <div class="control_group control_group_last">
+            Laplacian mode:
+                <select name="laplacian_mode" id="laplacian_mode">
+                <option value="graph" selected="selected">Graph</option>
+                <option value="cotangent">Cotangent with Barycentric Area</option>
+                </select>
+            </div>
+            <div class="control_group">
+                Save: <input type="button" value="Save weights" id="save_weights"><br>
+                Load: <input type="file" value="Load weights" id="load_weights" style="width:200px">
+            </div>
+            </form>
+        </div>
+        
+        <!-- This #progress didn't work. Long JavaScript computations don't allow the screen to refresh, so setting the text doesn't show up. -->
+        <!-- <div id="progress_holder">Status: <span id="progress">Idle</span></div> -->
+        </div>
+        
+        <script src="js/Blob.js"></script>
+        <script src="js/FileSaver.js"></script>
+        <script src="js/threejs/three.min.js"></script>
+        <script src="js/threejs/loaders/OBJLoader.js"></script>
+        <script src="js/threejs/libs/stats.min.js"></script>
+        <script src="js/threejs/controls/TrackballControls.js"></script>
+        <script src="js/jquery-3.3.1.min.js"></script>
+        <script src="js/numeric-1.2.6.js"></script>
+        <script src="js/websocket-client.js"></script>
+        <!-- <script src="js/bbw.js"></script> -->
+        
+        <script src="js/main.js"></script>
+    </body>
+</html>
