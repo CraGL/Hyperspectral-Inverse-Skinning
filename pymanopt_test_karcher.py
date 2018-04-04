@@ -228,11 +228,14 @@ def callback( X ):
 	## p is the point on the line
 	## B is a one-column vector parallel to the line
 	p,B = pB_from_X( X )
+	p = np.array( p ).ravel()
+	B = np.array( B ).ravel()
+	import web_gui.relay as relay
 	print( "callback:" )
-	print( p )
-	print( B )
-	from plot_visualization import draw_3d_line
-	draw_3d_line( p, B )
+	relay.send_data( [p.tolist(), p.tolist()] )
+	## relay.send_data( B.tolist() )
+	# from plot_visualization import draw_3d_line
+# 	draw_3d_line( p, B )
 	# draw( [ ( point_on_flat, cross( ortho_dirs.T[0], ortho_dirs.T[1] ) ) for ortho_dirs, point_on_flat in flats ], ( p, B ) )
 
 if args.manifold == 'graff':

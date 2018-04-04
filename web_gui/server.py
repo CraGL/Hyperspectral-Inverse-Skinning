@@ -1,10 +1,8 @@
-from __future__ import print_function, division
-
 import asyncio
 import websockets
 import json
 
-async def bbw_server( websocket, path ):
+async def server( websocket, path ):
     async for msg in websocket:
         if msg.startswith( "bbw " ):
             parts = msg.split()
