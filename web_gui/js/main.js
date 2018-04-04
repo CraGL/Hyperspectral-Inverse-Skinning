@@ -310,10 +310,10 @@ function createLineFromReceived( position, direction ) {
     var mat = new THREE.LineBasicMaterial({ linewidth: 2, color: 0xffffff, vertexColors: THREE.VertexColors });
         
     geom.vertices.push( position.clone() );
-    direction.normalize()
+    direction.normalize();
     
- 	geom.vertices.push( position.clone().add( direction ) );
-	geom.colors = [ new THREE.Color( 0xc441f4 ), new THREE.Color( 0xc441f4 ) ];
+    geom.vertices.push( position.clone().add( direction ) );
+    geom.colors = [ new THREE.Color( 0xc441f4 ), new THREE.Color( 0xc441f4 ) ];
     
     var line = new THREE.Line( geom, mat, THREE.LineSegments );
     line.computeLineDistances = true;
