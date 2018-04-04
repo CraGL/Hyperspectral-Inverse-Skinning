@@ -29,7 +29,9 @@ parser.add_argument('--load', type=str, help = 'If specified, loads p and B from
 parser.add_argument('--lines', type=str2bool, default = False, help = 'Shorthand for --dim 3 --ortho 2 --handles 1.')
 parser.add_argument('--centroid-best-p', type=str2bool, default = False, help ='Whether or not to improve the centroid guess with the optimal p (default: False, because it seems to harm optimization).')
 parser.add_argument('--flats-are-vertices', type=str2bool, default = False, help ='Whether or not to assume flats are I kron [x y z 1].')
+parser.add_argument('--visualize', type=str, choices = ['lines', 'points', 'none'], help ='Whether to visualize `lines` in 3D, `points` in 4D, or `none`.')
 parser.add_argument('--recovery', type=float, help ='Recovery test magnitude.')
+parser.add_argument('--number', type=int, help ='Number of given vertices.')
 args = parser.parse_args()
 
 ## Print the arguments.
@@ -61,7 +63,9 @@ if args.lines:
     Q = 2
     handles = 1
 
-N = 200
+N = 100
+if args.number:
+	N = args.number
 # p, B
 
 ## (1b) Generate data
@@ -77,8 +81,13 @@ if args.test_data == 'zero':
     flats = [ ( A, np.zeros(a.shape) ) for A, a in flats ]
 elif args.test_data == 'line':
     ## With a known solution along a line:
-    flats = [ ( A, i*np.ones(a.shape) ) for i, ( A, a ) in enumerate( flats ) ]
+    flats = [ ( A, float(i)/len(flats)*np.ones(a.shape) ) for i, ( A, a ) in enumerate( flats ) ]
+    ## Some extra noise:
+    # flats = [ ( A, float(i)/len(flats)*np.ones(a.shape) + np.random.random(dim)*.1 ) for i, ( A, a ) in enumerate( flats ) ]
     print( "The solution should have slope:", 1./np.sqrt(dim) )
+elif args.test_data == 'handle':
+	## With a known solution on a handle-dimensional plane:
+    flats = [ ( A, np.append( np.random.random(handles), np.zeros(dim-handles) ) ) for i, ( A, a ) in enumerate( flats ) ]
 elif args.test_data == 'random':
     ## This is the default.
     pass
@@ -225,18 +234,27 @@ def cost(X):
     return sum
 
 def callback( X ):
-	## p is the point on the line
-	## B is a one-column vector parallel to the line
-	p,B = pB_from_X( X )
-	p = np.array( p ).ravel()
-	B = np.array( B ).ravel()
-	import web_gui.relay as relay
-	print( "callback:" )
-	relay.send_data( [p.tolist(), p.tolist()] )
-	## relay.send_data( B.tolist() )
-	# from plot_visualization import draw_3d_line
-# 	draw_3d_line( p, B )
-	# draw( [ ( point_on_flat, cross( ortho_dirs.T[0], ortho_dirs.T[1] ) ) for ortho_dirs, point_on_flat in flats ], ( p, B ) )
+	if args.visualize == 'lines':
+		## p is the point on the line
+		## B is a one-column vector parallel to the line
+		p,B = pB_from_X( X )
+		p = np.array( p ).ravel()
+		B = np.array( B ).ravel()
+		import web_gui.relay as relay
+		print( "callback:" )
+		all_data = []
+		for flat in flats:
+			dir = np.cross( flat[0][0], flat[0][1] )
+			pt = flat[1]
+			all_data.append( pt.tolist() )
+			all_data.append( dir.tolist() )
+		all_data.append( p.tolist() )
+		all_data.append( B.tolist() )
+		relay.send_data( all_data )
+		# relay.send_data( [p.tolist(), B.tolist()] )
+		# from plot_visualization import draw_3d_line
+	# 	draw_3d_line( p, B )
+		# draw( [ ( point_on_flat, cross( ortho_dirs.T[0], ortho_dirs.T[1] ) ) for ortho_dirs, point_on_flat in flats ], ( p, B ) )
 
 if args.manifold == 'graff':
     print( "Using manually computed gradient." )

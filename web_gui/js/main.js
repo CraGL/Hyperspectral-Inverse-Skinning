@@ -304,16 +304,15 @@ async function init_socket()
     receive();
 }
 
-function createLineFromReceived( position, direction ) {
+function createLineFromReceived( position, direction, color0, width = 2, len = 2 ) {
     // From: http://soledadpenades.com/articles/three-js-tutorials/drawing-the-coordinate-axes/
     var geom = new THREE.Geometry();
-    var mat = new THREE.LineBasicMaterial({ linewidth: 2, color: 0xffffff, vertexColors: THREE.VertexColors });
+    var mat = new THREE.LineBasicMaterial({ linewidth: width, color: 0xffffff, vertexColors: THREE.VertexColors });
         
-    geom.vertices.push( position.clone() );
-    direction.normalize();
-    
+    direction = direction.normalize().multiplyScalar( len );
+    geom.vertices.push( position.clone().sub( direction ) );
     geom.vertices.push( position.clone().add( direction ) );
-    geom.colors = [ new THREE.Color( 0xc441f4 ), new THREE.Color( 0xc441f4 ) ];
+    geom.colors = [ color0.clone(), color0.clone() ];
     
     var line = new THREE.Line( geom, mat, THREE.LineSegments );
     line.computeLineDistances = true;
@@ -336,10 +335,13 @@ async function receive()
         // Assume data is an array of 3D positions.
         let pts = JSON.parse( data );
         
-        var position = new THREE.Vector3( pts[0][0], pts[0][1], pts[0][2] );
-        var direction = new THREE.Vector3( pts[1][0], pts[1][1], pts[1][2] );
-        
-        all_pts.add( createLineFromReceived( position, direction ) );
+        for (var i = 0; i < pts.length; i += 2) { 
+        	// let pt = pts[i];
+			var position = new THREE.Vector3( pts[i][0], pts[i][1], pts[i][2] );
+			var direction = new THREE.Vector3( pts[i + 1][0], pts[i + 1][1], pts[i + 1][2] );
+			if ( i >= pts.length - 2 ) all_pts.add( createLineFromReceived( position, direction, new THREE.Color( 0xc441f4 ), 5, 100 ) );
+			else 					   all_pts.add( createLineFromReceived( position, direction, new THREE.Color( 0x000000 ) ) );
+        }
         
         // Add the points to the scene.
         scene.add( all_pts ); 
