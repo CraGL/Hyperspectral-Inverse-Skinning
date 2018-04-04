@@ -46,7 +46,7 @@ function init_3D() {
     window.addEventListener( 'resize', onWindowResize, false );
     
     // Add your initialization code here.
-    scene.add( buildAxes( 2. ) );
+    scene.add( buildAxes( 1. ) );
 }
 function createAxisLine( position0, position1, color0, color1, dashed ) {
     // From: http://soledadpenades.com/articles/three-js-tutorials/drawing-the-coordinate-axes/
