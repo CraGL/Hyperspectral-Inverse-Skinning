@@ -114,7 +114,7 @@ target_link_libraries(viewer
 
 ## Another simple viewer
 add_executable(viewer2
-	viewer2.cpp
+	viewer2re.cpp
 	jsoncpp.cpp
 	viewer/save_screenshot.cpp
 	viewer/stb_image_write.cpp

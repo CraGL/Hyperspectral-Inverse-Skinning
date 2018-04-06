@@ -50,12 +50,14 @@ except:
 poses = 10
 dim = 12*poses
 Q = 3*poses
-handles = 5
+handles = 4
+N = 100
 
 if args.poses is not None: poses = args.poses
 if args.dim is not None: dim = args.dim
 if args.ortho is not None: Q = args.ortho
 if args.handles is not None: handles = args.handles
+if args.number is not None: N = args.number
 
 ## Lines in 3D
 if args.lines:
@@ -63,9 +65,6 @@ if args.lines:
     Q = 2
     handles = 1
 
-N = 100
-if args.number:
-	N = args.number
 # p, B
 
 ## (1b) Generate data
