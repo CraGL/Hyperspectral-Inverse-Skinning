@@ -1791,10 +1791,13 @@ if __name__ == '__main__':
 	
 			H = int(rev_vertex_trans.shape[1]/12)
 			for i in range(H):
+				base = "0000"
+				name = base[ : -len( str(i+1) ) ] + str(i+1)
+				
 				per_pose_transformtion = rev_vertex_trans[:,i*12:(1+i)*12]
 				per_pose_transformtion = per_pose_transformtion.reshape(-1,3,4)
 				per_pose_transformtion = np.swapaxes(per_pose_transformtion, 1, 2).reshape(-1,12)
-				output_path = os.path.join( output_folder, str(i+1) + ".DMAT" )
+				output_path = os.path.join( output_folder, name + ".DMAT" )
 				format_loader.write_DMAT( output_path, per_pose_transformtion )
 	
 	
