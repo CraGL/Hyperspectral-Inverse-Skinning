@@ -27,21 +27,28 @@ class ErrorRecorder:
 	'''
 	A class to compute RMS error.
 	'''
-	csv_path=None
-	rest_vs=None
-	deformed_vs=None
-	P=None
-	H=None
-	energy=None
-	z_strategy=None
-	values=None
-	ground_truth=None
+	csv_path = None
+	rest_vs = None
+	deformed_vs = None
+	P = None
+	H = None
+	energy = None
+	z_strategy = None
+	values = None
+	ground_truth = None
+	visualize = False
 	
 	def __init__(self):
 		self.values=[]
 		
-	def add_error(self, data, enable_cayley=True):
-		P = self.P
+	def visualize_error( self, data ):
+		if H > 4: return None
+		print( data )
+		from space_mapper import SpaceMapper
+		space_mapper = Uncorrellated_Space( data )
+		
+	def add_error(self, data, enable_cayley = True):
+		P = self.P 
 		H = self.H
 		x = data.copy()
 		if enable_cayley == True and self.energy == 'cayley':
@@ -1489,6 +1496,7 @@ if __name__ == '__main__':
 	parser.add_argument('--seed', type=int, default=0, help='initial seed.')
 	parser.add_argument('--subset', type=int, default=-1, help='random number of vertices')
 	parser.add_argument('--basinhopping', type=int, default=0, help='basinhopping algorithm to jump out of local minima with random step.')
+	parser.add_argument('--visualize', type=str2bool, default=False, help='visualize the optimization precedure, only works for 4 handles.')
 	
 	args = parser.parse_args()
 	H = args.handles
@@ -1568,6 +1576,7 @@ if __name__ == '__main__':
 	error_recorder.z_strategy = args.z_strategy
 	error_recorder.csv_path = args.csv_path
 	error_recorder.ground_truth = args.ground_truth
+	error_recorder.visualize = args.visualize
 			
 	def solve_for_H( H, rest_vs, deformed_vs, all_R_mats ):
 		x = None
