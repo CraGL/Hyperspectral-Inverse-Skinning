@@ -153,7 +153,7 @@ if __name__ == '__main__':
 		
 	parser = argparse.ArgumentParser(description = "From per-vertex transformations to per-bone transformations. ", usage="%(prog)s path/to/input_model_folder")
 	parser.add_argument("per_vertex_tranformation", type=str, help="Path to the folder containing input mesh files.")
-	parser.add_argument('--method', type=str, help='linear or quadratic solver: "lp" (default), "qp", "qp-major", "ipopt", "binary" or "scipy".')
+	parser.add_argument('--method', '-M', type=str, help='linear or quadratic solver: "lp" (default), "qp", "qp-major", "ipopt", "binary" or "scipy".')
 	parser.add_argument('--linear-solver', '-L', type=str, help='Linear solver: "glpk" (default) or "mosek".')
 	parser.add_argument('--max-iter', type=int, help='The maximum iterations for the solver.')
 	parser.add_argument('--ground-truth', '-GT', type=str, help='Ground truth data path.')
