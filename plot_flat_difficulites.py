@@ -17,8 +17,8 @@ def parseOutput( path ):
 				words = s.split( " " )
 				if words[0] == "max":
 					## max time reached
-					# data.append( [ ortho, handle, 1000 ] )
-					data.append( [ ortho, handle, int( words[4] ) ] )
+					data.append( [ ortho, handle, 1000 ] )
+					# data.append( [ ortho, handle, int( words[4] ) ] )
 				else:
 					## min grad norm reached
 					data.append( [ ortho, handle, int( words[5] ) ] )
@@ -57,9 +57,9 @@ if __name__ == '__main__':
 	df2.columns = df2.columns.astype( int )
 
 	# Draw a heatmap with the numeric values in each cell
-	# f, ax = plt.subplots( figsize=(9, 6) )
-	# sns.heatmap(df, annot=True, fmt="d", linewidths=.5, ax=ax)
 	f, ax = plt.subplots( figsize=(9, 6) )
-	sns.heatmap(df2, annot=True, fmt=".2g", linewidths=.5, ax=ax)
+	sns.heatmap(df, annot=True, fmt="d", linewidths=.5, ax=ax)
+# 	f, ax = plt.subplots( figsize=(9, 6) )
+# 	sns.heatmap(df2, annot=True, fmt=".2g", linewidths=.5, ax=ax)
 
 	plt.show()
