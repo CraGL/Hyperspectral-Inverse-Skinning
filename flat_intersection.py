@@ -1571,7 +1571,9 @@ if __name__ == '__main__':
 			print( "The rank of the stack of all pose row matrices is: ", np.linalg.matrix_rank( np.vstack( all_flats ) ) )
 		else:
 			all_R_mats = np.append( rest_vs, np.ones( ( len( rest_vs ), 1 ) ), axis = 1 )
-			return all_R_mats
+			# return all_R_mats
+		return all_R_mats #### should be here!, not in 'else' scope.
+
 	all_R_mats = build_R_mats(rest_vs, deformed_vs)
 	
 	def random_subset(num, rest_vs, deformed_vs, all_R_mats):
