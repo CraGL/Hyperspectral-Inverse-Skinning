@@ -41,6 +41,8 @@ class ErrorRecorder:
 	def __init__(self):
 		self.values=[]
 		
+		self.visualize_last = None
+		
 	def visualize_error( self, rev_vertex_trans ):
 		if H > 4: return None
 		import web_gui.relay as relay
@@ -50,6 +52,14 @@ class ErrorRecorder:
 # 		reduce_mapper = SpaceMapper.Uncorrellated_Space( rev_vertex_trans, dimension = 3 )
 		reduce_mapper = SpaceMapper.Uncorrellated_Space( rev_vertex_trans )
 		reduced_data = reduce_mapper.project( rev_vertex_trans )
+		
+		## Apply rigid alignment.
+		if self.visualize_last is not None:
+			# Align data with first frame.
+			import scipy.linalg
+			R, _ = scipy.linalg.orthogonal_procrustes( reduced_data, self.visualize_last )
+			reduced_data = reduced_data.dot( R )
+		self.visualize_last = reduced_data
 		
 		relay.send_data( reduced_data.tolist() )
 		
