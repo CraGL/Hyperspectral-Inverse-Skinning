@@ -342,9 +342,12 @@ def MVES( pts, initial_guess_vertices = None, method = None, linear_solver = Non
 		assert ( bary <= 1+eps ).all()
 		assert ( abs( bary.sum(0) - 1.0 ) < eps ).all()
 		
+		print( "initial guess (points are columns):" )
+		print( x0.T )
+		
 		x0 = numpy.linalg.inv( x0.T ).ravel()
-		print( "inital volume:", f_volume( x0 ) )
-		print( "inital log volume:", f_log_volume( x0 ) )
+		print( "initial volume:", f_volume( x0 ) )
+		print( "initial log volume:", f_log_volume( x0 ) )
 		return x0
 	
 	## Make an initial guess.
@@ -555,7 +558,8 @@ def MVES( pts, initial_guess_vertices = None, method = None, linear_solver = Non
 		Tao = (n+1)*1000/len(pts)
 		Mu = 1e-6
 		def hnorm( X ): return numpy.maximum( -X, 0.0 ).sum()
-		def soft( X, beta ): return numpy.maximum( numpy.abs( X + beta/2.0 ) - beta/2.0, 0.0 )*numpy.sign(X)
+		# def soft( X, beta ): return numpy.maximum( numpy.abs( X + beta/2.0 ) - beta/2.0, 0.0 )*numpy.sign(X)
+		def soft( X, beta ): return numpy.maximum( -X, 0.0 )
 		def allclose( x1, x2 ): numpy.allclose( x1, x2, rtol=1e-03, atol=1e-06 )
 		
 		# A = g_bary_jac( x0 )
@@ -713,11 +717,17 @@ def test( method ):
 	
 	pts = [ [ 0,1 ], [ 1,0 ], [ -2,0 ], [ 0, 0 ] ]
 	# pts = [ [ 0,.9 ], [.1,.9], [ 1,0 ], [ 0, 0 ] ]
-	print( 'pts:', pts )
+	print( 'pts (points are columns):' )
+	print( numpy.asarray(pts).T )
 	#numpy.random.seed(0)
 	#pts = numpy.random.random_sample((200, 16))
 	solution, weights, iterations = MVES( pts, method = method )
-	print( 'solution' )
+	
+	print( '====' )
+	
+	print( 'pts (points are columns):' )
+	print( numpy.asarray(pts).T )
+	print( 'solution (points are columns):' )
 	print( solution )
 
 	print( 'solution * data', '(', len(pts), 'data points)' )

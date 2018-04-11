@@ -914,6 +914,8 @@ def optimize_biquadratic( P, H, rest_vs, deformed_vs, x0, solve_for_rest_pose = 
 			]
 		current_zs = np.zeros( ( len( rest_vs ), H ) )
 		z_neighbor_weight = 0.01
+	elif z_strategy == 'sparse4':
+		current_zs = np.zeros( ( len( rest_vs ), H ) )
 	
 	f_prev = None
 	
@@ -951,7 +953,7 @@ def optimize_biquadratic( P, H, rest_vs, deformed_vs, x0, solve_for_rest_pose = 
 				rest_vs = rest_vs.copy()
 			
 			## New iteration. Copy the current z's to the last z's.
-			if z_strategy == 'neighbors': last_zs = current_zs.copy()
+			if z_strategy in ('neighbors','sparse4'): last_zs = current_zs.copy()
 			
 			for i, deformed_v in enumerate(deformed_vs):
 				vprime = deformed_v.reshape((3*P,1))
@@ -962,12 +964,14 @@ def optimize_biquadratic( P, H, rest_vs, deformed_vs, x0, solve_for_rest_pose = 
 					z, ssz, fi = biquadratic.solve_for_z( W_prev, v, vprime, nullspace = nullspace, return_energy = True, use_pseudoinverse = use_pseudoinverse, strategy = z_strategy,
 						neighborz = np.average( last_zs[ neighbors[i] ], axis = 0 ), neighbor_weight = z_neighbor_weight
 						)
+				elif z_strategy == 'sparse4' and 'z_strategy_arg' in kwargs and int(kwargs['z_strategy_arg']) > 0 and iterations >= int(kwargs['z_strategy_arg']):
+					z, ssz, fi = biquadratic.solve_for_z( W_prev, v, vprime, nullspace = nullspace, return_energy = True, use_pseudoinverse = use_pseudoinverse, strategy = z_strategy, last_z_values = current_zs )
 				else:
 					z, ssz, fi = biquadratic.solve_for_z( W_prev, v, vprime, nullspace = nullspace, return_energy = True, use_pseudoinverse = use_pseudoinverse, strategy = z_strategy )
 				fis[i] = fi
 				
 				## Save z if that's what we're up to.
-				if z_strategy == 'neighbors': current_zs[i] = z
+				if z_strategy in ('neighbors','sparse4'): current_zs[i] = z
 				
 				if 'ssv:skip' in strategy:
 					if ssz < 1e-5:
@@ -1494,6 +1498,7 @@ if __name__ == '__main__':
 	parser.add_argument('--x-eps', type=float, help='Variable change epsilon (biquadratic).')
 	parser.add_argument('--W-projection', type=str, choices = ['normalize', 'first', 'regularize_translation', 'regularize_identity', 'constrain_magnitude'], help='How to project W (biquadratic): normalize, first, regularize_translation, regularize_identity, constrain_magnitude.')
 	parser.add_argument('--z-strategy', type=str, choices = ['positive', 'sparse4', 'neighbors'], help='How to solve for z (biquadratic): positive, sparse4, neighbors.')
+	parser.add_argument('--z-strategy-arg', type=str, help='Extra argument passed to biquadratic solver')
 	parser.add_argument('--csv-path', '--CSV', type=str, help='csv file which save objective values.')
 	parser.add_argument('--handle-threshold', type=int, default=1, help='RMS threshold to determine proper number of handles.')
 	parser.add_argument('--forced-init', type=str2bool, default=False, help='Whether to use the same initial guess.')
@@ -1666,7 +1671,7 @@ if __name__ == '__main__':
 				converged, x = optimize_nullspace_directly(P, H, all_R_mats, deformed_vs, x, strategy = args.strategy, max_iter = args.max_iter, nullspace = args.nullspace )
 			elif args.energy == 'biquadratic':
 				if args.solve_for_rest_pose:
-					converged, x, new_all_R_mats = optimize_biquadratic( P, H, all_R_mats, deformed_vs, x0, strategy = args.strategy, solve_for_rest_pose = args.solve_for_rest_pose, max_iter = args.max_iter, f_eps = args.f_eps, x_eps = args.x_eps, W_projection = args.W_projection, z_strategy = args.z_strategy, csv_path = args.csv_path, nullspace = args.nullspace )
+					converged, x, new_all_R_mats = optimize_biquadratic( P, H, all_R_mats, deformed_vs, x0, strategy = args.strategy, solve_for_rest_pose = args.solve_for_rest_pose, max_iter = args.max_iter, f_eps = args.f_eps, x_eps = args.x_eps, W_projection = args.W_projection, z_strategy = args.z_strategy, csv_path = args.csv_path, nullspace = args.nullspace, z_strategy_arg = args.z_strategy_arg )
 				elif args.W_projection == 'first':
 					assert args.fancy_init is not None
 					assert args.fancy_init_errors is not None
@@ -1674,22 +1679,22 @@ if __name__ == '__main__':
 					guess_data = np.loadtxt( args.fancy_init )
 					guess_errors = np.loadtxt( args.fancy_init_errors )
 					guess_ssv = np.loadtxt( args.fancy_init_ssv )
-					converged, x = optimize_biquadratic( P, H, all_R_mats, deformed_vs, x0, strategy = args.strategy, max_iter = args.max_iter, f_eps = args.f_eps, x_eps = args.x_eps, W_projection = args.W_projection, z_strategy = args.z_strategy, guess_data = guess_data, guess_errors = guess_errors, guess_ssv = guess_ssv, csv_path = args.csv_path, nullspace = args.nullspace )
+					converged, x = optimize_biquadratic( P, H, all_R_mats, deformed_vs, x0, strategy = args.strategy, max_iter = args.max_iter, f_eps = args.f_eps, x_eps = args.x_eps, W_projection = args.W_projection, z_strategy = args.z_strategy, guess_data = guess_data, guess_errors = guess_errors, guess_ssv = guess_ssv, csv_path = args.csv_path, nullspace = args.nullspace, z_strategy_arg = args.z_strategy_arg )
 				else:
-					converged, x = optimize_biquadratic( P, H, all_R_mats, deformed_vs, x0, strategy = args.strategy, max_iter = args.max_iter, f_eps = args.f_eps, x_eps = args.x_eps, W_projection = args.W_projection, z_strategy = args.z_strategy, csv_path = args.csv_path, mesh = rest_mesh, nullspace = args.nullspace )
+					converged, x = optimize_biquadratic( P, H, all_R_mats, deformed_vs, x0, strategy = args.strategy, max_iter = args.max_iter, f_eps = args.f_eps, x_eps = args.x_eps, W_projection = args.W_projection, z_strategy = args.z_strategy, csv_path = args.csv_path, mesh = rest_mesh, nullspace = args.nullspace, z_strategy_arg = args.z_strategy_arg )
 			elif args.energy == 'biquadratic+handles':
-				converged, x = optimize_biquadratic( P, H, all_R_mats, deformed_vs, x0, strategy = args.strategy, max_iter = args.max_iter, f_eps = args.f_eps, x_eps = args.x_eps, W_projection = args.W_projection, z_strategy = args.z_strategy, nullspace = args.nullspace )
+				converged, x = optimize_biquadratic( P, H, all_R_mats, deformed_vs, x0, strategy = args.strategy, max_iter = args.max_iter, f_eps = args.f_eps, x_eps = args.x_eps, W_projection = args.W_projection, z_strategy = args.z_strategy, nullspace = args.nullspace, z_strategy_arg = args.z_strategy_arg )
 				p, B = unpack( x, P )
 				B = B[:,:-1]
 				x = pack( p, B )
-				converged, x = optimize_biquadratic( P, H-1, all_R_mats, deformed_vs, x, strategy = args.strategy, max_iter = args.max_iter, f_eps = args.f_eps, x_eps = args.x_eps, W_projection = args.W_projection, z_strategy = args.z_strategy, nullspace = args.nullspace )
+				converged, x = optimize_biquadratic( P, H-1, all_R_mats, deformed_vs, x, strategy = args.strategy, max_iter = args.max_iter, f_eps = args.f_eps, x_eps = args.x_eps, W_projection = args.W_projection, z_strategy = args.z_strategy, nullspace = args.nullspace, z_strategy_arg = args.z_strategy_arg )
 			elif args.energy == 'biquadratic+B':
-				converged, x = optimize_biquadratic( P, H, all_R_mats[:,0,:4], deformed_vs, x0, strategy = args.strategy, max_iter = args.max_iter, f_eps = args.f_eps, x_eps = args.x_eps, W_projection = args.W_projection, z_strategy = args.z_strategy, nullspace = args.nullspace )
+				converged, x = optimize_biquadratic( P, H, all_R_mats[:,0,:4], deformed_vs, x0, strategy = args.strategy, max_iter = args.max_iter, f_eps = args.f_eps, x_eps = args.x_eps, W_projection = args.W_projection, z_strategy = args.z_strategy, nullspace = args.nullspace, z_strategy_arg = args.z_strategy_arg )
 				for i in range(10):
 					print( "Now trying B for one iteration." )
 					converged, x = optimize_nullspace_directly(P, H, all_R_mats, deformed_vs, x, strategy = 'hessian', max_iter = 1, nullspace = args.nullspace )
 					print( "Now biquadratic again." )
-					converged, x = optimize_biquadratic( P, H, all_R_mats[:,0,:4], deformed_vs, x, strategy = args.strategy, max_iter = args.max_iter, f_eps = args.f_eps, x_eps = args.x_eps, W_projection = args.W_projection, z_strategy = args.z_strategy, nullspace = args.nullspace )
+					converged, x = optimize_biquadratic( P, H, all_R_mats[:,0,:4], deformed_vs, x, strategy = args.strategy, max_iter = args.max_iter, f_eps = args.f_eps, x_eps = args.x_eps, W_projection = args.W_projection, z_strategy = args.z_strategy, nullspace = args.nullspace, z_strategy_arg = args.z_strategy_arg )
 			elif args.energy == 'laplacian':
 				qs_errors = None
 				if args.fancy_init_errors is not None: qs_errors = np.loadtxt(args.fancy_init_errors)
