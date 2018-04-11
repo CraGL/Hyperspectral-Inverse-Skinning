@@ -1,0 +1,31 @@
+Loading recovered result ... 
+Finish Loading recovered result.
+############################################
+wolf.obj 21 handles
+Reconstruction Mesh Error: 
+rev: max, mean and median per-vertex distance 2.55444199704e-07 3.49435729925e-08 1.79613710863e-08
+Our E_RMS_kavan2010:  3.07150738744e-05
+############################################
+usage: compare.py [-h] [--write-OBJ WRITE_OBJ] [--ssd_result SSD_RESULT]
+                  [--debug DEBUG]
+                  rest_pose pose_folder weights our_result
+compare.py: error: unrecognized arguments: --output ./results_mves/wolf-21/result.txt
+match order of our recovery:  [0 1 2 3 4 5]
+############################################
+Per-bone transformation Error: 
+rev error:  7.30283652501e-05
+############################################
+Weight Error: 
+rev error:  4.8470577034e-06
+
+gt  average sparsity (1e-5 threshold): 17.0888669951
+ssd average sparsity (1e-5 threshold): 21.0
+rev average sparsity (1e-5 threshold): 14.9523152709
+gt  average sparsity (0.1 threshold): 19.3430541872
+ssd average sparsity (0.1 threshold): 21.0
+rev average sparsity (0.1 threshold): 19.3454187192
+############################################
+Reconstruction Mesh Error: 
+rev: max, mean and median per-vertex distance 1.29585162495e-07 1.70632449353e-08 9.27070798816e-09
+Our E_RMS_kavan2010:  3.07574479897e-05
+############################################

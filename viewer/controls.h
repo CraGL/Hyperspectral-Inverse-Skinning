@@ -29,8 +29,5 @@ void windowFromNDC( const float& xnd, const float& ynd, const GLint* viewport, f
 float point_to_edge_distance( const Eigen::Vector2f& point, 
 	const Eigen::Vector2f& edge0, const Eigen::Vector2f& edge1 );
 
-void load_scene(void *);
-void export_scene(void *);
-
 
 #endif

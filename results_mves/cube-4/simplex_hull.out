@@ -1,0 +1,68 @@
+Using our gradient functions, not automatic finite differencing ones.
+uncorrelated data shape
+(1538, 3)
+All pts #:  1538
+inital volume: -0.122478618357
+inital log volume: 2.09981880825
+Solve MEVS with cvxopt ip solver.
+GLPK Simplex Optimizer, v4.61
+6156 rows, 16 columns, 24624 non-zeros
+      0: obj =   0.000000000e+00 inf =   1.000e+00 (1)
+      1: obj =  -1.000000000e+00 inf =   0.000e+00 (0)
+*    22: obj =  -6.386724289e+00 inf =   7.024e-10 (0)
+OPTIMAL LP SOLUTION FOUND
+Current log volume:  -0.00588630987623
+GLPK Simplex Optimizer, v4.61
+6156 rows, 16 columns, 24624 non-zeros
+      0: obj =   0.000000000e+00 inf =   1.000e+00 (1)
+      1: obj =  -1.000000000e+00 inf =   0.000e+00 (0)
+*    26: obj =  -4.084643757e+00 inf =   4.339e-13 (0)
+OPTIMAL LP SOLUTION FOUND
+Current log volume:  -0.00615559587219
+GLPK Simplex Optimizer, v4.61
+6156 rows, 16 columns, 24624 non-zeros
+      0: obj =   0.000000000e+00 inf =   1.000e+00 (1)
+      1: obj =  -1.000000000e+00 inf =   0.000e+00 (0)
+*    26: obj =  -4.004133057e+00 inf =   4.339e-13 (0)
+OPTIMAL LP SOLUTION FOUND
+Current log volume:  -0.00615559587219
+all close!
+# LP Iteration:  3
+Final log volume: -0.00202509834681
+weight test fails.
+solution
+[[ 0.4659  0.2853 -0.1437 -0.5355]
+ [-0.3019  0.7743  0.2885 -0.1514]
+ [ 0.0353 -0.4471  0.6653 -0.1382]
+ [ 1.      1.      1.      1.    ]]
+=> Best simplex found with volume: 0.997976950781
+
+Optimization costs: 0.00 minutes
+solution simplex volumn:  0.998
+recovered (4, 48)
+[[ 1.     0.     0.    -0.     1.     0.    -0.    -0.     1.     0.
+   0.    -0.     1.     0.     0.    -0.     1.     0.001 -0.    -0.
+   1.     0.     0.    -0.001  0.772 -0.35   0.53   0.47   0.877 -0.106
+  -0.428  0.331  0.841  0.172  0.206 -0.197  0.747 -0.466 -0.474 -0.259
+   0.454 -0.853  0.612  0.76   0.218  0.051  0.295  1.268]
+ [ 1.     0.     0.    -0.     1.     0.    -0.    -0.     1.     0.
+   0.    -0.     1.     0.    -0.    -0.     1.     0.     0.    -0.
+   1.    -0.     0.    -0.     0.987 -0.006  0.164  0.156  0.356 -0.922
+  -0.052  0.935  0.352 -0.052 -0.146  0.785  1.    -0.019  0.026  0.019
+   1.     0.014 -0.026 -0.013  1.001  0.003  0.006 -0.008]
+ [ 1.    -0.    -0.     0.     1.    -0.     0.     0.     1.    -0.
+  -0.     0.     0.6   -0.354 -0.719 -0.01   0.894 -0.449  0.801  0.276
+   0.532 -0.396 -0.085  0.458  1.     0.    -0.    -0.     1.001  0.001
+   0.    -0.001  1.001 -0.     0.    -0.     0.68   0.309 -0.665 -0.539
+   0.826 -0.168  0.497  0.473  0.728  0.021 -0.149  0.22 ]
+ [ 0.894 -0.305 -0.329  0.01   0.746 -0.666  0.448  0.592  0.67  -0.325
+  -0.444  0.202  0.93  -0.363  0.059  0.357  0.853 -0.381  0.088  0.376
+   0.923  0.075 -0.123  0.929  1.     0.    -0.    -0.     1.     0.
+   0.    -0.     1.     0.     0.    -0.     0.19   0.175 -0.966 -0.835
+   0.547 -0.065  0.518  0.819  0.249 -0.283 -0.303  0.136]]
+Minimum weight: -1.38777878078e-15
+Number of points with negative weights (< -1e-5): 0
+Number of points with negative weights (< -0.1): 0
+Number of points with negative weights (< -0.5): 0
+Number of points with negative weights (< -1): 0
+Saving recovered results to: ./results_mves/cube-4/result.txt

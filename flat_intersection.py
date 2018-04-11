@@ -41,11 +41,14 @@ class ErrorRecorder:
 	def __init__(self):
 		self.values=[]
 		
-	def visualize_error( self, data ):
+	def visualize_error( self, rev_vertex_trans ):
 		if H > 4: return None
-		print( data )
 		from space_mapper import SpaceMapper
-		space_mapper = Uncorrellated_Space( data )
+# 		reduce_mapper = SpaceMapper.Uncorrellated_Space( rev_vertex_trans, dimension = 3 )
+		reduce_mapper = SpaceMapper.Uncorrellated_Space( rev_vertex_trans )
+		reduced_data = reduce_mapper.project( rev_vertex_trans )
+		import web_gui.relay as relay
+		relay.send_data( reduced_data.tolist() )
 		
 	def add_error(self, data, enable_cayley = True):
 		P = self.P 
@@ -62,6 +65,9 @@ class ErrorRecorder:
 		
 		print( "Added error: ", err )
 		self.values.append(err)
+		
+		if self.visualize:
+			self.visualize_error( rev_vertex_trans )
 		
 	def clear_error(self):
 		self.values=[]
