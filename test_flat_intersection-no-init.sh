@@ -20,11 +20,7 @@ do
 		echo python3 -u flat_intersection.py "${MODEL_DIR}"/"${REST_POSE}" "${POSES_DIR}" ${FLAT_INTERSECTION_ARGS_NO_INIT} --output "${OUTPUT_DIR}" 2>&1 | tee -i "${OUTPUT_DIR}"/flat_intersection_no_init.out
 		python3 -u flat_intersection.py "${MODEL_DIR}"/"${REST_POSE}" "${POSES_DIR}" ${FLAT_INTERSECTION_ARGS_NO_INIT} --output "${OUTPUT_DIR}" 2>&1 | tee -i "${OUTPUT_DIR}"/flat_intersection_no_init.out
 		
-# 		python -m pdb compare_per_vertex_transformation.py "${GT_DIR}" "${OUTPUT_DIR}"
-		
-# 		python -u PerVertex/local_subspace_recover.py ${INITIAL_GUESS_ARGS} "${MODEL_DIR}"/"${REST_POSE}" "${POSES_DIR}"/*.obj -o "${OUTPUT_DIR}"/local_subspace_recover.txt 2>&1 | tee "${OUTPUT_DIR}"/local_subspace_recover.out
-# 		FLAT_INTERSECTION_ARGS="--energy ipca --CSV ${OUTPUT_DIR}/${test_dir}.csv --W-projection normalize --max-iter ${MAXITER} --f-eps 0 --handles ${H} --fancy-init ${OUTPUT_DIR}/local_subspace_recover.txt"
-# 		python -u flat_intersection.py "${MODEL_DIR}"/"${REST_POSE}" "${POSES_DIR}" ${FLAT_INTERSECTION_ARGS} 2>&1 | tee -i "${OUTPUT_DIR}"/flat_intersection.out
+		python -m pdb compare_per_vertex_transformation.py "${GT_DIR}" "${OUTPUT_DIR}"
 	echo
 	done	
 done

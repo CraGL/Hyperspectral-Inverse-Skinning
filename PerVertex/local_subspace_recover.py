@@ -4,6 +4,7 @@ import numpy as np
 import scipy.linalg
 import scipy.optimize
 from trimesh import TriMesh
+# import includes
 import time
 
 
@@ -201,7 +202,7 @@ def find_scale(Vertices):
     return scale
 
 
-def find_subspace_intersections(rest_pose, other_poses, version, method = None, use_pseudoinverse = None, propagate = None, random_sample_close_vertex="none", candidate_num=100, sample_num=10, vertices_num=40, precomputed_geodesic_distance=None):
+def find_subspace_intersections(rest_pose, other_poses, version, method = None, use_pseudoinverse = None, propagate = None, random_sample_close_vertex="none", candidate_num=120, sample_num=10, vertices_num=40, precomputed_geodesic_distance=None):
     
     
     if propagate is None: propagate = False
@@ -406,6 +407,7 @@ if __name__ == '__main__':
     parser.add_argument( 'other_poses', type=str, nargs='+', help='Paths to other poses (OBJ)')
     parser.add_argument( '--svd_threshold', '-s', type=float, help='Threshold for determining a singular vertex neighborhood (flat).' )
     parser.add_argument( '--transformation_threshold', '-t', type=float, help='Threshold for determining whether the subspaces intersect.' )
+    parser.add_argument( '--transformation_percentile', '-p', type=float, help='Percentile for choosing best subspace intersections.' )
     parser.add_argument( '--version', '-v', type=int, help='0 means basic least square linear solver. 1 means constrained least square' )
     parser.add_argument( '--method', '-m', type=str, choices=["vertex","nullspace"], help='vertex: minimize transformed vertex error (default). nullspace: minimize distance to 3p-dimensional flats.' )
     parser.add_argument( '--propagate', action='store_true', help="If this flag is passed, then transformations will be propagated to neighbors if it helps." )
@@ -418,6 +420,7 @@ if __name__ == '__main__':
     parser.add_argument( '--random-sample-method', '-rand', type=str, help=""" 'none' means one ring subspace intersection, others are 'euclidian', 'geodesic', 'precomputed-geodesic' """)
     parser.add_argument( '--subset-size', '-ssize', type=int, default=40, help='should smaller than 100, because search range is defalut to be 100' )
     parser.add_argument( '--precomputed-geodesic-distance-path', '-pre', type=str, help='Path to store the precomputed geodesic pairwise distance.' )
+    parser.add_argument( '--save-dmat', '-dmat', type=str, help='save transformations as dmat' )
 
     args = parser.parse_args()
 
@@ -457,30 +460,51 @@ if __name__ == '__main__':
     qs, errors, smallest_singular_values = find_subspace_intersections( rest_pose, other_poses, args.version, method = args.method, use_pseudoinverse = args.pinv, propagate = args.propagate, random_sample_close_vertex=args.random_sample_method, vertices_num=sampled_subset_size, precomputed_geodesic_distance=vertices_pairwise_distance)
     end_time = time.time()
     print( "... Finished generating transformations." )
-    print( "Finding subspace intersection duration (minutes): ", (end_time-start_time)/60 )
+    print( "Finding subspace intersection duration (minutes):", (end_time-start_time)/60 )
 
     if args.out is None:
         np.set_printoptions( precision = 24, linewidth = 2000 )
-        if args.print_all:
-            print( "# qs" )
-            print( repr( qs ) )
-            print( "# transformation errors" )
-            print( repr( errors ) )
-            print( "# smallest_singular_values" )
-            print( repr( smallest_singular_values ) )
-        else:
-            print( repr( qs[np.logical_and( errors<args.transformation_threshold, smallest_singular_values>=args.svd_threshold )] ) )
-    elif args.print_all:
-        np.savetxt( args.out, qs )
-        print( "Saved:", args.out )
-        
-        if args.out_errors is not None:
-            np.savetxt( args.out_errors, errors )
-            print( "Saved:", args.out_errors )
-        
-        if args.out_ssv is not None:
-            np.savetxt( args.out_ssv, smallest_singular_values )
-            print( "Saved:", args.out_ssv )
+        def save_one( path, M ):
+            print( repr( M ) )
     else:
-        np.savetxt( args.out, qs[np.logical_and( errors<args.transformation_threshold, smallest_singular_values>=args.svd_threshold )] )
-        print( "Saved:", args.out )
+        def save_one( path, M ):
+            np.savetxt( path, M )
+            print( "Saved to path:", path )
+            
+    if args.save_dmat is not None:
+        assert args.out is not None
+        dmat = qs.reshape(qs.shape[0], -1, 12)
+        dmat = np.swapaxes(dmat, 0, 1)
+        import os, sys
+        sys.path.append("..")
+        from InverseSkinning import format_loader as fl
+        name = os.path.join(args.save_dmat, os.path.splitext( os.path.split(args.out)[1] )[0])
+        for i in range(len(dmat)):
+            idx = "0000"
+            idx = idx[:-len(str(i))] + str(i)
+            path = name + "-" + idx + ".DMAT"
+            data = dmat[i].reshape(dmat[i].shape[0], 3, 4)
+            data = np.swapaxes(data, 1, 2)
+            data = data.reshape(data.shape[0], 12)
+            fl.write_DMAT(path, data)
+            print("save transformations to ", path)
+    
+    if args.print_all:
+        print( "# qs" )
+        save_one( args.out, qs )
+        print( "# transformation errors" )
+        save_one( args.out_errors, errors )
+        print( "# smallest_singular_values" )
+        save_one( args.out_ssv, smallest_singular_values )
+    elif args.transformation_threshold is not None:
+        qs_to_save = qs[np.logical_and( errors<args.transformation_threshold, smallest_singular_values>=args.svd_threshold )]
+        print( "About to save qs with dimension:", qs_to_save.shape )
+        save_one( args.out, qs_to_save )
+    elif args.transformation_percentile is not None:
+        qs_to_save = qs[ smallest_singular_values>=args.svd_threshold ]
+        topN = int( len( qs_to_save )*args.transformation_percentile/100 )
+        qs_to_save = qs_to_save[ np.argsort( errors[ smallest_singular_values>=args.svd_threshold ] )[:topN], : ]
+        print( "About to save qs with dimension:", qs_to_save.shape )
+        save_one( args.out, qs_to_save )
+    else:
+        raise RuntimeError( "No combination of --print-all, --transformation_threshold, or --transformation_percentile was given." )
