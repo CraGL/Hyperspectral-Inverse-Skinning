@@ -418,7 +418,7 @@ if __name__ == '__main__':
     parser.add_argument( '--out-ssv', type=str, help='Path to store the smallest singular values.' )
     
     parser.add_argument( '--random-sample-method', '-rand', type=str, help=""" 'none' means one ring subspace intersection, others are 'euclidian', 'geodesic', 'precomputed-geodesic' """)
-    parser.add_argument( '--subset-size', '-ssize', type=int, default=40, help='should smaller than 100, because search range is defalut to be 100' )
+    parser.add_argument( '--subset-size', '-ssize', type=int, default=48, help='should smaller than 100, because search range is defalut to be 100' )
     parser.add_argument( '--precomputed-geodesic-distance-path', '-pre', type=str, help='Path to store the precomputed geodesic pairwise distance.' )
     parser.add_argument( '--save-dmat', '-dmat', type=str, help='save transformations as dmat' )
 
