@@ -423,7 +423,14 @@ if args.optimize_from is not None or args.load is not None:
     
     if args.load is not None:
         print( "Loading initial guess from a file:", args.load )
-        loaded = np.load( args.load )
+        if args.load.lower().endswith( '.npz' ):
+            print( "Loading as NumPy format." )
+            loaded = np.load( args.load )
+        else:
+            print( "Loading as MATLAB format." )
+            ## Try matlab format
+            import scipy.io
+            loaded = scipy.io.loadmat( args.load )
         p = loaded['p']
         B = loaded['B']
         Xopt = X_from_pB( p, B )
