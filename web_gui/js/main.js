@@ -4,7 +4,7 @@
  * Global variables.
  */
 var container, stats;
-var camera, scene, renderer, controls;
+var camera, scene, axes, renderer, controls;
 var socket;
 var draw_mode = "lines";
 
@@ -47,7 +47,8 @@ function init_3D() {
     window.addEventListener( 'resize', onWindowResize, false );
     
     // Add your initialization code here.
-    scene.add( buildAxes( 1. ) );
+    axes = buildAxes( 1. );
+    scene.add( axes );
 }
 function createAxisLine( position0, position1, color0, color1, dashed ) {
     // From: http://soledadpenades.com/articles/three-js-tutorials/drawing-the-coordinate-axes/
@@ -73,7 +74,7 @@ function createAxisLine( position0, position1, color0, color1, dashed ) {
     
     return axis;
 }
-function buildAxes( length )
+function buildAxes( length, cube = true )
 {
     // From: http://soledadpenades.com/articles/three-js-tutorials/drawing-the-coordinate-axes/
     var axes = new THREE.Object3D();
@@ -84,26 +85,28 @@ function buildAxes( length )
     axes.add( createAxisLine( new THREE.Vector3( 0, 0, 0 ), new THREE.Vector3( 0, 0, length ), new THREE.Color( 0x0000FF ), new THREE.Color( 0x0000FF ), false ) ); // +Z
     // axes.add( buildAxis( new THREE.Vector3( 0, 0, 0 ), new THREE.Vector3( 0, 0, -length ), 0x0000FF, true ) ); // -Z
     
-    // XY
-    axes.add( createAxisLine( new THREE.Vector3( length, 0, 0 ), new THREE.Vector3( length, length, 0 ), new THREE.Color( 0xAAAAAA ), new THREE.Color( 0xAAAAAA ), false ) );
-    axes.add( createAxisLine( new THREE.Vector3( 0, length, 0 ), new THREE.Vector3( length, length, 0 ), new THREE.Color( 0xAAAAAA ), new THREE.Color( 0xAAAAAA ), false ) );
-    
-    // YZ
-    axes.add( createAxisLine( new THREE.Vector3( 0, length, 0 ), new THREE.Vector3( 0, length, length ), new THREE.Color( 0xAAAAAA ), new THREE.Color( 0xAAAAAA ), false ) );
-    axes.add( createAxisLine( new THREE.Vector3( 0, 0, length ), new THREE.Vector3( 0, length, length ), new THREE.Color( 0xAAAAAA ), new THREE.Color( 0xAAAAAA ), false ) );
-    
-    // XZ
-    axes.add( createAxisLine( new THREE.Vector3( length, 0, 0 ), new THREE.Vector3( length, 0, length ), new THREE.Color( 0xAAAAAA ), new THREE.Color( 0xAAAAAA ), false ) );
-    axes.add( createAxisLine( new THREE.Vector3( 0, 0, length ), new THREE.Vector3( length, 0, length ), new THREE.Color( 0xAAAAAA ), new THREE.Color( 0xAAAAAA ), false ) );
-    
-    // XY from 1,1,1
-    axes.add( createAxisLine( new THREE.Vector3( length, length, length ), new THREE.Vector3( length, length, 0 ), new THREE.Color( 0xAAAAAA ), new THREE.Color( 0xAAAAAA ), false ) );
-    
-    // YZ from 1,1,1
-    axes.add( createAxisLine( new THREE.Vector3( length, length, length ), new THREE.Vector3( 0, length, length ), new THREE.Color( 0xAAAAAA ), new THREE.Color( 0xAAAAAA ), false ) );
-    
-    // XZ from 1,1,1
-    axes.add( createAxisLine( new THREE.Vector3( length, length, length ), new THREE.Vector3( length, 0, length ), new THREE.Color( 0xAAAAAA ), new THREE.Color( 0xAAAAAA ), false ) );
+    if( cube ) {
+        // XY
+        axes.add( createAxisLine( new THREE.Vector3( length, 0, 0 ), new THREE.Vector3( length, length, 0 ), new THREE.Color( 0xAAAAAA ), new THREE.Color( 0xAAAAAA ), false ) );
+        axes.add( createAxisLine( new THREE.Vector3( 0, length, 0 ), new THREE.Vector3( length, length, 0 ), new THREE.Color( 0xAAAAAA ), new THREE.Color( 0xAAAAAA ), false ) );
+        
+        // YZ
+        axes.add( createAxisLine( new THREE.Vector3( 0, length, 0 ), new THREE.Vector3( 0, length, length ), new THREE.Color( 0xAAAAAA ), new THREE.Color( 0xAAAAAA ), false ) );
+        axes.add( createAxisLine( new THREE.Vector3( 0, 0, length ), new THREE.Vector3( 0, length, length ), new THREE.Color( 0xAAAAAA ), new THREE.Color( 0xAAAAAA ), false ) );
+        
+        // XZ
+        axes.add( createAxisLine( new THREE.Vector3( length, 0, 0 ), new THREE.Vector3( length, 0, length ), new THREE.Color( 0xAAAAAA ), new THREE.Color( 0xAAAAAA ), false ) );
+        axes.add( createAxisLine( new THREE.Vector3( 0, 0, length ), new THREE.Vector3( length, 0, length ), new THREE.Color( 0xAAAAAA ), new THREE.Color( 0xAAAAAA ), false ) );
+        
+        // XY from 1,1,1
+        axes.add( createAxisLine( new THREE.Vector3( length, length, length ), new THREE.Vector3( length, length, 0 ), new THREE.Color( 0xAAAAAA ), new THREE.Color( 0xAAAAAA ), false ) );
+        
+        // YZ from 1,1,1
+        axes.add( createAxisLine( new THREE.Vector3( length, length, length ), new THREE.Vector3( 0, length, length ), new THREE.Color( 0xAAAAAA ), new THREE.Color( 0xAAAAAA ), false ) );
+        
+        // XZ from 1,1,1
+        axes.add( createAxisLine( new THREE.Vector3( length, length, length ), new THREE.Vector3( length, 0, length ), new THREE.Color( 0xAAAAAA ), new THREE.Color( 0xAAAAAA ), false ) );
+    }
     
     return axes;
 }
@@ -351,19 +354,21 @@ async function receive()
     
     // TODO: Process the data. You can await more data if needed.
     {
-        console.log( data );
+        // console.log( data );
         if( data == "\"lines\"" ) {
         	draw_mode = "lines";
         	console.log( "switch to lines." );
-        	// Call ourselves recursively.
-		    receive();
         }
         else if( data == "\"points\"" ) {
         	draw_mode = "points";
         	console.log( "switch to points." );
-        	// Call ourselves recursively.
-		    receive();
+        	scene.remove( axes );
+        	axes = buildAxes( 1., false );
+        	scene.add( axes );
+            controls.target.set( 0,0,0 );
         }
+        
+        data = await socket.receive();
         
 		// Create the data holder.
 		if( all_pts !== null ) scene.remove( all_pts );
