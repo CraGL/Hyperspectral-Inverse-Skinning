@@ -476,8 +476,7 @@ if __name__ == '__main__':
         dmat = qs.reshape(qs.shape[0], -1, 12)
         dmat = np.swapaxes(dmat, 0, 1)
         import os, sys
-        sys.path.append("..")
-        from InverseSkinning import format_loader as fl
+        import format_loader as fl
         name = os.path.join(args.save_dmat, os.path.splitext( os.path.split(args.out)[1] )[0])
         for i in range(len(dmat)):
             idx = "0000"
