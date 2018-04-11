@@ -71,8 +71,8 @@ namespace {
 	struct RenderState
 	{
 		bool show_model = true;
-		bool show_wireframe = false;
-		bool show_handles = false;
+		bool show_wireframe = true;
+		bool show_handles = true;
 		double fps = 0.0;
 		double time_stamp = 0;
 	};
@@ -447,7 +447,7 @@ int main(int argc, char * argv[])
 	rebar.TwAddVarRW("normalize on-the-fly",TW_TYPE_BOOLCPP,&g_scene.shader_settings.enable_normalize, "");
 	
 	string pose_selection_text = "rest";
-	for(int i=1; i<=g_scene.P; i++)		pose_selection_text += (",pos"+to_string(i));
+	for(int i=1; i<g_scene.P; i++)		pose_selection_text += (",pos"+to_string(i));
 	TwType PoseSelectionTW = igl::anttweakbar::ReTwDefineEnumFromString("PoseSelection",pose_selection_text.c_str()); 
 	rebar.TwAddVarRW("Poses",PoseSelectionTW,&g_scene.pose_index,"");
 		

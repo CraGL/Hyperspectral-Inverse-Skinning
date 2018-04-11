@@ -4,11 +4,15 @@ ROOT_DIR="../.."
 MODEL_DIR="./models"
 RES_DIR="./results-no-init"
 OBJ_SUFF=".obj"
-MAXITER=10
+MAXITER=100
 
-for REST_POSE in $(basename "${MODEL_DIR}"/cyli*.obj)
-do
-	name="${REST_POSE%$OBJ_SUFF}"
+# declare -a gt_models=("cylinder" "cube" "cheburashka" "wolf" "cow")
+declare -a gt_models=("cylinder")
+
+# for REST_POSE in $(basename "${MODEL_DIR}"/cyli*.obj); do
+# 	REST_POSE="${name}.obj"
+for name in "${gt_models[@]}"; do
+	REST_POSE="${name}.obj"
 	POSES_DIR="${MODEL_DIR}/${name}"
 	for OUTPUT_DIR in "${RES_DIR}"/"${name}"*
 	do
@@ -20,7 +24,7 @@ do
 		echo python3 -u flat_intersection.py "${MODEL_DIR}"/"${REST_POSE}" "${POSES_DIR}" ${FLAT_INTERSECTION_ARGS_NO_INIT} --output "${OUTPUT_DIR}" 2>&1 | tee -i "${OUTPUT_DIR}"/flat_intersection_no_init.out
 		python3 -u flat_intersection.py "${MODEL_DIR}"/"${REST_POSE}" "${POSES_DIR}" ${FLAT_INTERSECTION_ARGS_NO_INIT} --output "${OUTPUT_DIR}" 2>&1 | tee -i "${OUTPUT_DIR}"/flat_intersection_no_init.out
 		
-		python -m pdb compare_per_vertex_transformation.py "${GT_DIR}" "${OUTPUT_DIR}"
-	echo
+		echo python -u compare_per_vertex_transformation.py "${GT_DIR}" "${OUTPUT_DIR}"
+		python -u compare_per_vertex_transformation.py "${GT_DIR}" "${OUTPUT_DIR}"
 	done	
 done
