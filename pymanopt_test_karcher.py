@@ -233,11 +233,11 @@ def cost(X):
     return sum
 
 def callback( X ):
+	import web_gui.relay as relay
+	print( "callback:" )
 	if args.visualize == 'lines':
 		## p is the point on the line
 		## B is a one-column vector parallel to the line
-		import web_gui.relay as relay
-		print( "callback:" )
 		relay.send_data( "lines" )
 		p,B = pB_from_X( X )
 		p = np.array( p ).ravel()
@@ -254,6 +254,7 @@ def callback( X ):
 		# relay.send_data( [p.tolist(), B.tolist()] )
 		# from plot_visualization import draw_3d_line
 	elif args.visualize == 'points':
+		relay.send_data( "points" )
 		pass
 		
 if args.manifold == 'graff':

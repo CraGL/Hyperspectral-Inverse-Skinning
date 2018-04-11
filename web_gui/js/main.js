@@ -6,7 +6,7 @@
 var container, stats;
 var camera, scene, renderer, controls;
 var socket;
-var draw_mode = "points";
+var draw_mode = "lines";
 
 // The setup code.
 window.onload = function() {
@@ -352,27 +352,27 @@ async function receive()
     // TODO: Process the data. You can await more data if needed.
     {
         console.log( data );
-        if( data === "lines" ) {
+        if( data == "\"lines\"" ) {
         	draw_mode = "lines";
         	console.log( "switch to lines." );
         	// Call ourselves recursively.
-    		receive();
+		    receive();
         }
-        else if( data === "points" ) {
+        else if( data == "\"points\"" ) {
         	draw_mode = "points";
         	console.log( "switch to points." );
         	// Call ourselves recursively.
-    		receive();
+		    receive();
         }
         
-        // Create the data holder.
-        if( all_pts !== null ) scene.remove( all_pts );
-        all_pts = new THREE.Object3D();
-        
-        // Assume data is an array of 3D positions.
-        let pts = JSON.parse( data );
-        
-        if( draw_mode === "lines" ) {
+		// Create the data holder.
+		if( all_pts !== null ) scene.remove( all_pts );
+		all_pts = new THREE.Object3D();
+
+		// Assume data is an array of 3D positions.
+		let pts = JSON.parse( data );
+
+		if( draw_mode == "lines" ) {
 			for (var i = 0; i < pts.length; i += 2) { 
 				// let pt = pts[i];
 				var position = new THREE.Vector3( pts[i][0], pts[i][1], pts[i][2] );
@@ -380,12 +380,11 @@ async function receive()
 				if ( i >= pts.length - 2 ) all_pts.add( createLineFromReceived( position, direction, new THREE.Color( 0xc441f4 ), 5, 100 ) );
 				else 					   all_pts.add( createLineFromReceived( position, direction, new THREE.Color( 0x000000 ) ) );
 			}
-        }
-        else if( draw_mode === "points" ) {
-        	var points = createPointFromReceived( pts, new THREE.Color( 0xc441f4 ), 2 );
-        	all_pts.add( points );
-        }
-
+		}
+		else if( draw_mode == "points" ) {
+			var points = createPointFromReceived( pts, new THREE.Color( 0xc441f4 ), 2 );
+			all_pts.add( points );
+		}
     }
     // Add the points to the scene.
     scene.add( all_pts );
