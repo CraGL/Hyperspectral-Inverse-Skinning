@@ -1,0 +1,120 @@
+cp pymanopt_test_simple.py pymanopt_test_karcher.py
+edit pymanopt_test_karcher.py 
+python pymanopt_test_karcher.py 
+python3 pymanopt_test_karcher.py 
+python pymanopt_test_karcher.py
+python3 pymanopt_test_karcher.py
+python3 -m pdb pymanopt_test_karcher.py
+edit pymanopt_test_karcher.py
+octave positive_definite_karcher_mean.m 
+edit positive_definite_karcher_mean.m 
+python3 -m pdb pymanopt_test_karcher.py 
+python3  pymanopt_test_karcher.py 
+edit pymanopt_karcher_mean.py
+python3 -i pymanopt_test_karcher.py 
+git add pymanopt_karcher_mean.py
+git add pymanopt_test_karcher.py
+git commit -a -m 'karcher mean plus optimization experiments'
+git commit -a -m 'karcher mean argparse'
+python3 pymanopt_karcher_mean.py 
+python3 -i pymanopt_karcher_mean.py 
+python3 pymanopt_test_karcher.py --optimize-p no
+python3 -m pdb pymanopt_test_karcher.py --optimize-p no
+edit pymanopt_karcher_mean.py 
+python3 -m pdb pymanopt_test_karcher.py --mean karcher
+python3 -m pdb pymanopt_test_karcher.py --mean karcher --lines yes
+python3 -m pdb pymanopt_test_karcher.py --mean projection --lines yes
+cp pymanopt_test_karcher.py pymanopt_test_karcher_graff.py
+edit pymanopt_test_karcher_graff.py 
+rm pymanopt_test_karcher_graff.py 
+python3 -m pdb pymanopt_test_karcher.py --lines yes
+python3 -m pdb pymanopt_test_karcher.py --lines yes --manifold ssB
+python3 -m pdb pymanopt_test_karcher.py --lines yes --manifold graff
+python3 -m pdb pymanopt_test_karcher.py --manifold graff
+python3 -m pdb pymanopt_test_karcher.py --manifold pB
+python3 pymanopt_test_karcher.py --manifold pB
+python3 pymanopt_test_karcher.py --manifold ssB
+python3 pymanopt_test_karcher.py --manifold ssB --save 'centroid_ssB.npz'
+python3 pymanopt_test_karcher.py --manifold graff --load 'centroid_ssB.npz'
+python3 -m pdb pymanopt_test_karcher.py --manifold graff --load 'centroid_ssB.npz'
+python3 -m pdb pymanopt_test_karcher.py --manifold graff --optimize-from centroid
+python3 -m pdb pymanopt_test_karcher.py --manifold graff --optimize-from random
+python3 pymanopt_test_karcher.py --manifold graff --optimize-from centroid
+python3 -m pdb pymanopt_test_karcher.py --manifold graff --optimize-from random --lines
+python3 pymanopt_test_karcher.py --manifold graff --optimize-from random --lines yes
+python3 pymanopt_test_karcher.py --manifold graff --optimize-from centroid --lines yes
+python3 pymanopt_test_karcher.py --manifold graff --optimize-from random
+python3 pymanopt_test_karcher.py --manifold pB --optimize-from centroid --lines yes
+python3 pymanopt_test_karcher.py --manifold pB --optimize-from centroid --lines yes --test-data zero
+python3 pymanopt_test_karcher.py --manifold graff --optimize-from centroid --lines yes --test-data zero
+python3 pymanopt_test_karcher.py --manifold graff --optimize-from centroid --lines yes --test-data line
+python3 pymanopt_test_karcher.py --manifold pB --optimize-from centroid --lines yes --test-data line
+python3 -i pymanopt_test_karcher.py --manifold graff --optimize-from centroid --lines yes --test-data line
+python3 pymanopt_test_karcher.py --manifold graff --optimize-from centroid --lines yes --test-date line
+python3 pymanopt_test_karcher.py --manifold grafpB --optimize-from centroid --lines yes --test-data line
+python3 pymanopt_test_karcher.py --manifold ssB --optimize-from centroid --lines yes --test-data line
+python3 pymanopt_test_karcher.py --manifold ssB --optimize-from centroid --lines yes --test-data random
+python3 pymanopt_test_karcher.py --manifold ssB --optimize-from centroid --lines yes --test-data zero
+python3 pymanopt_test_karcher.py --manifold graff --optimize-from centroid --lines yes --test-data random
+python3 pymanopt_test_karcher.py --manifold graff --optimize-from centroid --lines yes --test-data lines
+python3 pymanopt_test_karcher.py --manifold graff --optimize-from centroid --test-data zero
+python3 pymanopt_test_karcher.py --manifold graff --optimize-from centroid --test-data line
+python3 pymanopt_test_karcher.py --manifold pB --optimize-from centroid --test-data rando
+python3 pymanopt_test_karcher.py --manifold pB --optimize-from centroid --test-data random
+python3 pymanopt_test_karcher.py --manifold graff
+python3 pymanopt_test_karcher.py --manifold graff --optimize-from centroid --test-data random
+python3 pymanopt_test_karcher.py --manifold graff --optimize-from centroid --test-data random --optimize-solver steepest
+python3 pymanopt_test_karcher.py --manifold graff --optimize-from centroid --test-data random --optimize-solver conjugate
+python3 pymanopt_test_karcher.py --manifold graff --optimize-from centroid --test-data random --optimize-solver nelder
+python3 pymanopt_test_karcher.py --manifold graff --optimize-from centroid --test-data random --optimize-solver particle
+python3 pymanopt_test_karcher.py --manifold graff --optimize-from centroid --test-data line --lines yes
+python3 pymanopt_test_karcher.py --manifold graff --optimize-from centroid --test-data line --optimize-solver conjugate
+python3 pymanopt_test_karcher.py --manifold graff --optimize-from centroid --lines yes --optimize-solver conjugate
+python3 pymanopt_test_karcher.py --manifold graff --optimize-from random --lines yes --optimize-solver conjugate
+python3 pymanopt_test_karcher.py --manifold graff --optimize-from random --test-data zero --lines yes --optimize-solver conjugate
+python3 pymanopt_test_karcher.py --manifold graff --optimize-from random --test-data line --lines yes --optimize-solver conjugate
+python3 pymanopt_test_karcher.py --manifold graff --optimize-from random --test-data line --lines yes --optimize-solver trust
+python3 pymanopt_test_karcher.py --manifold graff --optimize-from centroid --test-data random --lines yes
+python3 pymanopt_test_karcher.py --manifold graff --optimize-from random --test-data random --lines yes
+python3 pymanopt_test_karcher.py --manifold graff --optimize-from random --test-data random --lines yes --optimize-solver conjugate
+python3 pymanopt_test_karcher.py --manifold graff --optimize-from random --test-data random --lines yes --optimize-solver trust
+python3 pymanopt_test_karcher.py --manifold graff --optimize-from random --test-data random --optimize-solver conjugate
+python3 pymanopt_test_karcher.py --manifold graff --optimize-from random --test-data random --optimize-solver trust
+python3 pymanopt_test_karcher.py --manifold graff --optimize-from random --test-data random --lines yes --load centroid_ssB.npz 
+python3 pymanopt_test_karcher.py --manifold pB --optimize-from random --test-data random --lines yes --save random_lines_centroid_pB.npz
+python3 pymanopt_test_karcher.py --manifold graff --optimize-from random --test-data random --lines yes --load random_lines_centroid_pB.npz
+python3 pymanopt_test_karcher.py --manifold pB --optimize-from random --test-data random --save random_flats_centroid_pB.npz
+python3 pymanopt_test_karcher.py --manifold graff --optimize-from random --test-data random --load random_flats_centroid_pB.npz
+python3 -i pymanopt_test_karcher.py --manifold graff --optimize-from random --lines yes --test-data line
+python3 -i pymanopt_test_karcher.py --manifold pB --optimize-from random --lines yes --test-data line
+python3 -i pymanopt_test_karcher.py --manifold pB --optimize-from random --lines yes --test-data line --centroid-best-p no
+python3 -i pymanopt_test_karcher.py --manifold pB --optimize-from random --lines yes --test-data line --centroid-best-p yes
+python3 -i pymanopt_test_karcher.py --manifold pB --optimize-from centroid --lines yes --test-data line --centroid-best-p no
+python3 -i pymanopt_test_karcher.py --manifold pB --optimize-from centroid --lines yes --test-data line --centroid-best-p yes
+python3 -i pymanopt_test_karcher.py --manifold graff --optimize-from centroid --lines yes --test-data line --centroid-best-p yes
+python3 pymanopt_test_karcher.py --manifold graff --optimize-from centroid --test-data zero --lines yes
+python3 pymanopt_test_karcher.py --manifold graff --optimize-from random --test-data zero --lines yes
+python3 pymanopt_test_karcher.py --manifold graff --optimize-from random --test-data line --lines yes
+python3 pymanopt_test_karcher.py --manifold graff --load cheburashka2_pB.npz --test-data cheburashka2_flats.mat
+python3 -m pdb pymanopt_test_karcher.py --manifold graff --load cheburashka2_pB.npz --test-data cheburashka2_flats.mat
+python3 -m pdb pymanopt_test_karcher.py --manifold graff --load cheburashka2_pB.npz --test-data cheburashka2_flats.mat --handles 10
+python3 -m pdb pymanopt_test_karcher.py --manifold graff --load cheburashka2_pB.npz --test-data cheburashka2_flats.mat --handles 10 --optimize-solver steepest
+python3 -m pdb pymanopt_test_karcher.py --manifold graff --load cheburashka2_pB.npz --test-data cheburashka2_flats.mat --handles 10 --optimize-solver conjugate
+python3 -m pdb pymanopt_test_karcher.py --manifold graff --load cheburashka2_flats.mat --test-data cheburashka2_flats.mat --handles 10 --optimize-solver conjugate
+python3 pymanopt_test_karcher.py --manifold graff --load cheburashka2_pB.npz --test-data cheburashka2_flats.mat --handles 10 --optimize-solver steepest
+python3 pymanopt_test_karcher.py --manifold graff --load cheburashka2_pB.npz --test-data cheburashka2_flats.mat --handles 10
+python3 pymanopt_test_karcher.py --manifold graff --load cheburashka2_pB.npz --test-data cheburashka2_flats.mat --handles 10 --optimize-solver steepest --flats-are-vertices true
+python3 -m pdb pymanopt_test_karcher.py --manifold graff --load cheburashka2_pB.npz --test-data cheburashka2_flats.mat --handles 10 --optimize-solver steepest --flats-are-vertices true
+python3 -m pdb pymanopt_test_karcher.py --manifold pB --load cheburashka2_pB.npz --test-data cheburashka2_flats.mat --handles 10 --optimize-solver steepest --flats-are-vertices true
+python3 pymanopt_test_karcher.py --manifold pB --load cheburashka2_pB.npz --test-data cheburashka2_flats.mat --handles 10 --optimize-solver steepest --flats-are-vertices true
+python3 pymanopt_test_karcher.py --manifold graff --load cheburashka2_pB.npz --test-data cheburashka2_flats.mat --handles 10 --optimize-solver trust --flats-are-vertices true
+python3 -m pdb pymanopt_test_karcher.py --manifold graff --load cheburashka2_pB.npz --test-data cheburashka2_flats.mat --handles 10 --optimize-solver trust --flats-are-vertices true
+python3 -m pdb pymanopt_test_karcher.py --manifold graff --load cheburashka2_pB.npz --test-data cheburashka2_flats.mat --handles 10 --optimize-solver conjugate --flats-are-vertices true
+python3 -m pdb pymanopt_test_karcher.py --manifold graff --load cheburashka2_pB.npz --test-data cheburashka2_flats.mat --handles 10 --optimize-solver conjugate --flats-are-vertices true --recovery 0.001
+
+## To run with the same initial guess and data as flat_intersection.py
+flat_intersection.py --save-matlab-initial filename.mat --max-iter 0
+## That will save the initial data and guess to a file pymanopt_test_karcher.py can load. Then run:
+pymanopt_test_karcher.py --load filename.mat --test-data filename.mat --handles --handles 10 --optimize-solver conjugate --manifold pB
+pymanopt_test_karcher.py --load filename.mat --test-data filename.mat --handles --handles 10 --optimize-solver conjugate --manifold graff
+## Important: The pymanopt_test_karcher.py parameter --handles should be one less than the parameter you use with flat_intersection.py.
