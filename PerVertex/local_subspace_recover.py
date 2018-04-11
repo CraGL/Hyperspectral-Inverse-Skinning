@@ -369,7 +369,7 @@ def find_subspace_intersections(rest_pose, other_poses, version, method = None, 
 
 def E_RMS_kavan2010( gt, data, scale=1.0):
     ### for vertex error
-    E_RMS_kavan2010 = 1000*np.linalg.norm( gt.ravel() - data.ravel() )/np.sqrt(len(gt.ravel())*scale*scale) ## 3*pose_num*vs_num, and scale!
+    E_RMS_kavan2010 = 1000*np.linalg.norm( gt.ravel() - data.ravel() )*2.0/np.sqrt(len(gt.ravel())*scale*scale) ## 3*pose_num*vs_num, and scale!
     return E_RMS_kavan2010
 
 def vertex_reconstruction_error(vertices0, vertices1, q_space, scale=1.0):
