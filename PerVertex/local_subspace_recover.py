@@ -4,13 +4,14 @@ import numpy as np
 import scipy.linalg
 import scipy.optimize
 from trimesh import TriMesh
+# import includes
 import time
 
 
 
 '''
 Command:
-python local_subspace_recover.py ./datas/cube4_copy/cube.obj ./datas/cube4_copy/poses-1/cube-*.obj -s 1e-15 -t 1e-4 -v 1  -o ./datas/cube4_copy/qs.txt
+python local_subspace_recover.py ./datas/cube4_copy/cube.obj ./datas/cube4_copy/poses-1/cube-*.obj -s 1e-15 -t 1e-4 -v 1  -o ./datas/cube4_copy/qs.txt -rand "euclidian" -ssize 30
 '''
 
 def null_space_matrix(A):
@@ -175,8 +176,8 @@ def solve_directly(V0, V1, method, version=0, use_pseudoinverse = None):
             ## Reshape the right-hand-side in column-major order (F).
             x=scipy.linalg.solve( left, right ).ravel( order='F' )
     elif version==1:
-    	v0_center = V0[0]
-    	v1_center = V1[0]
+        v0_center = V0[0]
+        v1_center = V1[0]
         new_left = np.zeros( ( 5,5 ) )
         new_left[:4,:4] = left
         new_left[:-1,-1] = v0_center.T.squeeze()
@@ -201,7 +202,8 @@ def find_scale(Vertices):
     return scale
 
 
-def find_subspace_intersections( rest_pose, other_poses, version, method = None, use_pseudoinverse = None, propagate = None ):
+def find_subspace_intersections(rest_pose, other_poses, version, method = None, use_pseudoinverse = None, propagate = None, random_sample_close_vertex="none", candidate_num=120, sample_num=10, vertices_num=40, precomputed_geodesic_distance=None):
+    
     
     if propagate is None: propagate = False
     
@@ -217,33 +219,97 @@ def find_subspace_intersections( rest_pose, other_poses, version, method = None,
     ## Stack all poses horizontally.
     vertices1 = np.hstack( [ mesh.vs for mesh in mesh1_list ] )
     
+    if random_sample_close_vertex=="euclidian":
+        data=vertices0[:,:3]
+        vertices_pairwise_distance=np.sqrt(np.square(data.reshape((1,-1,3))-data.reshape((-1,1,3))).sum(axis=-1))
+        np.random.seed(1)
+    elif random_sample_close_vertex=="geodesic":
+        import geodesic
+        compute_distance=geodesic.GeodesicDistanceComputation(np.asarray(mesh0.vs), np.asarray(mesh0.faces))
+        vertices_pairwise_distance=[]
+        for i in range(len(mesh0.vs)):
+            vertices_pairwise_distance.append(compute_distance(0))
+        vertices_pairwise_distance=np.asarray(vertices_pairwise_distance)
+        print (vertices_pairwise_distance.shape)
+        np.random.seed(1)
+    elif random_sample_close_vertex=="precomputed-geodesic":
+        if precomputed_geodesic_distance is None:
+            print ("Wrong!")
+        else:
+            vertices_pairwise_distance=precomputed_geodesic_distance
+        
+        np.random.seed(1)
+        
+        
+    
+    
     scale=find_scale(vertices0[:,:3])
     q_space=[]
     errors=[]
     smallest_singular_values=[]
 
     for i in range(len(vertices1)):
-        indices = mesh0.vertex_vertex_neighbors(i)
-        indices=np.asarray(indices)
         
-        ## We want everything, we'll use the pseudoinverse.
-        # if len(indices)>=3:
-        v0=vertices0[i].reshape((1,-1))
-        v0_neighbor=vertices0[indices,:]
-        v1=vertices1[i].reshape((1,-1))
-        v1_neighbor=vertices1[indices,:]
+        if random_sample_close_vertex=="none":
+            indices = mesh0.vertex_vertex_neighbors(i)
+            indices=np.asarray(indices)
+            
+            ## We want everything, we'll use the pseudoinverse.
+            # if len(indices)>=3:
+            v0=vertices0[i].reshape((1,-1))
+            v0_neighbor=vertices0[indices,:]
+            v1=vertices1[i].reshape((1,-1))
+            v1_neighbor=vertices1[indices,:]
+
+            V0=np.vstack((v0, v0_neighbor))
+            V1=np.vstack((v1, v1_neighbor))
+
+            #### solve directly
+            q,cost,ssv=solve_directly(V0, V1, method = method, version = version, use_pseudoinverse = use_pseudoinverse)
+            smallest_singular_values.append( ssv )
+
+            assert q is not None
+            # if q is not None:
+            q_space.append(q)
+            errors.append(np.sqrt(max(cost/(pose_num*scale*scale), 1e-30)))
         
-        V0=np.vstack((v0, v0_neighbor))
-        V1=np.vstack((v1, v1_neighbor))
+        
+        else:
+            distance_to_others = vertices_pairwise_distance[i,:]
+            sorted_distance_indices=np.argsort(distance_to_others)
+            temp_q_space=[]
+            temp_errors=[]
+            temp_smallest_singular_values=[]
+            for sample in range(sample_num):
+                
+                random_3_extra_vertices_indices=(np.random.random(vertices_num)*candidate_num).round().astype(np.int32)
+                indices=np.asarray(sorted_distance_indices[random_3_extra_vertices_indices])
+            
+                ## We want everything, we'll use the pseudoinverse.
+                # if len(indices)>=3:
+                v0=vertices0[i].reshape((1,-1))
+                v0_neighbor=vertices0[indices,:]
+                v1=vertices1[i].reshape((1,-1))
+                v1_neighbor=vertices1[indices,:]
 
-        #### solve directly
-        q,cost,ssv=solve_directly(V0, V1, method = method, version = version, use_pseudoinverse = use_pseudoinverse)
-        smallest_singular_values.append( ssv )
+                V0=np.vstack((v0, v0_neighbor))
+                V1=np.vstack((v1, v1_neighbor))
 
-        assert q is not None
-        # if q is not None:
-        q_space.append(q)
-        errors.append(np.sqrt(max(cost/(pose_num*scale*scale), 1e-30)))
+                #### solve directly
+                q,cost,ssv=solve_directly(V0, V1, method = method, version = version, use_pseudoinverse = use_pseudoinverse)
+                temp_smallest_singular_values.append( ssv )
+
+                assert q is not None
+                # if q is not None:
+                temp_q_space.append(q)
+                temp_errors.append(np.sqrt(np.maximum(cost/(pose_num*scale*scale), 1e-30)))
+             
+            
+            minimum_cost_ind=np.argmin(np.asarray(temp_errors))
+            q_space.append(temp_q_space[minimum_cost_ind])
+            errors.append(temp_errors[minimum_cost_ind])
+            smallest_singular_values.append( temp_smallest_singular_values[minimum_cost_ind] )
+
 
 
     q_space=np.asarray(q_space)
@@ -301,6 +367,37 @@ def find_subspace_intersections( rest_pose, other_poses, version, method = None,
     return q_space, errors, smallest_singular_values
 
 
+def E_RMS_kavan2010( gt, data, scale=1.0):
+    ### for vertex error
+    E_RMS_kavan2010 = 1000*np.linalg.norm( gt.ravel() - data.ravel() )/np.sqrt(len(gt.ravel())*scale*scale) ## 3*pose_num*vs_num, and scale!
+    return E_RMS_kavan2010
+
+def vertex_reconstruction_error(vertices0, vertices1, q_space, scale=1.0):
+    gt_vertices=[]
+    reconstructed_vertices=[]
+    pose_num=vertices1.shape[1]//3
+
+    for i in range(len(vertices1)):
+        v0=vertices0[i].reshape((1,-1))
+        v1=vertices1[i].reshape((1,-1))
+
+        v0_expand=np.zeros((3*pose_num,12*pose_num))
+        for j in range(pose_num):
+            for k in range(3):
+                v0_expand[j*3+k, (j*3+k)*4:(j*3+k)*4+4]=v0.ravel()[4*j:4*j+4]
+
+        t=q_space[i]
+        v1_reconstructed=v0_expand.dot(t).ravel()
+        reconstructed_vertices.append(v1_reconstructed)
+        gt_vertices.append(v1.ravel())
+
+    return E_RMS_kavan2010(np.asarray(gt_vertices), np.asarray(reconstructed_vertices), scale=scale)
+
+def transformation_matrix_error(gt, data):
+    diff=abs(gt-data).ravel()
+    rmse=np.sqrt(np.square(gt-data).sum()/len(gt.ravel()))
+    return [max(diff), min(diff), np.median(diff), np.mean(diff), rmse]
+    
 
 if __name__ == '__main__':
     import argparse
@@ -310,6 +407,7 @@ if __name__ == '__main__':
     parser.add_argument( 'other_poses', type=str, nargs='+', help='Paths to other poses (OBJ)')
     parser.add_argument( '--svd_threshold', '-s', type=float, help='Threshold for determining a singular vertex neighborhood (flat).' )
     parser.add_argument( '--transformation_threshold', '-t', type=float, help='Threshold for determining whether the subspaces intersect.' )
+    parser.add_argument( '--transformation_percentile', '-p', type=float, help='Percentile for choosing best subspace intersections.' )
     parser.add_argument( '--version', '-v', type=int, help='0 means basic least square linear solver. 1 means constrained least square' )
     parser.add_argument( '--method', '-m', type=str, choices=["vertex","nullspace"], help='vertex: minimize transformed vertex error (default). nullspace: minimize distance to 3p-dimensional flats.' )
     parser.add_argument( '--propagate', action='store_true', help="If this flag is passed, then transformations will be propagated to neighbors if it helps." )
@@ -318,6 +416,11 @@ if __name__ == '__main__':
     parser.add_argument( '--out', '-o', type=str, help='Path to store the result (prints to stdout if not specified).' )
     parser.add_argument( '--out-errors', type=str, help='Path to store the resulting cost.' )
     parser.add_argument( '--out-ssv', type=str, help='Path to store the smallest singular values.' )
+    
+    parser.add_argument( '--random-sample-method', '-rand', type=str, help=""" 'none' means one ring subspace intersection, others are 'euclidian', 'geodesic', 'precomputed-geodesic' """)
+    parser.add_argument( '--subset-size', '-ssize', type=int, default=40, help='should smaller than 100, because search range is defalut to be 100' )
+    parser.add_argument( '--precomputed-geodesic-distance-path', '-pre', type=str, help='Path to store the precomputed geodesic pairwise distance.' )
+    parser.add_argument( '--save-dmat', '-dmat', type=str, help='save transformations as dmat' )
 
     args = parser.parse_args()
 
@@ -336,34 +439,72 @@ if __name__ == '__main__':
     print( "...done." )
 
     print( "Generating transformations..." )
+
+    if args.random_sample_method=="precomputed-geodesic":
+        import gzip
+        # f=gzip.GzipFile(base_dir+'/pairwise_geodesic_distance.npy.gz', "r")
+        f=gzip.GzipFile(args.precomputed_geodesic_distance_path, "r")
+
+        vertices_pairwise_distance=np.load(f)
+        print (vertices_pairwise_distance.shape)
+    else:
+        vertices_pairwise_distance=None
+
+    if args.random_sample_method=="none": ### no need sample
+        sampled_subset_size=3 ## not useful
+    else:
+        sampled_subset_size=args.subset_size
+
+
     start_time = time.time()
-    qs, errors, smallest_singular_values = find_subspace_intersections( rest_pose, other_poses, args.version, method = args.method, use_pseudoinverse = args.pinv, propagate = args.propagate )
+    qs, errors, smallest_singular_values = find_subspace_intersections( rest_pose, other_poses, args.version, method = args.method, use_pseudoinverse = args.pinv, propagate = args.propagate, random_sample_close_vertex=args.random_sample_method, vertices_num=sampled_subset_size, precomputed_geodesic_distance=vertices_pairwise_distance)
     end_time = time.time()
     print( "... Finished generating transformations." )
-    print( "Finding subspace intersection duration (minutes): ", (end_time-start_time)/60 )
+    print( "Finding subspace intersection duration (minutes):", (end_time-start_time)/60 )
 
     if args.out is None:
         np.set_printoptions( precision = 24, linewidth = 2000 )
-        if args.print_all:
-            print( "# qs" )
-            print( repr( qs ) )
-            print( "# transformation errors" )
-            print( repr( errors ) )
-            print( "# smallest_singular_values" )
-            print( repr( smallest_singular_values ) )
-        else:
-            print( repr( qs[np.logical_and( errors<args.transformation_threshold, smallest_singular_values>=args.svd_threshold )] ) )
-    elif args.print_all:
-        np.savetxt( args.out, qs )
-        print( "Saved:", args.out )
-        
-        if args.out_errors is not None:
-            np.savetxt( args.out_errors, errors )
-            print( "Saved:", args.out_errors )
-        
-        if args.out_ssv is not None:
-            np.savetxt( args.out_ssv, smallest_singular_values )
-            print( "Saved:", args.out_ssv )
+        def save_one( path, M ):
+            print( repr( M ) )
     else:
-        np.savetxt( args.out, qs[np.logical_and( errors<args.transformation_threshold, smallest_singular_values>=args.svd_threshold )] )
-        print( "Saved:", args.out )
+        def save_one( path, M ):
+            np.savetxt( path, M )
+            print( "Saved to path:", path )
+            
+    if args.save_dmat is not None:
+        assert args.out is not None
+        dmat = qs.reshape(qs.shape[0], -1, 12)
+        dmat = np.swapaxes(dmat, 0, 1)
+        import os, sys
+        sys.path.append("..")
+        from InverseSkinning import format_loader as fl
+        name = os.path.join(args.save_dmat, os.path.splitext( os.path.split(args.out)[1] )[0])
+        for i in range(len(dmat)):
+            idx = "0000"
+            idx = idx[:-len(str(i))] + str(i)
+            path = name + "-" + idx + ".DMAT"
+            data = dmat[i].reshape(dmat[i].shape[0], 3, 4)
+            data = np.swapaxes(data, 1, 2)
+            data = data.reshape(data.shape[0], 12)
+            fl.write_DMAT(path, data)
+            print("save transformations to ", path)
+    
+    if args.print_all:
+        print( "# qs" )
+        save_one( args.out, qs )
+        print( "# transformation errors" )
+        save_one( args.out_errors, errors )
+        print( "# smallest_singular_values" )
+        save_one( args.out_ssv, smallest_singular_values )
+    elif args.transformation_threshold is not None:
+        qs_to_save = qs[np.logical_and( errors<args.transformation_threshold, smallest_singular_values>=args.svd_threshold )]
+        print( "About to save qs with dimension:", qs_to_save.shape )
+        save_one( args.out, qs_to_save )
+    elif args.transformation_percentile is not None:
+        qs_to_save = qs[ smallest_singular_values>=args.svd_threshold ]
+        topN = int( len( qs_to_save )*args.transformation_percentile/100 )
+        qs_to_save = qs_to_save[ np.argsort( errors[ smallest_singular_values>=args.svd_threshold ] )[:topN], : ]
+        print( "About to save qs with dimension:", qs_to_save.shape )
+        save_one( args.out, qs_to_save )
+    else:
+        raise RuntimeError( "No combination of --print-all, --transformation_threshold, or --transformation_percentile was given." )

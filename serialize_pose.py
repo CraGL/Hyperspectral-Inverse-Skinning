@@ -1,5 +1,4 @@
 from __future__ import print_function, division
-from recordclass import recordclass
 
 import numpy as np
 import glob
