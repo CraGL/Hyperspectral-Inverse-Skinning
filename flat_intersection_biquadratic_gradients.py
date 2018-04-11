@@ -181,7 +181,10 @@ def solve_for_z( W, v, vprime, nullspace = False, return_energy = False, use_pse
         ## Constrain all but the 4 biggest weights to 0 and re-solve.
         ## UPDATE: Use the absolute value of the weights. Those are the closest to "unused".
         # biggest_z_indices = np.argsort(z)[:-4]
-        biggest_z_indices = np.argsort(np.abs(z))[:-4]
+        if 'last_z_values' in kwargs:
+            biggest_z_indices = np.argsort(np.abs(kwargs['last_z_values']))[:-4]
+        else:
+            biggest_z_indices = np.argsort(np.abs(z))[:-4]
         ## It only makes sense to do this if there are at least 4 handles:
         if len(biggest_z_indices) > 0:
             ## Constrain them to 0's.
