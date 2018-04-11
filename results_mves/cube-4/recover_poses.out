@@ -1,0 +1,84 @@
+python -u ./recover_poses.py --output NO ./models/cube.obj ./models/cube ./results_mves/cube-4/result.txt
+Loading recovered result ... 
+Finish Loading recovered result.
+############################################
+cube.obj 4 handles
+Reconstruction Mesh Error: 
+rev: max, mean and median per-vertex distance 4.27577313234e-07 8.60382237905e-08 4.60569657053e-08
+Our E_RMS_kavan2010:  7.00006560052e-05
+############################################
+Traceback (most recent call last):
+  File "./recover_poses.py", line 74, in <module>
+    rest_mesh = TriMesh.FromOBJ_FileName(args.rest_pose)
+  File "/Users/songrun/Graphics/InverseSkinning/trimesh.py", line 815, in FromOBJ_FileName
+    f = open( obj_fname )
+IOError: [Errno 2] No such file or directory: './models/{name}.obj'
+Traceback (most recent call last):
+  File "./recover_poses.py", line 74, in <module>
+    rest_mesh = TriMesh.FromOBJ_FileName(args.rest_pose)
+  File "/Users/songrun/Graphics/InverseSkinning/trimesh.py", line 815, in FromOBJ_FileName
+    f = open( obj_fname )
+IOError: [Errno 2] No such file or directory: './models/{name}.obj'
+Loading recovered result ... 
+Finish Loading recovered result.
+############################################
+cube.obj 4 handles
+Reconstruction Mesh Error: 
+rev: max, mean and median per-vertex distance 4.27577313234e-07 8.60382237905e-08 4.60569657053e-08
+Our E_RMS_kavan2010:  7.00006560052e-05
+############################################
+Loading recovered result ... 
+Finish Loading recovered result.
+############################################
+cube.obj 4 handles
+Reconstruction Mesh Error: 
+rev: max, mean and median per-vertex distance 4.27577313234e-07 8.60382237905e-08 4.60569657053e-08
+Our E_RMS_kavan2010:  7.00006560052e-05
+############################################
+Loading recovered result ... 
+Finish Loading recovered result.
+############################################
+cube.obj 4 handles
+Reconstruction Mesh Error: 
+rev: max, mean and median per-vertex distance 4.27577313234e-07 8.60382237905e-08 4.60569657053e-08
+Our E_RMS_kavan2010:  7.00006560052e-05
+############################################
+Loading recovered result ... 
+Finish Loading recovered result.
+############################################
+cube.obj 4 handles
+Reconstruction Mesh Error: 
+rev: max, mean and median per-vertex distance 4.27577313234e-07 8.60382237905e-08 4.60569657053e-08
+Our E_RMS_kavan2010:  7.00006560052e-05
+############################################
+Loading recovered result ... 
+Finish Loading recovered result.
+############################################
+cube.obj 4 handles
+Reconstruction Mesh Error: 
+rev: max, mean and median per-vertex distance 4.27577313234e-07 8.60382237905e-08 4.60569657053e-08
+Our E_RMS_kavan2010:  7.00006560052e-05
+############################################
+usage: compare.py [-h] [--write-OBJ WRITE_OBJ] [--ssd_result SSD_RESULT]
+                  [--debug DEBUG]
+                  rest_pose pose_folder weights our_result
+compare.py: error: unrecognized arguments: --output ./results_mves/cube-4/result.txt
+match order of our recovery:  [0 1 2 3]
+############################################
+Per-bone transformation Error: 
+rev error:  2.85428161757e-05
+############################################
+Weight Error: 
+rev error:  0.000235558563422
+
+gt  average sparsity (1e-5 threshold): 1.89791937581
+ssd average sparsity (1e-5 threshold): 4.0
+rev average sparsity (1e-5 threshold): 0.360858257477
+gt  average sparsity (0.1 threshold): 2.62808842653
+ssd average sparsity (0.1 threshold): 4.0
+rev average sparsity (0.1 threshold): 2.62678803641
+############################################
+Reconstruction Mesh Error: 
+rev: max, mean and median per-vertex distance 2.18492747778e-07 4.22986614208e-08 2.3570225844e-08
+Our E_RMS_kavan2010:  7.04376507412e-05
+############################################

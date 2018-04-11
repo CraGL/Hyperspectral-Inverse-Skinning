@@ -49,6 +49,8 @@ struct BlendScene
     igl::Camera camera;
     Eigen::Vector3f eye;
     
+    std::string scene_path;
+    
     double bbd;	 // bounding box diagonal
     int P;		// number of poses;
     int H; 		// number of handles;
@@ -70,6 +72,8 @@ struct BlendScene
     void init_scene(const std::string & rest_path, const std::string & result_path);
     void show_pose(const int index_pos);
     void compute_handle_positions();
+    void load_scene(std::string path = "");
+    void save_scene(std::string path = "");
 
     void bind_scene_varying_uniforms(GLuint program_id) const;
     

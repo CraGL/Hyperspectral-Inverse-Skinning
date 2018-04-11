@@ -349,3 +349,101 @@ void BlendScene::build_wire_program(GLuint &program_id)
 	    glDeleteShader( shader );
 	}
 }
+
+void BlendScene::load_scene(std::string path)
+{
+	using namespace std;
+	if(path == "")	path = scene_path;
+	ifstream jsonConfig(path, ifstream::binary);
+	if (!jsonConfig.is_open()) {
+		cerr << REDRUM("Cannot open " + path + ".") << endl;
+		return;
+	}
+
+	Json::Reader reader;
+	Json::Value root;
+	bool parsingSuccessful = reader.parse( jsonConfig, root, false ); 
+	if (!parsingSuccessful) {
+		cerr << REDRUM("Cannot read parameters from " + path + ".") << endl;
+	} else {
+		cout<<GREENGIN("Load scene from "+path+".")<<endl;
+	}
+	
+	camera.m_angle = root["Camera"]["m_angle"].asDouble();
+	// We don't want to load the aspect ratio unless we are also going
+	// to resize the window to match.
+	// camera.m_aspect = root["Camera"]["m_aspect"].asDouble();
+	camera.m_near = root["Camera"]["m_near"].asDouble();
+	camera.m_far = root["Camera"]["m_far"].asDouble();
+	camera.m_at_dist = root["Camera"]["m_at_dist"].asDouble();
+	camera.m_orthographic = root["Camera"]["m_orthographic"].asBool();
+
+	const Json::Value m_rotation_conj = root["Camera"]["m_rotation_conj"];
+	camera.m_rotation_conj.x() = m_rotation_conj[0].asDouble();
+	camera.m_rotation_conj.y() = m_rotation_conj[1].asDouble();
+	camera.m_rotation_conj.z() = m_rotation_conj[2].asDouble();
+	camera.m_rotation_conj.w() = m_rotation_conj[3].asDouble();
+
+	const Json::Value m_translation = root["Camera"]["m_translation"];
+	camera.m_translation(0) = m_translation[0].asDouble();
+	camera.m_translation(1) = m_translation[1].asDouble();
+	camera.m_translation(2) = m_translation[2].asDouble();
+
+	for( int i=0; i<dQ.size(); i++ ) {
+		string var = "dQ-" + to_string(i);
+		const Json::Value dQ_i = root[var];
+	
+		dQ[i].x() = dQ_i[0].asDouble();
+		dQ[i].y() = dQ_i[1].asDouble();
+		dQ[i].z() = dQ_i[2].asDouble();
+		dQ[i].w() = dQ_i[3].asDouble();
+	}
+}
+
+void BlendScene::save_scene(std::string path)
+{
+	using namespace std;
+	if(path == "")	path = scene_path;
+	ofstream jsonConfig(path, ofstream::binary);
+	if (!jsonConfig.is_open()) {
+		cerr << REDRUM("Cannot open " + path + ".")<< endl;
+		return;
+	}
+
+	Json::StyledWriter styledWriter;
+	Json::Value root;
+
+	root["Camera"]["m_angle"] = camera.m_angle;
+	root["Camera"]["m_aspect"] = camera.m_aspect;
+	root["Camera"]["m_near"] = camera.m_near;
+	root["Camera"]["m_far"] = camera.m_far;
+	root["Camera"]["m_at_dist"] = camera.m_at_dist;
+	root["Camera"]["m_orthographic"] = camera.m_orthographic;
+
+	Json::Value m_rotation_conj;
+	m_rotation_conj.append( camera.m_rotation_conj.x() );
+	m_rotation_conj.append( camera.m_rotation_conj.y() );
+	m_rotation_conj.append( camera.m_rotation_conj.z() );
+	m_rotation_conj.append( camera.m_rotation_conj.w() );
+	root["Camera"]["m_rotation_conj"] = m_rotation_conj;
+
+	Json::Value m_translation;
+	m_translation.append( camera.m_translation(0) );
+	m_translation.append( camera.m_translation(1) );
+	m_translation.append( camera.m_translation(2) );
+	root["Camera"]["m_translation"] = m_translation;
+    
+	for( int i=0; i<dQ.size(); i++ ) {
+		Json::Value dQ_i;
+		string var = "dQ-" + to_string(i);
+		dQ_i.append( dQ[i].x() );
+		dQ_i.append( dQ[i].y() );
+		dQ_i.append( dQ[i].z() );
+		dQ_i.append( dQ[i].w() );
+		root[ var ] = dQ_i;
+	}
+	
+	jsonConfig << styledWriter.write(root);
+	cout<<GREENGIN("Current scene written to "+path+".")<<endl;
+	jsonConfig.close();	
+}

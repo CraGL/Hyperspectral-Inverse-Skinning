@@ -1,0 +1,63 @@
+Loading recovered result ... 
+Finish Loading recovered result.
+############################################
+cylinder.obj 4 handles
+Reconstruction Mesh Error: 
+rev: max, mean and median per-vertex distance 3.34343721409e-07 7.24565871308e-08 4.10130429924e-08
+Our E_RMS_kavan2010:  5.74170981464e-05
+############################################
+Loading recovered result ... 
+Finish Loading recovered result.
+############################################
+cylinder.obj 4 handles
+Reconstruction Mesh Error: 
+rev: max, mean and median per-vertex distance 3.34343721409e-07 7.24565871308e-08 4.10130429924e-08
+Our E_RMS_kavan2010:  5.74170981464e-05
+############################################
+Loading recovered result ... 
+Finish Loading recovered result.
+############################################
+cylinder.obj 4 handles
+Reconstruction Mesh Error: 
+rev: max, mean and median per-vertex distance 3.34343721409e-07 7.24565871308e-08 4.10130429924e-08
+Our E_RMS_kavan2010:  5.74170981464e-05
+############################################
+Loading recovered result ... 
+Finish Loading recovered result.
+############################################
+cylinder.obj 4 handles
+Reconstruction Mesh Error: 
+rev: max, mean and median per-vertex distance 3.34343721409e-07 7.24565871308e-08 4.10130429924e-08
+Our E_RMS_kavan2010:  5.74170981464e-05
+############################################
+Loading recovered result ... 
+Finish Loading recovered result.
+############################################
+cylinder.obj 4 handles
+Reconstruction Mesh Error: 
+rev: max, mean and median per-vertex distance 3.34343721409e-07 7.24565871308e-08 4.10130429924e-08
+Our E_RMS_kavan2010:  5.74170981464e-05
+############################################
+usage: compare.py [-h] [--write-OBJ WRITE_OBJ] [--ssd_result SSD_RESULT]
+                  [--debug DEBUG]
+                  rest_pose pose_folder weights our_result
+compare.py: error: unrecognized arguments: --output ./results_mves/cylinder-4/result.txt
+match order of our recovery:  [0 1 2 3]
+############################################
+Per-bone transformation Error: 
+rev error:  6.11143498938e-05
+############################################
+Weight Error: 
+rev error:  2.09545984006e-05
+
+gt  average sparsity (1e-5 threshold): 1.79761904762
+ssd average sparsity (1e-5 threshold): 4.0
+rev average sparsity (1e-5 threshold): 0.7
+gt  average sparsity (0.1 threshold): 2.52857142857
+ssd average sparsity (0.1 threshold): 4.0
+rev average sparsity (0.1 threshold): 2.52857142857
+############################################
+Reconstruction Mesh Error: 
+rev: max, mean and median per-vertex distance 1.69136826853e-07 3.62610055674e-08 2.00618950575e-08
+Our E_RMS_kavan2010:  5.75680499937e-05
+############################################

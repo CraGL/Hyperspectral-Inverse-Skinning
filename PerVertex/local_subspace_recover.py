@@ -369,7 +369,7 @@ def find_subspace_intersections(rest_pose, other_poses, version, method = None, 
 
 def E_RMS_kavan2010( gt, data, scale=1.0):
     ### for vertex error
-    E_RMS_kavan2010 = 1000*np.linalg.norm( gt.ravel() - data.ravel() )/np.sqrt(len(gt.ravel())*scale*scale) ## 3*pose_num*vs_num, and scale!
+    E_RMS_kavan2010 = 1000*np.linalg.norm( gt.ravel() - data.ravel() )*2.0/np.sqrt(len(gt.ravel())*scale*scale) ## 3*pose_num*vs_num, and scale!
     return E_RMS_kavan2010
 
 def vertex_reconstruction_error(vertices0, vertices1, q_space, scale=1.0):
@@ -418,7 +418,7 @@ if __name__ == '__main__':
     parser.add_argument( '--out-ssv', type=str, help='Path to store the smallest singular values.' )
     
     parser.add_argument( '--random-sample-method', '-rand', type=str, help=""" 'none' means one ring subspace intersection, others are 'euclidian', 'geodesic', 'precomputed-geodesic' """)
-    parser.add_argument( '--subset-size', '-ssize', type=int, default=40, help='should smaller than 100, because search range is defalut to be 100' )
+    parser.add_argument( '--subset-size', '-ssize', type=int, default=48, help='should smaller than 100, because search range is defalut to be 100' )
     parser.add_argument( '--precomputed-geodesic-distance-path', '-pre', type=str, help='Path to store the precomputed geodesic pairwise distance.' )
     parser.add_argument( '--save-dmat', '-dmat', type=str, help='save transformations as dmat' )
 

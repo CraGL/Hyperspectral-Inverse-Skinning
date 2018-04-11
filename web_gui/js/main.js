@@ -6,6 +6,7 @@
 var container, stats;
 var camera, scene, renderer, controls;
 var socket;
+var draw_mode = "lines";
 
 // The setup code.
 window.onload = function() {
@@ -320,6 +321,29 @@ function createLineFromReceived( position, direction, color0, width = 2, len = 2
         
     return line;
 }
+
+function createPointFromReceived( pts, color0, size = 2 ) {
+	// From: https://github.com/josdirksen/learning-threejs/blob/master/chapter-07/10-create-particle-system-from-model.html
+    var geom = new THREE.Geometry();
+    
+	for (var i = 0; i < pts.length; i++) { 
+		var point = new THREE.Vector3( pts[i][0], pts[i][1], pts[i][2] );
+		geom.vertices.push( point );
+	}
+	
+	var material = new THREE.PointsMaterial({
+		color: color0,
+		size: 0.05,
+		transparent: false,
+		blending: THREE.AdditiveBlending,
+		// map: generateSprite()
+	});
+	var cloud = new THREE.Points(geom, material);
+	
+	cloud.sortParticles = true;
+	return cloud;
+}
+
 var all_pts = null;
 async function receive()
 {
@@ -328,26 +352,42 @@ async function receive()
     // TODO: Process the data. You can await more data if needed.
     {
         console.log( data );
-        
-        // Create the data holder.
-        if( all_pts !== null ) scene.remove( all_pts );
-        all_pts = new THREE.Object3D();
-        
-        // Assume data is an array of 3D positions.
-        let pts = JSON.parse( data );
-        
-        for (var i = 0; i < pts.length; i += 2) { 
-        	// let pt = pts[i];
-			var position = new THREE.Vector3( pts[i][0], pts[i][1], pts[i][2] );
-			var direction = new THREE.Vector3( pts[i + 1][0], pts[i + 1][1], pts[i + 1][2] );
-			if ( i >= pts.length - 2 ) all_pts.add( createLineFromReceived( position, direction, new THREE.Color( 0xc441f4 ), 5, 100 ) );
-			else 					   all_pts.add( createLineFromReceived( position, direction, new THREE.Color( 0x000000 ) ) );
+        if( data == "\"lines\"" ) {
+        	draw_mode = "lines";
+        	console.log( "switch to lines." );
+        	// Call ourselves recursively.
+		    receive();
+        }
+        else if( data == "\"points\"" ) {
+        	draw_mode = "points";
+        	console.log( "switch to points." );
+        	// Call ourselves recursively.
+		    receive();
         }
         
-        // Add the points to the scene.
-        scene.add( all_pts ); 
+		// Create the data holder.
+		if( all_pts !== null ) scene.remove( all_pts );
+		all_pts = new THREE.Object3D();
+
+		// Assume data is an array of 3D positions.
+		let pts = JSON.parse( data );
+
+		if( draw_mode == "lines" ) {
+			for (var i = 0; i < pts.length; i += 2) { 
+				// let pt = pts[i];
+				var position = new THREE.Vector3( pts[i][0], pts[i][1], pts[i][2] );
+				var direction = new THREE.Vector3( pts[i + 1][0], pts[i + 1][1], pts[i + 1][2] );
+				if ( i >= pts.length - 2 ) all_pts.add( createLineFromReceived( position, direction, new THREE.Color( 0xc441f4 ), 5, 100 ) );
+				else 					   all_pts.add( createLineFromReceived( position, direction, new THREE.Color( 0x000000 ) ) );
+			}
+		}
+		else if( draw_mode == "points" ) {
+			var points = createPointFromReceived( pts, new THREE.Color( 0xc441f4 ), 2 );
+			all_pts.add( points );
+		}
     }
-    
+    // Add the points to the scene.
+    scene.add( all_pts );
     needs_redisplay();
     
     // Call ourselves recursively.

@@ -1,0 +1,31 @@
+Loading recovered result ... 
+Finish Loading recovered result.
+############################################
+cheburashka.obj 11 handles
+Reconstruction Mesh Error: 
+rev: max, mean and median per-vertex distance 4.37901774828e-07 8.37716531614e-08 8.40201330145e-08
+Our E_RMS_kavan2010:  6.23743314184e-05
+############################################
+usage: compare.py [-h] [--write-OBJ WRITE_OBJ] [--ssd_result SSD_RESULT]
+                  [--debug DEBUG]
+                  rest_pose pose_folder weights our_result
+compare.py: error: unrecognized arguments: --output ./results_mves/cheburashka-11/result.txt
+match order of our recovery:  [ 0  1  2  3  4  5  6  7  8  9 10]
+############################################
+Per-bone transformation Error: 
+rev error:  2.90516923028e-06
+############################################
+Weight Error: 
+rev error:  9.65150711331e-07
+
+gt  average sparsity (1e-5 threshold): 6.50352376668
+ssd average sparsity (1e-5 threshold): 11.0
+rev average sparsity (1e-5 threshold): 3.85829959514
+gt  average sparsity (0.1 threshold): 9.09176788124
+ssd average sparsity (0.1 threshold): 11.0
+rev average sparsity (0.1 threshold): 9.09161793372
+############################################
+Reconstruction Mesh Error: 
+rev: max, mean and median per-vertex distance 2.20068389285e-07 4.11881727442e-08 4.21427282496e-08
+Our E_RMS_kavan2010:  6.25118012553e-05
+############################################

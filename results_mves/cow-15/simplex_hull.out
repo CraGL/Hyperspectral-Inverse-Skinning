@@ -1,0 +1,440 @@
+Using our gradient functions, not automatic finite differencing ones.
+uncorrelated data shape
+(11666, 14)
+All pts #:  11666
+inital volume: -8.29467771298e-14
+inital log volume: 30.1205772322
+Solve MEVS with cvxopt ip solver.
+GLPK Simplex Optimizer, v4.61
+175005 rows, 225 columns, 2625075 non-zeros
+      0: obj =   0.000000000e+00 inf =   1.000e+00 (1)
+      1: obj =  -1.000000000e+00 inf =   0.000e+00 (0)
+Warning: basis matrix is ill-conditioned (cond = 1.05e+13)
+Warning: numerical instability (primal simplex, phase II)
+    323: obj =  -3.570390958e+01 inf =   1.467e-05 (0) 5
+Warning: numerical instability (primal simplex, phase II)
+    425: obj =  -4.691278221e+01 inf =   4.610e-05 (0) 2
+Warning: numerical instability (primal simplex, phase II)
+    457: obj =  -4.894801779e+01 inf =   3.188e-05 (0) 2
+*   500: obj =  -5.227776590e+01 inf =   1.993e-06 (113)
+Warning: numerical instability (primal simplex, phase II)
+    559: obj =  -5.372213916e+01 inf =   6.999e-07 (0) 2
+Warning: basis matrix is ill-conditioned (cond = 2.49e+14)
+*  1000: obj =  -7.646617384e+01 inf =   1.411e-04 (18) 4
+Warning: basis matrix is ill-conditioned (cond = 5.71e+13)
+Warning: numerical instability (primal simplex, phase II)
+   1167: obj =  -7.842856341e+01 inf =   5.251e-05 (0) 2
+OPTIMAL LP SOLUTION FOUND
+Current log volume:  inf
+GLPK Simplex Optimizer, v4.61
+175005 rows, 225 columns, 2625075 non-zeros
+      0: obj =   0.000000000e+00 inf =   1.000e+00 (1)
+      1: obj =  -1.000000000e+00 inf =   0.000e+00 (0)
+Warning: numerical instability (primal simplex, phase II)
+    273: obj =  -5.708792788e+02 inf =   1.815e-06 (0) 4
+Warning: basis matrix is ill-conditioned (cond = 2.58e+13)
+*   409: obj =  -5.756570695e+02 inf =   4.284e-06 (0) 3
+OPTIMAL LP SOLUTION FOUND
+Current log volume:  inf
+GLPK Simplex Optimizer, v4.61
+175005 rows, 225 columns, 2625075 non-zeros
+      0: obj =   0.000000000e+00 inf =   1.000e+00 (1)
+      1: obj =  -1.000000000e+00 inf =   0.000e+00 (0)
+Warning: basis matrix is ill-conditioned (cond = 2.05e+14)
+Warning: numerical instability (primal simplex, phase II)
+    319: obj =  -3.054755776e+03 inf =   3.062e-07 (0) 4
+Warning: basis matrix is ill-conditioned (cond = 8.66e+14)
+Warning: numerical instability (primal simplex, phase II)
+Warning: basis matrix is ill-conditioned (cond = 8.66e+14)
+Warning: basis matrix is ill-conditioned (cond = 3.27e+14)
+Warning: numerical instability (primal simplex, phase I)
+Warning: basis matrix is ill-conditioned (cond = 3.27e+14)
+    500: obj =  -3.052949138e+03 inf =   2.711e+02 (28744) 4
+Warning: basis matrix is ill-conditioned (cond = 2.48e+14)
+Warning: numerical instability (primal simplex, phase I)
+Warning: basis matrix is ill-conditioned (cond = 2.48e+14)
+Warning: basis matrix is ill-conditioned (cond = 2.49e+14)
+Warning: basis matrix is ill-conditioned (cond = 2.61e+14)
+Warning: basis matrix is ill-conditioned (cond = 2.43e+14)
+Warning: basis matrix is ill-conditioned (cond = 2.4e+14)
+   1000: obj =  -3.053078750e+03 inf =   2.073e+02 (27208) 6
+Warning: basis matrix is ill-conditioned (cond = 2.06e+14)
+   1500: obj =  -3.054652734e+03 inf =   1.523e+01 (10159) 5
+   2000: obj =  -3.054657981e+03 inf =   1.387e+01 (9513) 5
+   2278: obj =  -3.054691262e+03 inf =   2.567e-07 (0) 2
+Warning: numerical instability (primal simplex, phase II)
+   2384: obj =  -3.075837555e+03 inf =   1.200e-06 (0) 3
+Warning: basis matrix is ill-conditioned (cond = 2.59e+13)
+*  2500: obj =  -3.094922564e+03 inf =   1.707e-05 (95) 1
+Warning: basis matrix is ill-conditioned (cond = 5.55e+12)
+Warning: numerical instability (primal simplex, phase II)
+Warning: basis matrix is ill-conditioned (cond = 5.55e+12)
+   2587: obj =  -3.097870065e+03 inf =   2.701e-05 (0) 2
+Warning: numerical instability (primal simplex, phase II)
+   2789: obj =  -3.111852606e+03 inf =   4.685e-06 (0) 3
+Warning: numerical instability (primal simplex, phase II)
+   2873: obj =  -3.117977962e+03 inf =   1.281e-05 (0) 2
+*  3000: obj =  -3.122301537e+03 inf =   5.248e-03 (12) 2
+Warning: numerical instability (primal simplex, phase II)
+   3009: obj =  -3.122444531e+03 inf =   2.034e-04 (0) 2
+Warning: basis matrix is ill-conditioned (cond = 3.26e+13)
+Warning: numerical instability (primal simplex, phase II)
+Warning: basis matrix is ill-conditioned (cond = 3.26e+13)
+   3051: obj =  -3.122527999e+03 inf =   1.541e-05 (0) 2
+Warning: numerical instability (primal simplex, phase II)
+   3066: obj =  -3.123511844e+03 inf =   1.588e-05 (0) 1
+OPTIMAL LP SOLUTION FOUND
+Current log volume:  inf
+GLPK Simplex Optimizer, v4.61
+175005 rows, 225 columns, 2625075 non-zeros
+      0: obj =   0.000000000e+00 inf =   1.000e+00 (1)
+      1: obj =  -1.000000000e+00 inf =   0.000e+00 (0)
+Warning: basis matrix is ill-conditioned (cond = 1.22e+13)
+Warning: basis matrix is ill-conditioned (cond = 7.32e+12)
+Warning: numerical instability (primal simplex, phase II)
+Warning: basis matrix is ill-conditioned (cond = 7.32e+12)
+    238: obj =  -8.602764500e+02 inf =   2.480e-05 (0) 4
+Warning: numerical instability (primal simplex, phase II)
+    341: obj =  -8.633721140e+02 inf =   6.486e-06 (0) 2
+Warning: numerical instability (primal simplex, phase II)
+    471: obj =  -8.652685808e+02 inf =   9.024e-06 (0) 3
+*   500: obj =  -8.659183870e+02 inf =   2.271e-05 (90)
+Warning: numerical instability (primal simplex, phase II)
+    569: obj =  -8.664618001e+02 inf =   6.316e-05 (0) 2
+Warning: numerical instability (primal simplex, phase II)
+    773: obj =  -8.686742134e+02 inf =   7.026e-05 (0) 3
+Warning: basis matrix is ill-conditioned (cond = 2.3e+13)
+Warning: numerical instability (primal simplex, phase II)
+Warning: basis matrix is ill-conditioned (cond = 2.3e+13)
+    870: obj =  -8.695858149e+02 inf =   7.266e-05 (0) 2
+Warning: basis matrix is ill-conditioned (cond = 9.12e+13)
+*   952: obj =  -8.703783029e+02 inf =   1.106e-04 (0) 2
+OPTIMAL LP SOLUTION FOUND
+Current log volume:  inf
+GLPK Simplex Optimizer, v4.61
+175005 rows, 225 columns, 2625075 non-zeros
+      0: obj =   0.000000000e+00 inf =   1.000e+00 (1)
+      1: obj =  -1.000000000e+00 inf =   0.000e+00 (0)
+Warning: basis matrix is ill-conditioned (cond = 3.04e+14)
+Warning: basis matrix is ill-conditioned (cond = 1.64e+13)
+Warning: numerical instability (primal simplex, phase II)
+    500: obj =  -2.992628822e+01 inf =   2.493e-01 (724) 6
+    551: obj =  -2.992553038e+01 inf =   5.489e-05 (0)
+Warning: numerical instability (primal simplex, phase II)
+    601: obj =  -3.014762665e+01 inf =   7.962e-05 (0) 2
+Warning: numerical instability (primal simplex, phase II)
+    774: obj =  -3.159061241e+01 inf =   4.060e-05 (0) 3
+Warning: numerical instability (primal simplex, phase II)
+    945: obj =  -3.370248971e+01 inf =   9.864e-05 (0) 2
+Warning: numerical instability (primal simplex, phase II)
+    950: obj =  -3.370248962e+01 inf =   9.957e-05 (0) 1
+*   951: obj =  -3.370248962e+01 inf =   9.957e-05 (0)
+OPTIMAL LP SOLUTION FOUND
+Current log volume:  inf
+GLPK Simplex Optimizer, v4.61
+175005 rows, 225 columns, 2625075 non-zeros
+      0: obj =   0.000000000e+00 inf =   1.000e+00 (1)
+      1: obj =  -1.000000000e+00 inf =   0.000e+00 (0)
+Warning: numerical instability (primal simplex, phase II)
+    441: obj =  -3.166925758e+01 inf =   2.005e-05 (0) 6
+*   500: obj =  -3.197182478e+01 inf =   1.641e-05 (100)
+Warning: basis matrix is ill-conditioned (cond = 5.34e+12)
+Warning: numerical instability (primal simplex, phase II)
+Warning: basis matrix is ill-conditioned (cond = 5.34e+12)
+    828: obj =  -3.435894445e+01 inf =   7.247e-06 (0) 5
+*  1000: obj =  -3.691816377e+01 inf =   1.338e-05 (31) 3
+Warning: basis matrix is ill-conditioned (cond = 1.44e+13)
+*  1111: obj =  -3.896038573e+01 inf =   1.675e-05 (0) 2
+OPTIMAL LP SOLUTION FOUND
+Current log volume:  -0.310277957734
+GLPK Simplex Optimizer, v4.61
+175005 rows, 225 columns, 2625075 non-zeros
+      0: obj =   0.000000000e+00 inf =   1.000e+00 (1)
+      1: obj =  -1.000000000e+00 inf =   0.000e+00 (0)
+Warning: basis matrix is ill-conditioned (cond = 4.73e+12)
+Warning: numerical instability (primal simplex, phase II)
+Warning: numerical instability (primal simplex, phase I)
+    330: obj =  -8.436648685e+00 inf =   2.886e-05 (0) 6
+Warning: numerical instability (primal simplex, phase II)
+    432: obj =  -1.048368176e+01 inf =   4.648e-05 (0) 2
+*   500: obj =  -1.203264833e+01 inf =   5.512e-05 (84)
+Warning: numerical instability (primal simplex, phase II)
+    836: obj =  -1.473998085e+01 inf =   2.353e-04 (0) 5
+*   850: obj =  -1.510645571e+01 inf =   1.031e-04 (0)
+OPTIMAL LP SOLUTION FOUND
+Current log volume:  -0.310860720009
+GLPK Simplex Optimizer, v4.61
+175005 rows, 225 columns, 2625075 non-zeros
+      0: obj =   0.000000000e+00 inf =   1.000e+00 (1)
+      1: obj =  -1.000000000e+00 inf =   0.000e+00 (0)
+Warning: numerical instability (primal simplex, phase II)
+    350: obj =  -7.923052495e+00 inf =   2.916e-06 (0) 5
+Warning: numerical instability (primal simplex, phase II)
+    500: obj =   1.673444241e+01 inf =   5.703e+04 (67433) 2
+   1000: obj =   2.538563066e+00 inf =   2.262e+04 (56884) 5
+Warning: numerical instability (primal simplex, phase I)
+Warning: numerical instability (primal simplex, phase I)
+Warning: basis matrix is ill-conditioned (cond = 1.02e+13)
+   1500: obj =  -6.701453607e+00 inf =   2.492e+03 (27792) 7
+Warning: basis matrix is ill-conditioned (cond = 8.04e+12)
+Warning: basis matrix is ill-conditioned (cond = 8.03e+12)
+Warning: basis matrix is ill-conditioned (cond = 7.33e+12)
+Warning: basis matrix is ill-conditioned (cond = 6.21e+12)
+   2000: obj =  -6.888567801e+00 inf =   2.090e+03 (26407) 5
+Warning: basis matrix is ill-conditioned (cond = 5.53e+12)
+Warning: basis matrix is ill-conditioned (cond = 5.22e+12)
+Warning: numerical instability (primal simplex, phase I)
+   2500: obj =  -7.094649921e+00 inf =   1.652e+03 (24154) 6
+   3000: obj =  -7.240837191e+00 inf =   1.354e+03 (23638) 5
+Warning: numerical instability (primal simplex, phase I)
+Warning: numerical instability (primal simplex, phase I)
+   3500: obj =  -7.200602136e+00 inf =   1.250e+03 (22241) 7
+   4000: obj =  -7.197993243e+00 inf =   1.244e+03 (21421) 5
+Warning: numerical instability (primal simplex, phase I)
+   4500: obj =  -7.203357985e+00 inf =   1.091e+03 (14912) 6
+Warning: numerical instability (primal simplex, phase I)
+   5000: obj =  -7.329913451e+00 inf =   9.080e+02 (14402) 6
+   5500: obj =  -7.733400639e+00 inf =   4.297e+02 (13196) 4
+Warning: numerical instability (primal simplex, phase I)
+Warning: numerical instability (primal simplex, phase I)
+   6000: obj =  -7.749953456e+00 inf =   3.723e+02 (10749) 7
+Warning: numerical instability (primal simplex, phase I)
+Warning: numerical instability (primal simplex, phase I)
+Warning: numerical instability (primal simplex, phase I)
+   6500: obj =  -7.701108127e+00 inf =   2.642e+02 (6949) 8
+   7000: obj =  -7.700940933e+00 inf =   2.626e+02 (6338) 5
+   7500: obj =  -7.601472591e+00 inf =   2.558e+02 (5691) 5
+Warning: numerical instability (primal simplex, phase I)
+Warning: basis matrix is ill-conditioned (cond = 7.8e+12)
+Warning: numerical instability (primal simplex, phase I)
+Warning: basis matrix is ill-conditioned (cond = 7.8e+12)
+Warning: numerical instability (primal simplex, phase I)
+   8000: obj =  -7.492405270e+00 inf =   2.411e+02 (5109) 8
+Warning: numerical instability (primal simplex, phase I)
+Warning: numerical instability (primal simplex, phase I)
+Warning: numerical instability (primal simplex, phase I)
+   8340: obj =  -6.262969100e+00 inf =   9.389e-07 (0) 7
+Warning: numerical instability (primal simplex, phase II)
+   8440: obj =  -7.372734058e+00 inf =   1.016e-06 (0) 2
+*  8500: obj =  -8.166338099e+00 inf =   1.982e-06 (114)
+Warning: basis matrix is ill-conditioned (cond = 4.83e+12)
+Warning: numerical instability (primal simplex, phase II)
+Warning: basis matrix is ill-conditioned (cond = 4.83e+12)
+   8533: obj =  -9.108041363e+00 inf =   7.481e-06 (0) 2
+Warning: numerical instability (primal simplex, phase II)
+   8636: obj =  -1.024515216e+01 inf =   2.086e-06 (0) 2
+Warning: numerical instability (primal simplex, phase II)
+   8738: obj =  -1.176057757e+01 inf =   2.350e-06 (0) 2
+Warning: basis matrix is ill-conditioned (cond = 5.84e+12)
+Warning: numerical instability (primal simplex, phase II)
+Warning: basis matrix is ill-conditioned (cond = 5.84e+12)
+   8838: obj =  -1.234507286e+01 inf =   1.158e-05 (0) 2
+Warning: numerical instability (primal simplex, phase II)
+   8940: obj =  -1.368928338e+01 inf =   1.875e-04 (0) 2
+*  9000: obj =  -1.376403577e+01 inf =   1.052e-04 (40)
+Warning: numerical instability (primal simplex, phase II)
+   9042: obj =  -1.451327408e+01 inf =   1.159e-04 (0) 2
+*  9118: obj =  -1.500511145e+01 inf =   1.017e-04 (0)
+OPTIMAL LP SOLUTION FOUND
+Current log volume:  -0.31086066511
+GLPK Simplex Optimizer, v4.61
+175005 rows, 225 columns, 2625075 non-zeros
+      0: obj =   0.000000000e+00 inf =   1.000e+00 (1)
+      1: obj =  -1.000000000e+00 inf =   0.000e+00 (0)
+Warning: numerical instability (primal simplex, phase II)
+    350: obj =  -7.920627589e+00 inf =   2.916e-06 (0) 5
+Warning: numerical instability (primal simplex, phase II)
+    500: obj =   1.665881685e+01 inf =   5.703e+04 (67433) 2
+   1000: obj =   2.497593856e+00 inf =   2.262e+04 (56884) 5
+Warning: numerical instability (primal simplex, phase I)
+Warning: numerical instability (primal simplex, phase I)
+Warning: basis matrix is ill-conditioned (cond = 1.02e+13)
+   1500: obj =  -6.704668168e+00 inf =   2.492e+03 (27792) 7
+Warning: basis matrix is ill-conditioned (cond = 8.04e+12)
+Warning: basis matrix is ill-conditioned (cond = 8.03e+12)
+Warning: basis matrix is ill-conditioned (cond = 7.33e+12)
+Warning: basis matrix is ill-conditioned (cond = 6.21e+12)
+   2000: obj =  -6.890955676e+00 inf =   2.090e+03 (26407) 5
+Warning: basis matrix is ill-conditioned (cond = 5.53e+12)
+Warning: basis matrix is ill-conditioned (cond = 5.22e+12)
+Warning: numerical instability (primal simplex, phase I)
+   2500: obj =  -7.096072353e+00 inf =   1.652e+03 (24154) 6
+   3000: obj =  -7.241560132e+00 inf =   1.354e+03 (23638) 5
+Warning: numerical instability (primal simplex, phase I)
+Warning: numerical instability (primal simplex, phase I)
+   3500: obj =  -7.201133922e+00 inf =   1.250e+03 (22241) 7
+   4000: obj =  -7.198521466e+00 inf =   1.244e+03 (21421) 5
+Warning: numerical instability (primal simplex, phase I)
+   4500: obj =  -7.203532957e+00 inf =   1.091e+03 (14912) 6
+Warning: numerical instability (primal simplex, phase I)
+   5000: obj =  -7.329486702e+00 inf =   9.080e+02 (14402) 6
+   5500: obj =  -7.731064678e+00 inf =   4.297e+02 (13196) 4
+Warning: numerical instability (primal simplex, phase I)
+Warning: numerical instability (primal simplex, phase I)
+   6000: obj =  -7.747423311e+00 inf =   3.723e+02 (10749) 7
+Warning: numerical instability (primal simplex, phase I)
+Warning: numerical instability (primal simplex, phase I)
+Warning: numerical instability (primal simplex, phase I)
+   6500: obj =  -7.698668897e+00 inf =   2.642e+02 (6949) 8
+   7000: obj =  -7.698502572e+00 inf =   2.626e+02 (6338) 5
+   7500: obj =  -7.599129311e+00 inf =   2.558e+02 (5691) 5
+Warning: numerical instability (primal simplex, phase I)
+Warning: basis matrix is ill-conditioned (cond = 7.8e+12)
+Warning: numerical instability (primal simplex, phase I)
+Warning: basis matrix is ill-conditioned (cond = 7.8e+12)
+Warning: numerical instability (primal simplex, phase I)
+   8000: obj =  -7.490126789e+00 inf =   2.411e+02 (5109) 8
+Warning: numerical instability (primal simplex, phase I)
+Warning: numerical instability (primal simplex, phase I)
+Warning: numerical instability (primal simplex, phase I)
+   8340: obj =  -6.261137676e+00 inf =   9.389e-07 (0) 7
+Warning: numerical instability (primal simplex, phase II)
+   8440: obj =  -7.370821906e+00 inf =   1.016e-06 (0) 2
+*  8500: obj =  -8.164280706e+00 inf =   1.982e-06 (114)
+Warning: basis matrix is ill-conditioned (cond = 4.83e+12)
+Warning: numerical instability (primal simplex, phase II)
+Warning: basis matrix is ill-conditioned (cond = 4.83e+12)
+   8533: obj =  -9.105515440e+00 inf =   7.481e-06 (0) 2
+Warning: numerical instability (primal simplex, phase II)
+   8636: obj =  -1.024197166e+01 inf =   2.086e-06 (0) 2
+Warning: numerical instability (primal simplex, phase II)
+   8738: obj =  -1.175720291e+01 inf =   2.350e-06 (0) 2
+Warning: basis matrix is ill-conditioned (cond = 5.84e+12)
+Warning: numerical instability (primal simplex, phase II)
+Warning: basis matrix is ill-conditioned (cond = 5.84e+12)
+   8838: obj =  -1.234124476e+01 inf =   1.158e-05 (0) 2
+Warning: numerical instability (primal simplex, phase II)
+   8940: obj =  -1.368461815e+01 inf =   1.875e-04 (0) 2
+*  9000: obj =  -1.375925139e+01 inf =   1.052e-04 (40)
+Warning: numerical instability (primal simplex, phase II)
+   9042: obj =  -1.450841934e+01 inf =   1.159e-04 (0) 2
+*  9118: obj =  -1.500025507e+01 inf =   1.017e-04 (0)
+OPTIMAL LP SOLUTION FOUND
+Current log volume:  -0.31086066511
+GLPK Simplex Optimizer, v4.61
+175005 rows, 225 columns, 2625075 non-zeros
+      0: obj =   0.000000000e+00 inf =   1.000e+00 (1)
+      1: obj =  -1.000000000e+00 inf =   0.000e+00 (0)
+Warning: numerical instability (primal simplex, phase II)
+    350: obj =  -7.920506605e+00 inf =   2.916e-06 (0) 5
+Warning: numerical instability (primal simplex, phase II)
+    500: obj =   1.665504425e+01 inf =   5.703e+04 (67433) 2
+   1000: obj =   2.495550119e+00 inf =   2.262e+04 (56884) 5
+Warning: numerical instability (primal simplex, phase I)
+Warning: numerical instability (primal simplex, phase I)
+Warning: basis matrix is ill-conditioned (cond = 1.02e+13)
+   1500: obj =  -6.704828551e+00 inf =   2.492e+03 (27792) 7
+Warning: basis matrix is ill-conditioned (cond = 8.04e+12)
+Warning: basis matrix is ill-conditioned (cond = 8.03e+12)
+Warning: basis matrix is ill-conditioned (cond = 7.33e+12)
+Warning: basis matrix is ill-conditioned (cond = 6.21e+12)
+   2000: obj =  -6.891074820e+00 inf =   2.090e+03 (26407) 5
+Warning: basis matrix is ill-conditioned (cond = 5.53e+12)
+Warning: basis matrix is ill-conditioned (cond = 5.22e+12)
+Warning: numerical instability (primal simplex, phase I)
+   2500: obj =  -7.096143337e+00 inf =   1.652e+03 (24154) 6
+   3000: obj =  -7.241596222e+00 inf =   1.354e+03 (23638) 5
+Warning: numerical instability (primal simplex, phase I)
+Warning: numerical instability (primal simplex, phase I)
+   3500: obj =  -7.201160477e+00 inf =   1.250e+03 (22241) 7
+   4000: obj =  -7.198547843e+00 inf =   1.244e+03 (21421) 5
+Warning: numerical instability (primal simplex, phase I)
+   4500: obj =  -7.203541712e+00 inf =   1.091e+03 (14912) 6
+Warning: numerical instability (primal simplex, phase I)
+   5000: obj =  -7.329465441e+00 inf =   9.080e+02 (14402) 6
+   5500: obj =  -7.730948176e+00 inf =   4.297e+02 (13196) 4
+Warning: numerical instability (primal simplex, phase I)
+Warning: numerical instability (primal simplex, phase I)
+   6000: obj =  -7.747297122e+00 inf =   3.723e+02 (10749) 7
+Warning: numerical instability (primal simplex, phase I)
+Warning: numerical instability (primal simplex, phase I)
+Warning: numerical instability (primal simplex, phase I)
+   6500: obj =  -7.698547245e+00 inf =   2.642e+02 (6949) 8
+   7000: obj =  -7.698380964e+00 inf =   2.626e+02 (6338) 5
+   7500: obj =  -7.599012447e+00 inf =   2.558e+02 (5691) 5
+Warning: numerical instability (primal simplex, phase I)
+Warning: basis matrix is ill-conditioned (cond = 7.8e+12)
+Warning: numerical instability (primal simplex, phase I)
+Warning: basis matrix is ill-conditioned (cond = 7.8e+12)
+Warning: numerical instability (primal simplex, phase I)
+   8000: obj =  -7.490013159e+00 inf =   2.411e+02 (5109) 8
+Warning: numerical instability (primal simplex, phase I)
+Warning: numerical instability (primal simplex, phase I)
+Warning: numerical instability (primal simplex, phase I)
+   8340: obj =  -6.261046358e+00 inf =   9.389e-07 (0) 7
+Warning: numerical instability (primal simplex, phase II)
+   8440: obj =  -7.370726559e+00 inf =   1.016e-06 (0) 2
+*  8500: obj =  -8.164178107e+00 inf =   1.982e-06 (114)
+Warning: basis matrix is ill-conditioned (cond = 4.83e+12)
+Warning: numerical instability (primal simplex, phase II)
+Warning: basis matrix is ill-conditioned (cond = 4.83e+12)
+   8533: obj =  -9.105389451e+00 inf =   7.481e-06 (0) 2
+Warning: numerical instability (primal simplex, phase II)
+   8636: obj =  -1.024181301e+01 inf =   2.086e-06 (0) 2
+Warning: numerical instability (primal simplex, phase II)
+   8738: obj =  -1.175703457e+01 inf =   2.350e-06 (0) 2
+Warning: basis matrix is ill-conditioned (cond = 5.84e+12)
+Warning: numerical instability (primal simplex, phase II)
+Warning: basis matrix is ill-conditioned (cond = 5.84e+12)
+   8838: obj =  -1.234105379e+01 inf =   1.158e-05 (0) 2
+Warning: numerical instability (primal simplex, phase II)
+   8940: obj =  -1.368438538e+01 inf =   1.875e-04 (0) 2
+*  9000: obj =  -1.375901267e+01 inf =   1.052e-04 (40)
+Warning: numerical instability (primal simplex, phase II)
+   9042: obj =  -1.450817711e+01 inf =   1.159e-04 (0) 2
+*  9118: obj =  -1.500001275e+01 inf =   1.017e-04 (0)
+OPTIMAL LP SOLUTION FOUND
+Current log volume:  -0.31086066511
+all close!
+# LP Iteration:  10
+Final log volume: -0.310847913071
+weight test fails.
+solution
+[[ 0.3589 -0.6411 -0.3958  0.1823  0.2314  0.2108 -0.1269  0.2075 -0.2822
+  -0.4599 -0.0816  0.3174 -0.3185 -0.2768 -0.3655]
+ [ 0.055   0.6244 -0.3756  0.0218  0.0299  0.0263  0.0289  0.026  -0.2472
+  -0.3645 -0.0208  0.0472  0.2526 -0.1971 -0.2782]
+ [-0.0116  0.0273  0.6352 -0.0015 -0.003  -0.002   0.0064 -0.0024  0.4069
+  -0.3648  0.005  -0.0093  0.0144 -0.1843 -0.2716]
+ [-0.7935 -0.0521 -0.0877  0.1073  0.2066  0.1562  0.0357  0.16   -0.0403
+  -0.0706  0.0426 -0.5885  0.0025 -0.0151 -0.042 ]
+ [ 0.0358  0.0132  0.0242 -0.0086  0.7292 -0.2714 -0.0288  0.3799  0.0036
+   0.02   -0.0322  0.0156 -0.0128 -0.006   0.0066]
+ [ 0.0522  0.0483  0.0779 -0.5291  0.3012  0.4716 -0.1229  0.0963  0.0001
+   0.0778 -0.1334  0.0043 -0.0563 -0.0305  0.0216]
+ [-0.021  -0.1735 -0.2969 -0.0975 -0.0252 -0.0307  0.684  -0.015   0.0816
+  -0.3184  0.7062 -0.0177  0.3324  0.2466 -0.0222]
+ [-0.0012 -0.0106 -0.2287 -0.0016 -0.0094 -0.0057  0.3679  0.0536  0.328
+   0.1575  0.2868  0.0085  0.1518 -0.6622 -0.3362]
+ [ 0.0043  0.021  -0.3568  0.0015  0.0134  0.0054 -0.5548 -0.0896  0.4747
+  -0.0651 -0.185  -0.0137 -0.0782  0.3584  0.1912]
+ [ 0.0344  0.0129 -0.0161  0.0047  0.0649  0.0237  0.3179 -0.8485 -0.0024
+  -0.0025 -0.2081 -0.174  -0.2058 -0.0374 -0.0157]
+ [ 0.0002 -0.0428  0.0283  0.0019  0.0317  0.0048 -0.3235 -0.5773 -0.0099
+   0.0144  0.5063 -0.021   0.5234 -0.0274 -0.0328]
+ [-0.0705  0.0168 -0.0004 -0.0001  0.008  -0.0116  0.0551 -0.2749 -0.0021
+   0.0011 -0.0297  0.9152 -0.1659 -0.0118 -0.0077]
+ [-0.0146 -0.06   -0.0091 -0.0007 -0.0042  0.0009  0.0907  0.1563  0.0111
+  -0.0091 -0.6944  0.3166  0.5271 -0.0612  0.0172]
+ [-0.     -0.001   0.0021 -0.0001 -0.0006  0.0005 -0.0272  0.0606 -0.0315
+   0.0645 -0.1569  0.0163  0.0035  0.3392 -0.6868]
+ [ 1.      1.      1.      1.      1.      1.      1.      1.      1.
+   1.      1.      1.      1.      1.      1.    ]]
+=> Best simplex found with volume: 0.732825320547
+
+Optimization costs: 16.19 minutes
+solution simplex volumn:  0.7328
+recovered (15, 84)
+[[  1.     -0.      0.    ...   0.      0.      0.   ]
+ [  1.      0.     -0.    ...  -0.     -0.     -0.   ]
+ [  1.     -0.      0.    ...   0.      0.      0.   ]
+ ...
+ [  1.      0.     -0.    ...  -0.     -0.     -0.   ]
+ [  1.      0.     -0.    ... -27.455 -18.444 -33.917]
+ [  1.     -0.      0.    ... -30.667 -21.755 -55.683]]
+Minimum weight: -8.48426437716e-08
+Number of points with negative weights (< -1e-5): 0
+Number of points with negative weights (< -0.1): 0
+Number of points with negative weights (< -0.5): 0
+Number of points with negative weights (< -1): 0
+Saving recovered results to: ./results_mves/cow-15/result.txt

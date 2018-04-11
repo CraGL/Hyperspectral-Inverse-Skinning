@@ -68,6 +68,16 @@ namespace {
     	g_scene.poses[g_scene.pose_index].color_faces_with_weights(g_scene.W, indices);
     }
 
+	void save_scene(void *)
+	{
+		g_scene.save_scene();	
+	}
+
+	void load_scene(void *)
+	{
+		g_scene.load_scene();
+	}
+
 	struct RenderState
 	{
 		bool show_model = true;
@@ -300,7 +310,7 @@ namespace
 {
 void usage( const char* argv0 ) {
     std::cerr<<"Usage:"<<std::endl<<"    " << argv0 << " rest_pose.obj result.txt \
-    	[--shaders path/to/shaders]"<< std::endl;
+    	[--shaders path/to/shaders] [--scene scene.json]"<< std::endl;
     // exit(0) means success. Anything else means failure.
     exit(-1);
 }
@@ -324,6 +334,8 @@ void manual() {
 	s                       Save screenshot of the scene.
 	x						Export deformed mesh.
 	Z,z                     Snap to canonical view.
+	l                       Load the scene from setting file.
+	x						Export deformed mesh.
 	)";
 }
 }
@@ -339,16 +351,22 @@ int main(int argc, char * argv[])
 	
 	/// 1. processing input command.
 	vector<string> args( argv + 1, argv + argc );
+	string mesh_path = args.at(0);
+	string result_path = args.at(1);
 	
 	// Optional arguments.
 	get_optional_parameter( args, "--shaders", shader_path );
+	
+	const bool found_scene_path = get_optional_parameter( args, "--scene", g_scene.scene_path );	
+	if( !found_scene_path ) {
+		g_scene.scene_path = os_path_splitext( mesh_path ).first + ".json";
+	}
+	cout << "scene path: " << g_scene.scene_path << endl;
 		
 	// Positional arguments.
 	if( args.size() != 2 ) {
 	    std::cerr << "ERROR: Wrong number of arguments." << std::endl;
 	}
-	string mesh_path = args.at(0);
-	string result_path = args.at(1);
 	
 	g_scene.init_scene( mesh_path, result_path );
 	g_scene.show_pose(0);
@@ -457,6 +475,8 @@ int main(int argc, char * argv[])
 
     rebar.TwAddButton("save screenshot", save_screenshot_cb, nullptr, "key=s");
     rebar.TwAddButton("change colors", change_handle_colors, nullptr, "key=c");
+    rebar.TwAddButton("save scene", save_scene, nullptr, "key=e");
+    rebar.TwAddButton("load scene", load_scene, nullptr, "key=l");
         
 	/// 5. display
 	display( window );

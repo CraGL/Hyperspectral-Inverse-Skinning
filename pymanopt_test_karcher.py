@@ -233,14 +233,15 @@ def cost(X):
     return sum
 
 def callback( X ):
+	import web_gui.relay as relay
+	print( "callback:" )
 	if args.visualize == 'lines':
 		## p is the point on the line
 		## B is a one-column vector parallel to the line
+		relay.send_data( "lines" )
 		p,B = pB_from_X( X )
 		p = np.array( p ).ravel()
 		B = np.array( B ).ravel()
-		import web_gui.relay as relay
-		print( "callback:" )
 		all_data = []
 		for flat in flats:
 			dir = np.cross( flat[0][0], flat[0][1] )
@@ -252,9 +253,10 @@ def callback( X ):
 		relay.send_data( all_data )
 		# relay.send_data( [p.tolist(), B.tolist()] )
 		# from plot_visualization import draw_3d_line
-	# 	draw_3d_line( p, B )
-		# draw( [ ( point_on_flat, cross( ortho_dirs.T[0], ortho_dirs.T[1] ) ) for ortho_dirs, point_on_flat in flats ], ( p, B ) )
-
+	elif args.visualize == 'points':
+		relay.send_data( "points" )
+		pass
+		
 if args.manifold == 'graff':
     print( "Using manually computed gradient." )
     def gradient(X):
