@@ -881,7 +881,9 @@ def optimize_biquadratic( P, H, rest_vs, deformed_vs, x0, solve_for_rest_pose = 
 		Wgraff = Wgraff[:,:W.shape[1]]
 		return Wgraff
 	def W_from_graff( Wgraff ):
-		W = Wgraff[:-1] / Wgraff[-1:]
+		# W = Wgraff[:-1] / Wgraff[-1:]
+		W = Wgraff[:-1] / np.maximum(Wgraff[-1:], 1e-50) ##### I found a divide by zero error in one running test.
+
 		return W
 	
 	## Verify that we can unpack and re-pack shifted without changing anything.

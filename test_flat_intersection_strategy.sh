@@ -10,7 +10,7 @@ declare -a gt_models=("cylinder" "cube" "cheburashka" "wolf" "cow")
 declare -a wild_models=("cat-poses" "elephant-gallop" "horse-collapse" "chickenCrossing" "pdance")
 
 POSES_DIR="${MODEL_DIR}/${name}"
-for OUTPUT_DIR in "${RES_DIR}"/cat*
+for OUTPUT_DIR in "${RES_DIR}"/cylinder*
 do
 	test_dir=$(basename "${OUTPUT_DIR}")
 	SUF=`expr "$test_dir" : '.*\(-[0-9]*\)'` 
@@ -39,11 +39,12 @@ do
 
 		## B
 		FLAT_INTERSECTION_ARGS_B="--energy B --forced-init True --seed $SEED --CSV ${OUTPUT_DIR}/${test_dir}_b_${SEED}.csv --W-projection normalize --max-iter ${MAXITER} --f-eps 0 --handles ${H}"
-		python -u flat_intersection.py "${REST_POSE}" "${POSES_DIR}" ${FLAT_INTERSECTION_ARGS_B} 2>&1 | tee -i "${OUTPUT_DIR}"/flat_intersection_b.out
+		python3 -u flat_intersection.py "${REST_POSE}" "${POSES_DIR}" ${FLAT_INTERSECTION_ARGS_B} 2>&1 | tee -i "${OUTPUT_DIR}"/flat_intersection_b.out
  				
 		## IPCA 
 		FLAT_INTERSECTION_ARGS_IPCA="--energy ipca --seed $SEED --forced-init True --CSV ${OUTPUT_DIR}/${test_dir}_ipca_${SEED}.csv --W-projection normalize --max-iter ${MAXITER} --f-eps 0 --handles ${H}"
-		python -u flat_intersection.py "${REST_POSE}" "${POSES_DIR}" ${FLAT_INTERSECTION_ARGS_IPCA} 2>&1 | tee -i "${OUTPUT_DIR}"/flat_intersection_cayley.out	
+		python -u flat_intersection.py "${REST_POSE}" "${POSES_DIR}" ${FLAT_INTERSECTION_ARGS_IPCA} 2>&1 | tee -i "${OUTPUT_DIR}"/flat_intersection_ipca.out	
+
 	done
 echo
 done	

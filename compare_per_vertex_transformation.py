@@ -5,7 +5,7 @@ Written by Songrun Liu
 """
 
 from __future__ import print_function, division
-from recordclass import recordclass
+# from recordclass import recordclass
 
 import os
 import sys
@@ -39,28 +39,21 @@ if __name__ == '__main__':
 	rev_data = np.array([ format_loader.load_DMAT(transform_path).T for transform_path in rev_paths ])
 
 	
-	def compute_error( gt, data ):
-		error = []
-		for pose_gt, pose_data in zip(gt, data):
-			error.append( np.array([np.linalg.norm(pt_gt - pt_data) for pt_gt, pt_data in zip(pose_gt, pose_data)]) )
-		
-		## Divide this by the bounding sphere radius (or 1/2 the bounding box diagonal?)
-		## to get the error metric E_RMS from Kavan 2010.
-		E_RMS_kavan2010 = 1000*np.linalg.norm( gt.ravel() - data.ravel() )/np.sqrt(3*gt.shape[0]*gt.shape[1])
-		## We are assuming that `gt` is poses-by-#vertices-by-3.
-		assert len( gt.shape ) == 3
-		assert gt.shape[2] == 3
-		
-		return np.array(error), E_RMS_kavan2010
+	def transformation_matrix_error(gt, data):
+	    diff=abs(gt-data).ravel()
+	    rmse=np.sqrt(np.square(gt-data).sum()/len(gt.ravel()))
+	    return [max(diff), min(diff), np.median(diff), np.mean(diff), rmse]
+	    
 	
 	
 	print( "############################################" )
 	print( "Per-vertex transformation Error: " )
-	error = np.array([[np.linalg.norm(gt_pt - rev_pt) for gt_pt, rev_pt in zip(gt_pose, rev_pose)] for gt_pose, rev_pose in zip(gt_data, rev_data)])
-	print( "rev error: ", np.linalg.norm(error)/error.size )	
-	print( "max, mean and median per-vertex transformation error", np.max(error), np.mean(error), np.median(error) )
-# 	print( "SSD E_RMS_kavan2010: ", ssd_erms )
+	print( "max, min, median, mean and rmse per-vertex transformation error:")
+	errors=transformation_matrix_error(gt_data, rev_data)
+	print (errors)
 	print( "############################################" )
+
+
 	
 	import os, sys
 	output_dir = None

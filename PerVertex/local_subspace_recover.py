@@ -399,6 +399,31 @@ def transformation_matrix_error(gt, data):
     return [max(diff), min(diff), np.median(diff), np.mean(diff), rmse]
     
 
+
+def uncorrellated_space( data, threshold = 1e-6, H=None ):
+    X = data
+    ## Subtract the average.
+    Xavg = np.average( X, axis = 0 )[np.newaxis,:]
+    Xp = X - Xavg
+    U, s, V = np.linalg.svd( Xp, full_matrices = False, compute_uv = True )
+  
+    if H is None:
+        ## The first index less than threshold
+        stop_s = len(s) - searchsorted( s[::-1], threshold )
+    else:
+        stop_s=H
+
+    def restore( uncorrellated_data ):
+        return ( np.dot( uncorrellated_data, V[:stop_s] ) + Xavg )
+    
+    def project( correllated_data ):
+        return np.dot( correllated_data - Xavg, V[:stop_s].T)
+    
+    return project, restore
+
+
+
+
 if __name__ == '__main__':
     import argparse
     
@@ -461,6 +486,7 @@ if __name__ == '__main__':
     end_time = time.time()
     print( "... Finished generating transformations." )
     print( "Finding subspace intersection duration (minutes):", (end_time-start_time)/60 )
+
 
     if args.out is None:
         np.set_printoptions( precision = 24, linewidth = 2000 )
