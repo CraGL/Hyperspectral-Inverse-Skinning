@@ -113,7 +113,7 @@ class GeodesicDistanceComputation(object):
             + self._unit_normal_cross_e12 * u[self._tris[:,0]][:,np.newaxis]
             + self._unit_normal_cross_e20 * u[self._tris[:,1]][:,np.newaxis]
         )
-        X = - grad_u / veclen(grad_u)[:,np.newaxis]
+        X = - grad_u / (veclen(grad_u)[:,np.newaxis]+1e-50)
         # heat method step 3
         div_Xs = np.zeros(len(self._verts))
         for i1, i2, i3 in [(0, 1, 2), (1, 2, 0), (2, 0, 1)]: # for edge i2 --> i3 facing vertex i1

@@ -4,15 +4,15 @@ ROOT_DIR="../.."
 SSD_DIR="./SSD_unconstrained"
 MODEL_DIR="./models"
 # TEST_DIR="./results_songrun"
-TEST_DIR="./results_clean"
+TEST_DIR="./results_clean_nullspace_0"
 OBJ_SUFF=".obj"
-MAXITER=100
+MAXITER=10
 
 OUTPUT_FILE="${SSD_DIR}"/all_error.out
 
 # INITIAL_GUESS_ARGS="--svd_threshold 1e-15 --transformation_percentile 100 --version 0"
 # INITIAL_GUESS_ARGS="--svd_threshold 1e-15 --transformation_percentile 100 --version 1"
-INITIAL_GUESS_ARGS="--svd_threshold 1e-15 --transformation_percentile 100 --version 1 --method vertex"
+INITIAL_GUESS_ARGS="--svd_threshold 1e-15 --transformation_percentile 100 --version 0 --method nullspace"
 
 declare -a wild_models=("cat-poses" "elephant-gallop" "horse-collapse" "chickenCrossing" "pdance")
 declare -a gt_models=("cube" "cylinder" "cheburashka" "wolf" "cow")
