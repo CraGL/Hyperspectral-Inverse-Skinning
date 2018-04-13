@@ -37,6 +37,7 @@ class ErrorRecorder:
 	values = None
 	ground_truth = None
 	visualize = False
+	visualize_port = None
 	
 	def __init__(self):
 		self.values=[]
@@ -46,11 +47,11 @@ class ErrorRecorder:
 	def visualize_error( self, rev_vertex_trans ):
 		if H > 4: return None
 		import web_gui.relay as relay
-		relay.send_data( "points" )
+		relay.send_data( "points", port = self.visualize_port )
 		
 		from space_mapper import SpaceMapper
-# 		reduce_mapper = SpaceMapper.Uncorrellated_Space( rev_vertex_trans, dimension = 3 )
-		reduce_mapper = SpaceMapper.Uncorrellated_Space( rev_vertex_trans )
+		reduce_mapper = SpaceMapper.Uncorrellated_Space( rev_vertex_trans, dimension = 3 )
+		# reduce_mapper = SpaceMapper.Uncorrellated_Space( rev_vertex_trans )
 		reduced_data = reduce_mapper.project( rev_vertex_trans )
 		
 		## Apply rigid alignment.
@@ -61,7 +62,7 @@ class ErrorRecorder:
 			reduced_data = reduced_data.dot( R )
 		self.visualize_last = reduced_data
 		
-		relay.send_data( reduced_data.tolist() )
+		relay.send_data( reduced_data.tolist(), port = self.visualize_port )
 		
 	def add_error(self, data, enable_cayley = True):
 		P = self.P 
@@ -1521,6 +1522,7 @@ if __name__ == '__main__':
 	parser.add_argument('--subset', type=int, default=-1, help='random number of vertices')
 	parser.add_argument('--basinhopping', type=int, default=0, help='basinhopping algorithm to jump out of local minima with random step.')
 	parser.add_argument('--visualize', type=str2bool, default=False, help='visualize the optimization precedure, only works for 4 handles.')
+	parser.add_argument('--visualize-port', type=int, help='visualization relay server port.')
 	
 	args = parser.parse_args()
 	H = args.handles
@@ -1603,6 +1605,7 @@ if __name__ == '__main__':
 	error_recorder.csv_path = args.csv_path
 	error_recorder.ground_truth = args.ground_truth
 	error_recorder.visualize = args.visualize
+	error_recorder.visualize_port = args.visualize_port
 			
 	def solve_for_H( H, rest_vs, deformed_vs, all_R_mats ):
 		x = None
