@@ -899,7 +899,7 @@ def optimize_biquadratic( P, H, rest_vs, deformed_vs, x0, solve_for_rest_pose = 
 	def canonical_pB_diff( W0, W1 ):
 		p0, B0 = W_to_canonical_pB( W0 )
 		p1, B1 = W_to_canonical_pB( W1 )
-		pdiff = p0 - p1
+		pdiff = flat_metrics.distance_between_flats( p0, B0, p1, B1 )
 		cosangles = flat_metrics.principal_cosangles( B0, B1, orthonormal = False )
 		return pdiff, cosangles
 	
@@ -1088,14 +1088,14 @@ def optimize_biquadratic( P, H, rest_vs, deformed_vs, x0, solve_for_rest_pose = 
 			print( "cosine of principal angles of graff manifold:", graff_cosangles )
 			print( "| graff cos principal angles - 1 |", np.linalg.norm( graff_cosangles - 1. ) )
 			pdiff, B_cosangles = canonical_pB_diff( W_prev, W )
-			print( "magnitude of canonical p difference:", np.linalg.norm(pdiff) )
+			print( "flat distance:", pdiff )
 			print( "cosine of principal angles of B:", B_cosangles )
 			print( "| B cos principal angles - 1 |", np.linalg.norm( B_cosangles - 1. ) )
 			x_change = x_change_norm
 			if canonical == 'graff':
 				x_change = np.linalg.norm( graff_cosangles - 1. )
 			if canonical == 'pB':
-				x_change = np.linalg.norm(pdiff) + np.linalg.norm( B_cosangles - 1. )
+				x_change = pdiff + np.linalg.norm( B_cosangles - 1. )
 			if x_change < x_eps:
 				print( "Variables change too small, terminating:", x_change )
 				converged = True
