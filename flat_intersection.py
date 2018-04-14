@@ -871,8 +871,6 @@ def optimize_biquadratic( P, H, rest_vs, deformed_vs, x0, solve_for_rest_pose = 
 		B = W[:,1:] - pt
 		return pack( pt, B )
 	
-	canonical = False
-	
 	import flat_metrics
 	def W_to_graff( W ):
 		## Use a negative threshold so we get back all columns.
@@ -886,6 +884,39 @@ def optimize_biquadratic( P, H, rest_vs, deformed_vs, x0, solve_for_rest_pose = 
 		# W = Wgraff[:-1] / np.maximum(Wgraff[-1:], 1e-50) ##### I found a divide by zero error in one running test.
 
 		return W
+	
+	def W_to_canonical_pB( W ):
+		p = W[:,0:1]
+		B = W[:,1:] - p
+		## First orthonormalize
+		B = flat_metrics.orthonormalize( B, threshold = -1 )
+		## Then get canonical pt
+		p = flat_metrics.canonical_point( p, B )
+		return p, B
+	def canonical_pB_to_W( p, B ):
+		W = np.hstack((p,p+B))
+		return W
+	def canonical_pB_diff( W0, W1 ):
+		p0, B0 = W_to_canonical_pB( W0 )
+		p1, B1 = W_to_canonical_pB( W1 )
+		pdiff = p0 - p1
+		cosangles = flat_metrics.principal_cosangles( B0, B1, orthonormal = False )
+		return pdiff, cosangles
+	
+	#canonical = 'graff'
+	#canonical = 'pB'
+	canonical = None
+	
+	def canonicalize( W ):
+		if canonical is None:
+			return W
+		## Convert W to canonical form by converting in and out of the Graff manifold.
+		elif canonical == 'graff':
+			return W_from_graff( W_to_graff( W ) )
+		elif canonical == 'pB':
+			return canonical_pB_to_W( *W_to_canonical_pB( W ) )
+		else:
+			raise RuntimeError( "Unknown canonical type: %s" % canonical )
 	
 	## Verify that we can unpack and re-pack shifted without changing anything.
 	assert abs( pack_W( unpack_W( np.arange(36), 1 ) ) - np.arange(36) ).max() < 1e-10
@@ -937,8 +968,7 @@ def optimize_biquadratic( P, H, rest_vs, deformed_vs, x0, solve_for_rest_pose = 
 	f_prev = None
 	
 	W_prev = unpack_W( x0.copy(), P )
-	## Convert W to canonical form by converting in and out of the Graff manifold.
-	if canonical: W_prev = W_from_graff( W_to_graff( W_prev ) )
+	W_prev = canonicalize( W_prev )
 	
 	W = W_prev.copy() ## In case we terminate immediately.
 	iterations = 0
@@ -1023,9 +1053,7 @@ def optimize_biquadratic( P, H, rest_vs, deformed_vs, x0, solve_for_rest_pose = 
 			
 			## 4
 			W = biquadratic.solve_for_W_with_system( W_system, W_rhs, use_pseudoinverse = use_pseudoinverse, projection = W_projection, first_column = first_column )
-			
-			## Convert W to canonical form by converting in and out of the Graff manifold.
-			if canonical: W = W_from_graff( W_to_graff( W ) )
+			W = canonicalize( W )
 			
 			f *= normalization / weights
 			print( "Function value:", f )
@@ -1056,12 +1084,18 @@ def optimize_biquadratic( P, H, rest_vs, deformed_vs, x0, solve_for_rest_pose = 
 			x_change_max = abs( W_prev - W ).max()
 			print( "x change (norm):", x_change_norm )
 			print( "x change (max):", x_change_max )
-			cosangles = flat_metrics.principal_cosangles( W_to_graff( W_prev ), W_to_graff( W ), orthonormal = canonical )
-			print( "cosine of principal angles:", cosangles )
-			print( "| cos principal angles - 1 |", np.linalg.norm( cosangles - 1. ) )
+			graff_cosangles = flat_metrics.principal_cosangles( W_to_graff( W_prev ), W_to_graff( W ), orthonormal = canonical == 'graff' )
+			print( "cosine of principal angles of graff manifold:", graff_cosangles )
+			print( "| graff cos principal angles - 1 |", np.linalg.norm( graff_cosangles - 1. ) )
+			pdiff, B_cosangles = canonical_pB_diff( W_prev, W )
+			print( "magnitude of canonical p difference:", np.linalg.norm(pdiff) )
+			print( "cosine of principal angles of B:", B_cosangles )
+			print( "| B cos principal angles - 1 |", np.linalg.norm( B_cosangles - 1. ) )
 			x_change = x_change_norm
-			if canonical:
-				x_change = np.linalg.norm( cosangles - 1. )
+			if canonical == 'graff':
+				x_change = np.linalg.norm( graff_cosangles - 1. )
+			if canonical == 'pB':
+				x_change = np.linalg.norm(pdiff) + np.linalg.norm( B_cosangles - 1. )
 			if x_change < x_eps:
 				print( "Variables change too small, terminating:", x_change )
 				converged = True
