@@ -11,7 +11,7 @@ var draw_mode = "lines";
 // The setup code.
 window.onload = function() {
     init_3D();
-    // init_Widgets();
+    init_Widgets();
     init_socket();
     needs_redisplay();
     };
@@ -142,6 +142,24 @@ function init_controls( camera ) {
     // Namely, we do not call render() in our animate() function called
     // many times per second.
     controls.addEventListener( 'change', render );
+    
+    // Set up the inertial rotation checkbox.
+    // document.getElementById( 'intertia' ).addEventListener( 'change', function() { controls.staticMoving = !document.getElementById('intertia').checked; needs_redisplay(); } );
+    // document.getElementById( 'intertia' ).checked = !controls.staticMoving;
+    
+    document.getElementById( 'look_from_111' ).addEventListener( 'click', function() {
+        // First reset the controls (keep the current origin).
+        var origin = controls.target.clone();
+        controls.reset();
+        controls.target.copy( origin );
+        
+        var targetToCameraLength = camera.position.clone().sub( controls.target ).length();
+        
+        camera.position.set( 1, 1, 1 );
+        camera.position.sub( controls.target ).setLength( targetToCameraLength ).add( controls.target );
+        
+        needs_redisplay();
+        } );
 }
 
 function onWindowResize() {
@@ -174,10 +192,15 @@ function onDocumentMouseUp( event ) {
 }
 
 function needs_redisplay() {
-    requestAnimationFrame( function() {
-        render();
-        controls.update();
-        } );
+    requestAnimationFrame( animate );
+}
+
+function animate() {
+    if( !controls.staticMoving ) requestAnimationFrame( animate );
+    
+    controls.update();
+    // We have to split these because controls may call render() directly.
+    render();
 }
 
 function render() {
@@ -188,6 +211,8 @@ function render() {
 function init_Widgets()
 {
     // TODO: Fill this in for the GUI.
+    
+    /*
     
     $("#texture_map_URL").change( function() {
         // load_texture( $(this).val() );
@@ -296,14 +321,23 @@ function init_Widgets()
     $("#texture_map_URL_grid").click();
     // By default, use the circle OBJ.
     $("#obj_URL_circle").click();
+    */
 }
 
 
 async function init_socket()
 {
     socket = new WebSocketClient;
-    await socket.connect('ws://localhost:9876');
-    console.log( "Connected: ", socket.connected );
+    
+    // Socket from URL in modern JavaScript: https://stackoverflow.com/questions/979975/how-to-get-the-value-from-the-get-parameters
+    var url = new URL( window.location.href );
+    var port = 9876;
+    if( url.searchParams.has("port") ) {
+        port = parseInt( url.searchParams.get("port") );
+    }
+    
+    await socket.connect('ws://localhost:' + port);
+    console.log( "Connected on port " + port + ": ", socket.connected );
     
     // Call receive, which is an asynchronous function.
     receive();
