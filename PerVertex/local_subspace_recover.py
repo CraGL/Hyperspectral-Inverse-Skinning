@@ -527,7 +527,7 @@ if __name__ == '__main__':
         save_one( args.out, qs_to_save )
     elif args.transformation_percentile is not None:
         qs_to_save = qs[ smallest_singular_values>=args.svd_threshold ]
-        topN = int( len( qs_to_save )*args.transformation_percentile/100 )
+        topN = int( len( qs_to_save )*args.transformation_percentile/100.0 )
         qs_to_save = qs_to_save[ np.argsort( errors[ smallest_singular_values>=args.svd_threshold ] )[:topN], : ]
         print( "About to save qs with dimension:", qs_to_save.shape )
         save_one( args.out, qs_to_save )
