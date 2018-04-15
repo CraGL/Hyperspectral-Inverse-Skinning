@@ -79,6 +79,47 @@ def canonical_point( p, B ):
     # p_closest = p - B.dot( linalg.pinv( B.T.dot( B ) ).dot( B.T.dot(p) ) )
     return p_closest
 
+def distance_between_flats( p1, B1, p2, B2 ):
+    '''
+    Given:
+        p1: a point in R^n on flat 1.
+        B1: An orthonormal matrix whose columns are flat 1's directions in the ambient space R^n.
+        p2: a point in R^n on flat 2.
+        B2: An orthonormal matrix whose columns are flat 2's directions in the ambient space R^n.
+    Returns:
+        The Euclidean distance between flats.
+    '''
+    
+    p1 = asarray( p1 )
+    p2 = asarray( p2 )
+    
+    B1 = orthonormalize( B1 )
+    B2 = orthonormalize( B2 )
+    
+    def parallel_projector( B ):
+        # I = eye( B.shape[0] )
+        # P_Bortho = (I - dot( B, B.T ) )
+        
+        P_Bortho = -dot( B, B.T )
+        P_Bortho[ diag_indices_from( P_Bortho ) ] += 1
+        
+        return P_Bortho
+    
+    ## Code taken from pymanopt_test.py. There are two other methods there.
+    
+    ## The Anderson-Duffin formula
+    ## https://mathoverflow.net/questions/108177/intersection-of-subspaces
+    P_B1ortho = parallel_projector( B1 )
+    P_B2ortho = parallel_projector( B2 )
+    ## Is the pseudoinverse necessary?
+    # mr = np.linalg.matrix_rank( P_Bortho + P_Aortho )
+    # if mr < P_Bortho.shape[0]:
+    #    print( "Matrix not full rank! We should be using pseudoinverse. (%s instead of %s)" % ( mr, P_Bortho.shape[0] ) )
+    orthogonal_to_B1_and_B2 = dot( 2.*P_B1ortho, dot( linalg.pinv( P_B1ortho + P_B2ortho ), P_B2ortho ) )
+    
+    d = orthogonal_to_B1_and_B2.dot( p1 - p2 )
+    return linalg.norm(d)
+
 def optimal_p_given_B_for_flats_ortho( B, flats ):
     '''
     Given:
@@ -193,6 +234,42 @@ def test_orthonormalize():
 def test_canonical_point():
     p_closest = canonical_point( [1,1,0], array([[1,0,0],[0,1,0]]).T )
     numpy.testing.assert_allclose( p_closest, zeros(3) )
+
+def test_distance_between_flats():
+    ## Two points one unit apart
+    p1 = [ 0,0,0 ]
+    p2 = [ 1,0,0 ]
+    
+    ## One flat has a parallel direction between the points.
+    B1 = array([[ 1,0,0 ]]).T
+    B2 = array([[ 0,0,1 ]]).T
+    
+    d = distance_between_flats( p1, B1, p2, B2 )
+    numpy.testing.assert_allclose( d, 0 )
+    
+    
+    ## Two points one unit apart
+    p1 = [ 0,0,0 ]
+    p2 = [ 1,0,0 ]
+    
+    ## Flats have perpendicular direction to the vector between them.
+    B1 = array([[ 0,1,0 ], [ 0,0,1 ]]).T
+    B2 = array([[ 0,0,1 ]]).T
+    
+    d = distance_between_flats( p1, B1, p2, B2 )
+    numpy.testing.assert_allclose( d, 1 )
+    
+    
+    ## Two points zero unit apart
+    p1 = [ 0,0,0 ]
+    p2 = [ 0,0,0 ]
+    
+    ## Flats have perpendicular direction to the vector between them.
+    B1 = array([[ 0,1,0 ], [ 0,0,1 ]]).T
+    B2 = array([[ 0,0,1 ]]).T
+    
+    d = distance_between_flats( p1, B1, p2, B2 )
+    numpy.testing.assert_allclose( d, 0 )
 
 def test_optimal_p_given_B_for_flats_ortho():
     dim = 5

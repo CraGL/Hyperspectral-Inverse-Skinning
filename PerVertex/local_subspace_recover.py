@@ -399,6 +399,31 @@ def transformation_matrix_error(gt, data):
     return [max(diff), min(diff), np.median(diff), np.mean(diff), rmse]
     
 
+
+def uncorrellated_space( data, threshold = 1e-6, H=None ):
+    X = data
+    ## Subtract the average.
+    Xavg = np.average( X, axis = 0 )[np.newaxis,:]
+    Xp = X - Xavg
+    U, s, V = np.linalg.svd( Xp, full_matrices = False, compute_uv = True )
+  
+    if H is None:
+        ## The first index less than threshold
+        stop_s = len(s) - searchsorted( s[::-1], threshold )
+    else:
+        stop_s=H
+
+    def restore( uncorrellated_data ):
+        return ( np.dot( uncorrellated_data, V[:stop_s] ) + Xavg )
+    
+    def project( correllated_data ):
+        return np.dot( correllated_data - Xavg, V[:stop_s].T)
+    
+    return project, restore
+
+
+
+
 if __name__ == '__main__':
     import argparse
     
@@ -417,7 +442,7 @@ if __name__ == '__main__':
     parser.add_argument( '--out-errors', type=str, help='Path to store the resulting cost.' )
     parser.add_argument( '--out-ssv', type=str, help='Path to store the smallest singular values.' )
     
-    parser.add_argument( '--random-sample-method', '-rand', type=str, help=""" 'none' means one ring subspace intersection, others are 'euclidian', 'geodesic', 'precomputed-geodesic' """)
+    parser.add_argument( '--random-sample-method', '-rand', default="none", type=str, help=""" 'none' means one ring subspace intersection, others are 'euclidian', 'geodesic', 'precomputed-geodesic' """)
     parser.add_argument( '--subset-size', '-ssize', type=int, default=48, help='should smaller than 100, because search range is defalut to be 100' )
     parser.add_argument( '--precomputed-geodesic-distance-path', '-pre', type=str, help='Path to store the precomputed geodesic pairwise distance.' )
     parser.add_argument( '--save-dmat', '-dmat', type=str, help='save transformations as dmat' )
@@ -462,6 +487,7 @@ if __name__ == '__main__':
     print( "... Finished generating transformations." )
     print( "Finding subspace intersection duration (minutes):", (end_time-start_time)/60 )
 
+
     if args.out is None:
         np.set_printoptions( precision = 24, linewidth = 2000 )
         def save_one( path, M ):
@@ -501,7 +527,7 @@ if __name__ == '__main__':
         save_one( args.out, qs_to_save )
     elif args.transformation_percentile is not None:
         qs_to_save = qs[ smallest_singular_values>=args.svd_threshold ]
-        topN = int( len( qs_to_save )*args.transformation_percentile/100 )
+        topN = int( len( qs_to_save )*args.transformation_percentile/100.0 )
         qs_to_save = qs_to_save[ np.argsort( errors[ smallest_singular_values>=args.svd_threshold ] )[:topN], : ]
         print( "About to save qs with dimension:", qs_to_save.shape )
         save_one( args.out, qs_to_save )

@@ -63,8 +63,7 @@ if __name__ == '__main__':
 		if name == '':	name = folder.split(os.sep)[-2]
 		data_file_biquadratic = os.path.join( folder, name+'_biquadratic.csv' )
 		data_file_b = os.path.join( folder, name+'_b.csv' )
-		data_file_cayley = os.path.join( folder, name+'_cayley.csv' )
+		data_file_cayley = os.path.join( folder, name+'_pymanopt_b.csv' )
 		data_file_ipca = os.path.join( folder, name+'_ipca.csv' )
-		# data_file_hop = os.path.join( folder, name+'_basinhopping.csv' )
 		all_data[name] = [np.loadtxt(data_file_biquadratic, delimiter=','), np.loadtxt(data_file_b, delimiter=','), np.loadtxt(data_file_cayley, delimiter=','), np.loadtxt(data_file_ipca, delimiter=','), np.loadtxt(data_file_hop, delimiter=',')[:21]]
 	plot(all_data)
