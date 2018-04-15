@@ -4,7 +4,7 @@ ROOT_DIR="../.."
 SSD_DIR="./SSD_unconstrained"
 MODEL_DIR="./models"
 # TEST_DIR="./results_songrun"
-TEST_DIR="./results_clean_vertex_0_copy"
+TEST_DIR="./results_clean_with_initials"
 OBJ_SUFF=".obj"
 MAXITER=10
 
@@ -34,9 +34,10 @@ for name in "${gt_models[@]}"; do
 		# FLAT_INTERSECTION_ARGS="--energy biquadratic --max-iter ${MAXITER} --handles ${H} --f-eps 0 --strategy pinv+ssv:weighted --forced-init True"
 		# python3 -u flat_intersection.py "${MODEL_DIR}"/"${REST_POSE}" "${POSES_DIR}" ${FLAT_INTERSECTION_ARGS} 2>&1 | tee -i "${OUTPUT_DIR}"/flat_intersection.out
 		
-		for initial_method in "none" "euclidian" "geodesic"; do	
+		### "none" means "one-ring"
+		for initial_method in "none"
+		do	
  	
-			
 			### not save dmat, because conflict with flat_intersection saved dmat
 			python -u PerVertex/local_subspace_recover.py ${INITIAL_GUESS_ARGS} "${MODEL_DIR}"/"${REST_POSE}" "${POSES_DIR}"/*.obj -rand $initial_method -o "${OUTPUT_DIR}"/local_subspace_recover_${initial_method}.txt 2>&1 | tee "${OUTPUT_DIR}"/local_subspace_recover-${initial_method}.out
 

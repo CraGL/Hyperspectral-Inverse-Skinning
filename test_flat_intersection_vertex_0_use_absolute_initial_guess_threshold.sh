@@ -4,19 +4,16 @@ ROOT_DIR="../.."
 SSD_DIR="./SSD_unconstrained"
 MODEL_DIR="./models"
 # TEST_DIR="./results_songrun"
-TEST_DIR="./results_clean_vertex_0_copy"
+TEST_DIR="./results_clean_vertex_0_use_absolute_initial_guess_threshold"
 OBJ_SUFF=".obj"
 MAXITER=10
 
 OUTPUT_FILE="${SSD_DIR}"/all_error.out
 
-# INITIAL_GUESS_ARGS="--svd_threshold 1e-15 --transformation_percentile 100 --version 0"
-# INITIAL_GUESS_ARGS="--svd_threshold 1e-15 --transformation_percentile 100 --version 1"
-INITIAL_GUESS_ARGS="--svd_threshold 1e-15 --transformation_percentile 50 --version 0 --method vertex"
+INITIAL_GUESS_ARGS="--svd_threshold 1e-15 --transformation_threshold 1e-4 --version 0 --method vertex"
 
 declare -a wild_models=("cat-poses" "elephant-gallop" "horse-collapse" "chickenCrossing" "pdance")
 declare -a gt_models=("cube" "cylinder" "cheburashka" "wolf" "cow")
-# declare -a gt_models=("wolf")
 
 
 echo -n "" > "${OUTPUT_FILE}"
@@ -34,7 +31,7 @@ for name in "${gt_models[@]}"; do
 		# FLAT_INTERSECTION_ARGS="--energy biquadratic --max-iter ${MAXITER} --handles ${H} --f-eps 0 --strategy pinv+ssv:weighted --forced-init True"
 		# python3 -u flat_intersection.py "${MODEL_DIR}"/"${REST_POSE}" "${POSES_DIR}" ${FLAT_INTERSECTION_ARGS} 2>&1 | tee -i "${OUTPUT_DIR}"/flat_intersection.out
 		
-		for initial_method in "none" "euclidian" "geodesic"; do	
+		for initial_method in "none"; do	
  	
 			
 			### not save dmat, because conflict with flat_intersection saved dmat

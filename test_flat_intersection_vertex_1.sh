@@ -12,7 +12,7 @@ OUTPUT_FILE="${SSD_DIR}"/all_error.out
 
 # INITIAL_GUESS_ARGS="--svd_threshold 1e-15 --transformation_percentile 100 --version 0"
 # INITIAL_GUESS_ARGS="--svd_threshold 1e-15 --transformation_percentile 100 --version 1"
-INITIAL_GUESS_ARGS="--svd_threshold 1e-15 --transformation_percentile 10 --version 1 --method vertex"
+INITIAL_GUESS_ARGS="--svd_threshold 1e-15 --transformation_percentile 50 --version 1 --method vertex"
 
 declare -a wild_models=("cat-poses" "elephant-gallop" "horse-collapse" "chickenCrossing" "pdance")
 declare -a gt_models=("cube" "cylinder" "cheburashka" "wolf" "cow")
@@ -38,7 +38,7 @@ for name in "${gt_models[@]}"; do
 
 			
 			### not save dmat, because conflict with flat_intersection saved dmat
-			python2 -u PerVertex/local_subspace_recover.py ${INITIAL_GUESS_ARGS} "${MODEL_DIR}"/"${REST_POSE}" "${POSES_DIR}"/*.obj -rand $initial_method -o "${OUTPUT_DIR}"/local_subspace_recover_${initial_method}.txt 2>&1 | tee "${OUTPUT_DIR}"/local_subspace_recover-${initial_method}.out
+			python -u PerVertex/local_subspace_recover.py ${INITIAL_GUESS_ARGS} "${MODEL_DIR}"/"${REST_POSE}" "${POSES_DIR}"/*.obj -rand $initial_method -o "${OUTPUT_DIR}"/local_subspace_recover_${initial_method}.txt 2>&1 | tee "${OUTPUT_DIR}"/local_subspace_recover-${initial_method}.out
 
             ### save dmat for initial guess and save dmat for flat_intersection.
 			# python2 -u PerVertex/local_subspace_recover.py ${INITIAL_GUESS_ARGS} "${MODEL_DIR}"/"${REST_POSE}" "${POSES_DIR}"/*.obj -rand $initial_method -o "${OUTPUT_DIR}"/local_subspace_recover_${initial_method}.txt --save-dmat "${OUTPUT_DIR}" 2>&1 | tee "${OUTPUT_DIR}"/local_subspace_recover-${initial_method}.out

@@ -12,7 +12,7 @@ OUTPUT_FILE="${SSD_DIR}"/all_error.out
 
 # INITIAL_GUESS_ARGS="--svd_threshold 1e-15 --transformation_percentile 100 --version 0"
 # INITIAL_GUESS_ARGS="--svd_threshold 1e-15 --transformation_percentile 100 --version 1"
-INITIAL_GUESS_ARGS="--svd_threshold 1e-15 --transformation_percentile 100 --version 0 --method nullspace"
+INITIAL_GUESS_ARGS="--svd_threshold 1e-15 --transformation_percentile 10 --version 0 --method nullspace"
 
 declare -a wild_models=("cat-poses" "elephant-gallop" "horse-collapse" "chickenCrossing" "pdance")
 declare -a gt_models=("cube" "cylinder" "cheburashka" "wolf" "cow")
