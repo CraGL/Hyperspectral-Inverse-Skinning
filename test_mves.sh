@@ -3,9 +3,12 @@
 ROOT_DIR="../.."
 SSD_DIR="./SSD_unconstrained"
 MODEL_DIR="./models"
+POSE_DIR="./models"
+# POSE_DIR="./results_clean"
+# TEST_DIR="./results_mves_recovered"
 TEST_DIR="./results_mves"
 OBJ_SUFF=".obj"
-MAX_ITER=20
+MAX_ITER=5
 
 
 # OUTPUT_FILE="${SSD_DIR}"/all_error.out
@@ -26,16 +29,17 @@ for name in "${gt_models[@]}"; do
 		## unmixing ground truth per-vertex transformations
 		OUTPUT="${OUTPUT_DIR}/result.txt"
 		SIMPLEX_HULL_ARGS="--max-iter ${MAX_ITER} -O ${OUTPUT}"
-# 		python -u simplex_hull.py "${MODEL_DIR}"/${name} ${SIMPLEX_HULL_ARGS} 2>&1 | tee -i "${OUTPUT_DIR}"/simplex_hull.out
+# 		echo python -u simplex_hull.py "${POSE_DIR}"/${name} ${SIMPLEX_HULL_ARGS} 2>&1 | tee -i "${OUTPUT_DIR}"/simplex_hull.out
+#  		python -u simplex_hull.py "${POSE_DIR}"/${name} ${SIMPLEX_HULL_ARGS} 2>&1 | tee -i "${OUTPUT_DIR}"/simplex_hull.out
 
 		## measure differences with ground truth
 		RECOVER_POSES_OUTPUT="${OUTPUT_DIR}/recover_poses.out"
-		python -u ./compare.py "${REST_POSE}" "${MODEL_DIR}"/"${name}" "${MODEL_DIR}"/"${name}"-all/"${name}".DMAT "${OUTPUT}" 2>&1 | tee -a "${RECOVER_POSES_OUTPUT}"
+# 		python -u ./compare.py "${REST_POSE}" "${MODEL_DIR}"/"${name}" "${MODEL_DIR}"/"${name}"-all/"${name}".DMAT "${OUTPUT}" 2>&1 | tee -a "${RECOVER_POSES_OUTPUT}"
 		
 		## view recovered bones
 		cd build
 # 		echo ./viewer2 "../${REST_POSE}" "../${OUTPUT}"
-#		./viewer2 "../${REST_POSE}" "../${OUTPUT}"
+		./viewer2 "../${REST_POSE}" "../${OUTPUT}"
 		cd ..
 	done	
 done

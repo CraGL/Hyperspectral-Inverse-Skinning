@@ -82,3 +82,41 @@ Reconstruction Mesh Error:
 rev: max, mean and median per-vertex distance 2.18492747778e-07 4.22986614208e-08 2.3570225844e-08
 Our E_RMS_kavan2010:  7.04376507412e-05
 ############################################
+match order of our recovery:  [0 1 2 3]
+############################################
+Per-bone transformation Error: 
+rev error:  2.85428161757e-05
+############################################
+Weight Error: 
+rev error:  0.000235558563422
+
+gt  average sparsity (1e-5 threshold): 1.89791937581
+ssd average sparsity (1e-5 threshold): 4.0
+rev average sparsity (1e-5 threshold): 0.360858257477
+gt  average sparsity (0.1 threshold): 2.62808842653
+ssd average sparsity (0.1 threshold): 4.0
+rev average sparsity (0.1 threshold): 2.62678803641
+############################################
+Reconstruction Mesh Error: 
+rev: max, mean and median per-vertex distance 2.18492747778e-07 4.22986614208e-08 2.3570225844e-08
+Our E_RMS_kavan2010:  7.04376507412e-05
+############################################
+match order of our recovery:  [0 1 2 3]
+############################################
+Per-bone transformation Error: 
+rev error:  2.85428161757e-05
+############################################
+Weight Error: 
+rev error:  0.000235558563422
+
+gt  average sparsity (1e-5 threshold): 1.89791937581
+ssd average sparsity (1e-5 threshold): 4.0
+rev average sparsity (1e-5 threshold): 0.360858257477
+gt  average sparsity (0.1 threshold): 2.62808842653
+ssd average sparsity (0.1 threshold): 4.0
+rev average sparsity (0.1 threshold): 2.62678803641
+############################################
+Reconstruction Mesh Error: 
+rev: max, mean and median per-vertex distance 2.18492747778e-07 4.22986614208e-08 2.3570225844e-08
+Our E_RMS_kavan2010:  7.04376507412e-05
+############################################

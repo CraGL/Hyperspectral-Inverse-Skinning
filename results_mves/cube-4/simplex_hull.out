@@ -2,8 +2,13 @@ Using our gradient functions, not automatic finite differencing ones.
 uncorrelated data shape
 (1538, 3)
 All pts #:  1538
-inital volume: -0.122478618357
-inital log volume: 2.09981880825
+initial guess (points are columns):
+[[ 1.4784 -0.5352 -0.5352 -0.5352]
+ [-0.3015  1.7122 -0.3015 -0.3015]
+ [-0.3996 -0.3996  1.614  -0.3996]
+ [ 1.      1.      1.      1.    ]]
+initial volume: -0.122478618357
+initial log volume: 2.09981880825
 Solve MEVS with cvxopt ip solver.
 GLPK Simplex Optimizer, v4.61
 6156 rows, 16 columns, 24624 non-zeros

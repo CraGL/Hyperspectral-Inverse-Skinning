@@ -4,10 +4,10 @@ ROOT_DIR="../.."
 MODEL_DIR="./models"
 RES_DIR="./results-no-init"
 OBJ_SUFF=".obj"
-MAXITER=100
+MAXITER=2
 
-# declare -a gt_models=("cylinder" "cube" "cheburashka" "wolf" "cow")
-declare -a gt_models=("cylinder")
+declare -a gt_models=("cylinder" "cube" "cheburashka" "wolf" "cow")
+# declare -a gt_models=("cube")
 
 # for REST_POSE in $(basename "${MODEL_DIR}"/cyli*.obj); do
 # 	REST_POSE="${name}.obj"
