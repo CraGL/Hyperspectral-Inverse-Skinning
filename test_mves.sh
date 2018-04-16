@@ -13,8 +13,8 @@ MAX_ITER=5
 
 # OUTPUT_FILE="${SSD_DIR}"/all_error.out
 
-declare -a gt_models=("cylinder" "cube" "cheburashka" "wolf" "cow")
-# declare -a gt_models=("cylinder")
+# declare -a gt_models=("cylinder" "cube" "cheburashka" "wolf" "cow")
+declare -a gt_models=("wolf")
 
 # echo -n "" > "${OUTPUT_FILE}"
 for name in "${gt_models[@]}"; do
@@ -34,12 +34,12 @@ for name in "${gt_models[@]}"; do
 
 		## measure differences with ground truth
 		RECOVER_POSES_OUTPUT="${OUTPUT_DIR}/recover_poses.out"
-# 		python -u ./compare.py "${REST_POSE}" "${MODEL_DIR}"/"${name}" "${MODEL_DIR}"/"${name}"-all/"${name}".DMAT "${OUTPUT}" 2>&1 | tee -a "${RECOVER_POSES_OUTPUT}"
+		python -u ./compare.py "${REST_POSE}" "${MODEL_DIR}"/"${name}" "${MODEL_DIR}"/"${name}"-all/"${name}".DMAT "${OUTPUT}" 2>&1 | tee -a "${RECOVER_POSES_OUTPUT}"
 		
 		## view recovered bones
 		cd build
 # 		echo ./viewer2 "../${REST_POSE}" "../${OUTPUT}"
-		./viewer2 "../${REST_POSE}" "../${OUTPUT}"
+# 		./viewer2 "../${REST_POSE}" "../${OUTPUT}"
 		cd ..
 	done	
 done

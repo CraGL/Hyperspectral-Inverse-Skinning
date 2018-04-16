@@ -10,7 +10,7 @@ MAXITER=10
 
 OUTPUT_FILE="${SSD_DIR}"/all_error.out
 
-declare -a wild_models=("cat-poses" "elephant-gallop" "horse-collapse" "chickenCrossing" "pdance")
+declare -a wild_models=("cat-poses" "elephant-gallop" "horse-collapse" "lion-poses" "pdance")
 declare -a gt_models=("cube" "cylinder" "cheburashka" "wolf" "cow")
 # declare -a gt_models=("cylinder")
 
