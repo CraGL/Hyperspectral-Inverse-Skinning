@@ -32,6 +32,8 @@ parser.add_argument('--flats-are-vertices', type=str2bool, default = False, help
 parser.add_argument('--visualize', type=str, choices = ['lines', 'points', 'none'], help ='Whether to visualize `lines` in 3D, `points` in 4D, or `none`.')
 parser.add_argument('--recovery', type=float, help ='Recovery test magnitude.')
 parser.add_argument('--number', type=int, help ='Number of given vertices.')
+parser.add_argument('--numerical-gradient', type=str2bool, default = False, help ='If true, compute gradients numerically.')
+parser.add_argument('--pinv', type=str2bool, default = False, help ='If true, use the pseudoinverse.')
 args = parser.parse_args()
 
 ## Print the arguments.
@@ -162,6 +164,8 @@ print( "use optimization to improve the centroid:", args.optimize_from )
 print( "improve the centroid guess with the optimal p:", args.centroid_best_p )
 print( "load optimization initial guess from a file:", args.load )
 print( "test data:", args.test_data )
+print( "numerical gradient:", args.numerical_gradient )
+print( "use pseudoinverse:", args.pinv )
 print( "mean:", args.mean )
 print( "manifold:", args.manifold )
 print( "optimization cost function:", "simple" )
@@ -172,6 +176,36 @@ def repeated_block_diag_times_matrix( block, matrix ):
     # return scipy.sparse.block_diag( [ block ]*( matrix.shape[0]//block.shape[1] ) ).dot( matrix )
     # print( abs( scipy.sparse.block_diag( [ block ]*( matrix.shape[0]//block.shape[1] ) ).dot( matrix ) - numpy.dot( block, matrix.reshape( block.shape[1], -1, order='F' ) ).reshape( -1, matrix.shape[1], order='F' ) ).max() )
     return np.dot( block, matrix.reshape( block.shape[1], -1, order='F' ) ).reshape( -1, matrix.shape[1], order='F' )
+
+# transpose by swapping last two dimensions
+if args.pinv:
+    def T(x): return np.swapaxes(x, -1, -2)
+    def grad_pinv(ans, x):
+        dot = np.dot if ans.ndim == 2 else partial(np.einsum, '...ij,...jk->...ik')
+        # https://mathoverflow.net/questions/25778/analytical-formula-for-numerical-derivative-of-the-matrix-pseudo-inverse
+        return lambda g: (
+            -dot(dot(ans, g), ans)
+            + dot(dot(dot( ans, T(ans) ), T(g) ), np.eye(x.shape[0]) - dot(x,ans))
+            + dot(dot(dot( np.eye(ans.shape[0]) - dot(ans,x), T(g) ), T(ans) ), ans )
+            )
+    import autograd.extend
+    autograd.extend.defvjp(np.linalg.pinv, grad_pinv)
+    
+    ## It is correct.
+    def test_pinv():
+        import scipy.optimize
+        foo = 5
+        Xrand = np.random.random((foo,foo))
+        def cost( x ): return np.linalg.pinv( x ).sum()
+        from autograd import grad
+        Gp = scipy.optimize.approx_fprime( Xrand.ravel(), lambda x: cost(x.reshape(foo,foo)), 1e-7 )
+        Ga = grad( cost )(Xrand).ravel()
+        grad_err = scipy.optimize.check_grad( lambda x: cost(x.reshape(foo,foo)), lambda x: grad( cost )(x.reshape(foo,foo)).T.ravel(), Xrand.ravel() )
+        print( "Autograd gradient error:", grad_err )
+    # test_pinv()
+
+myinverse = np.linalg.inv
+if args.pinv: myinverse = np.linalg.pinv
 
 # (2) Define the cost function (here using autograd.numpy)
 def cost(X):
@@ -211,12 +245,12 @@ def cost(X):
         AB = Adot( B )
         
         if args.manifold in ('pB','ssB'):
-            z = np.dot( np.linalg.inv( np.dot( AB.T, AB ) ), -np.dot( AB.T, Adot( p - a ) ) )
+            z = np.dot( myinverse( np.dot( AB.T, AB ) ), -np.dot( AB.T, Adot( p - a ) ) )
             diff = Adot( p + np.dot( B, z ) - a )
         elif args.manifold == 'graff':
             ## Impose the z sum-to-one constraint via a large penalty.
             z = np.dot(
-                    np.linalg.inv( np.dot( AB.T, AB ) + weight_affine * Qaffine ),
+                    myinverse( np.dot( AB.T, AB ) + weight_affine * Qaffine ),
                     np.dot( AB.T, Adot( a ) ) + weight_affine * RHSaffine
                     )
             diff = Adot( np.dot( B, z ) - a )
@@ -256,9 +290,30 @@ def callback( X ):
 	elif args.visualize == 'points':
 		relay.send_data( "points" )
 		pass
-		
-if args.manifold == 'graff':
+
+if args.numerical_gradient:
+    print( "Using numerical gradient." )
+    import scipy.optimize
+    def gradient(X):
+        p, B = X
+        x = np.concatenate( ( p.ravel(), B.ravel() ) )
+        def cost_wrapper( x ):
+            X = [ x[:len(p.ravel())].reshape( *p.shape ), x[len(p.ravel()):].reshape( *B.shape ) ]
+            return cost( X )
+        return scipy.optimize.approx_fprime( x, cost_wrapper, 1e-7 )
+    import hessian
+    def hess(X):
+        p, B = X
+        x = concatenate( ( p.ravel(), B.ravel() ) )
+        def cost_wrapper( x ):
+            X = [ x[:len(p.ravel())].reshape( *p.shape ), x[len(p.ravel()):].reshape( *B.shape ) ]
+            return cost( X )
+        return hessian.hessian( x, f = cost_wrapper, epsilon = 1e-7 )
+    problem = Problem(manifold=manifold, cost=cost, egrad=gradient) #, ehess=hess)
+elif args.manifold == 'graff':
     print( "Using manually computed gradient." )
+    ## My manual gradient is incompatible with pinv()
+    assert not args.pinv
     def gradient(X):
         B = X[:-1]
         weight_affine = 1e3
@@ -289,7 +344,7 @@ if args.manifold == 'graff':
             AtAB = ATdot( AB )
             
             ## Impose the z sum-to-one constraint via a large penalty.
-            Sinv = np.linalg.inv( np.dot( AB.T, AB ) + weight_affine * Qaffine )
+            Sinv = myinverse( np.dot( AB.T, AB ) + weight_affine * Qaffine )
             R = np.dot( AB.T, Aa ) + weight_affine * RHSaffine
             # R' Sinv
             RtS = np.dot( R.T, Sinv )
@@ -329,14 +384,14 @@ if args.manifold == 'graff':
         print( "Manual gradient error:", grad_err )
         from autograd import grad
         print( "max |Autograd - manual gradient|:", np.abs( grad( cost )( Xrand ) - gradient( Xrand ) ).max() )
-    problem = Problem(manifold=manifold, cost=cost, grad=gradient)
+    problem = Problem(manifold=manifold, cost=cost, egrad=gradient)
     '''
     def hessian_product(x,v):
         import hessian
         H = hessian.hessian2D( x, grad = gradient )
         return np.tensordot( H, v, np.ndim(v) )
     # problem = Problem(manifold=manifold, cost=cost, grad=gradient, hess=lambda x, v: autograd.jacobian( gradient )(x).dot(v))
-    problem = Problem(manifold=manifold, cost=cost, grad=gradient, hess=hessian_product)
+    problem = Problem(manifold=manifold, cost=cost, egrad=gradient, ehess=hessian_product)
     '''
 else:
     problem = Problem(manifold=manifold, cost=cost)
@@ -448,7 +503,10 @@ if args.optimize_from is not None or args.load is not None:
         Xopt2 = solver.solve(problem, x=Xopt)
     elif args.optimize_from == 'random':
         print( "Optimizing from random with the simple original cost function." )
-        Xopt2 = solver.solve(problem, callback=callback)
+        if args.optimize_solver == 'trust':
+            Xopt2 = solver.solve(problem, callback=callback)
+        else:
+            Xopt2 = solver.solve(problem)
     else:
         raise RuntimeError( "Unknown --optimize-from parameter: %s" % args.optimize_from )
     print( "Final cost:", cost( Xopt2 ) )
