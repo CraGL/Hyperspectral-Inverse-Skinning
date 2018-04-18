@@ -469,7 +469,10 @@ if args.optimize_from is not None or args.load is not None:
     if args.optimize_solver == 'trust':
         solver = TrustRegions()
     elif args.optimize_solver == 'conjugate':
-        solver = ConjugateGradient()
+        # solver = ConjugateGradient()
+        print ("########### Now we use max iteration 20, for plot data!")
+        solver = ConjugateGradient(maxiter=21)
+
     elif args.optimize_solver == 'steepest':
         solver = SteepestDescent()
     elif args.optimize_solver == 'particle':
@@ -497,6 +500,7 @@ if args.optimize_from is not None or args.load is not None:
         
         print( "Optimizing the initial guess with the simple original cost function." )
         Xopt2 = solver.solve(problem, x=Xopt)
+
         
     elif args.optimize_from == 'centroid':
         print( "Optimizing the Karcher mean with the simple original cost function." )
@@ -510,7 +514,7 @@ if args.optimize_from is not None or args.load is not None:
     else:
         raise RuntimeError( "Unknown --optimize-from parameter: %s" % args.optimize_from )
     print( "Final cost:", cost( Xopt2 ) )
-    
+
     p2,B2 = pB_from_X( Xopt2 )
     print( 'p2.T:' )
     print( p2.T )

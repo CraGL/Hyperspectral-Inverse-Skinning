@@ -41,16 +41,16 @@ def plot(all_data):
 
 
 
-#### cat
-		# plt.semilogy(x, y[0], c=cmap[0], lw=2, label='Biquadratic(2.07 min)')
-		# plt.semilogy(x, y[1], c=cmap[1], lw=2, label='pB(1.67 min)')
-		# plt.semilogy(x, y[2], c=cmap[2], lw=2, label='pymanopt_pB(?? min)')
-		# plt.semilogy(x, y[3], c=cmap[3], lw=2, label='IPCA(2.07 min)')
+# ### cat
+# 		plt.semilogy(x, y[0], c=cmap[0], lw=2, label='Biquadratic(2.07 min)')
+# 		plt.semilogy(x, y[1], c=cmap[1], lw=2, label='pB(1.67 min)')
+# 		plt.semilogy(x, y[2], c=cmap[2], lw=2, label='pymanopt_pB(5.62 min)')
+# 		plt.semilogy(x, y[3], c=cmap[3], lw=2, label='IPCA(2.07 min)')
 		
 ### cheburashka
 		plt.semilogy(x, y[0], c=cmap[0], lw=2, label='Biquadratic(1.49 min)')
 		plt.semilogy(x, y[1], c=cmap[1], lw=2, label='pB(1.26 min)')
-		plt.semilogy(x, y[2], c=cmap[2], lw=2, label='pymanopt_pB(?? min)')
+		plt.semilogy(x, y[2], c=cmap[2], lw=2, label='pymanopt_pB(6.07 min)')
 		plt.semilogy(x, y[3], c=cmap[3], lw=2, label='IPCA(1.94 min)')
 		
 
