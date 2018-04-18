@@ -10,9 +10,10 @@ MAXITER=20
 
 POSES_DIR="${MODEL_DIR}/${name}"
 # for OUTPUT_DIR in "${RES_DIR}"/cat-poses*  "${RES_DIR}"/elephant-gallop* "${RES_DIR}"/horse-collapse*  "${RES_DIR}"/chickenCrossing*  "${RES_DIR}"/pdance*
-for OUTPUT_DIR in "${RES_DIR}"/horse-collapse*  "${RES_DIR}"/chickenCrossing*  "${RES_DIR}"/pdance*
+# for OUTPUT_DIR in "${RES_DIR}"/horse-collapse*  "${RES_DIR}"/chickenCrossing*  "${RES_DIR}"/pdance*
 
 # for OUTPUT_DIR in "${RES_DIR}"/cylinder*  "${RES_DIR}"/cube* "${RES_DIR}"/cheburashka*  "${RES_DIR}"/wolf*  "${RES_DIR}"/cow*
+for OUTPUT_DIR in "${RES_DIR}"/cat-poses*  "${RES_DIR}"/cheburashka*
 do
 	test_dir=$(basename "${OUTPUT_DIR}")
 	SUF=`expr "$test_dir" : '.*\(-[0-9]*\)'` 

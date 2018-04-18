@@ -29,19 +29,39 @@ def plot(all_data):
 		
 		plt.title('Different optimization strategies with performance' , fontsize='medium')
 		plt.xlabel('iterations')
-		plt.ylabel('E_RMS')
-		line1, = plt.plot(x, y[1], c=cmap[1], lw=2, label='Direct(1.5min)')
-		line2, = plt.plot(x, y[2], c=cmap[2], lw=2, label='Grassmann(2.2min)')
-		line0, = plt.plot(x, y[0], c=cmap[0], lw=2, label='Alternating(1.5min)')
-		line3, = plt.plot(x, y[3], c=cmap[3], lw=2, label='IPCA(2.1min)')
-		line4, = plt.plot(x, y[4], c=cmap[4], lw=2, label='basinhopping(2.0min)')
-		plt.plot(x, y[0], 'o', c=cmap[0])
-		plt.plot(x, y[1], 'o', c=cmap[1])
-		plt.plot(x, y[2], 'o', c=cmap[2])
-		plt.plot(x, y[3], 'o', c=cmap[3])
-		plt.plot(x, y[4], 'o', c=cmap[4])
+		plt.ylabel('E_RMS (log)')
+		# line0, = plt.plot(x, y[0], c=cmap[0], lw=2, label='Biquadratic(min)')
+		# line1, = plt.plot(x, y[1], c=cmap[1], lw=2, label='pB(min)')
+		# line2, = plt.plot(x, y[2], c=cmap[2], lw=2, label='pymanopt_pB(min)')
+		# line3, = plt.plot(x, y[3], c=cmap[3], lw=2, label='IPCA(min)')
+		# plt.plot(x, y[0], 'o', c=cmap[0])
+		# plt.plot(x, y[1], 'o', c=cmap[1])
+		# plt.plot(x, y[2], 'o', c=cmap[2])
+		# plt.plot(x, y[3], 'o', c=cmap[3])
+
+
+
+#### cat
+		# plt.semilogy(x, y[0], c=cmap[0], lw=2, label='Biquadratic(2.07 min)')
+		# plt.semilogy(x, y[1], c=cmap[1], lw=2, label='pB(1.67 min)')
+		# plt.semilogy(x, y[2], c=cmap[2], lw=2, label='pymanopt_pB(?? min)')
+		# plt.semilogy(x, y[3], c=cmap[3], lw=2, label='IPCA(2.07 min)')
 		
-		plt.legend( title=name+' with '+handles+' handles', loc='upper right', bbox_to_anchor=(1,1), ncol=1, fontsize='medium')
+### cheburashka
+		plt.semilogy(x, y[0], c=cmap[0], lw=2, label='Biquadratic(1.49 min)')
+		plt.semilogy(x, y[1], c=cmap[1], lw=2, label='pB(1.26 min)')
+		plt.semilogy(x, y[2], c=cmap[2], lw=2, label='pymanopt_pB(?? min)')
+		plt.semilogy(x, y[3], c=cmap[3], lw=2, label='IPCA(1.94 min)')
+		
+
+		plt.semilogy(x, y[0], 'o', c=cmap[0])
+		plt.semilogy(x, y[1], 'o', c=cmap[1])
+		plt.semilogy(x, y[2], 'o', c=cmap[2])
+		plt.semilogy(x, y[3], 'o', c=cmap[3])
+
+
+		
+		plt.legend( title=name+' with '+handles+' handles'+ ' and 0 as seed', loc='upper right', bbox_to_anchor=(1,1), ncol=1, fontsize='medium')
 # 	plt.ylim(ymin=0, ymax=30)
 #	plt.xlim(xmin=1)
 		plt.savefig('strategy_comparison_'+ item[0] +'.pdf', bbox_inches='tight')
@@ -61,9 +81,9 @@ if __name__ == '__main__':
 	for folder in args.example:
 		name = folder.split(os.sep)[-1]
 		if name == '':	name = folder.split(os.sep)[-2]
-		data_file_biquadratic = os.path.join( folder, name+'_biquadratic.csv' )
-		data_file_b = os.path.join( folder, name+'_b.csv' )
-		data_file_cayley = os.path.join( folder, name+'_pymanopt_b.csv' )
-		data_file_ipca = os.path.join( folder, name+'_ipca.csv' )
-		all_data[name] = [np.loadtxt(data_file_biquadratic, delimiter=','), np.loadtxt(data_file_b, delimiter=','), np.loadtxt(data_file_cayley, delimiter=','), np.loadtxt(data_file_ipca, delimiter=','), np.loadtxt(data_file_hop, delimiter=',')[:21]]
+		data_file_biquadratic = os.path.join( folder, name+'_biquadratic_0.csv' )
+		data_file_b = os.path.join( folder, name+'_b_0.csv' )
+		data_file_pymanopt_b = os.path.join( folder, name+'_pymanopt_b_0.csv' )
+		data_file_ipca = os.path.join( folder, name+'_ipca_0.csv' )
+		all_data[name] = [np.loadtxt(data_file_biquadratic, delimiter=','), np.loadtxt(data_file_b, delimiter=','), np.loadtxt(data_file_pymanopt_b, delimiter=','), np.loadtxt(data_file_ipca, delimiter=',')[:21]]
 	plot(all_data)
