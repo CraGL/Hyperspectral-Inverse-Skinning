@@ -34,6 +34,9 @@ parser.add_argument('--recovery', type=float, help ='Recovery test magnitude.')
 parser.add_argument('--number', type=int, help ='Number of given vertices.')
 parser.add_argument('--numerical-gradient', type=str2bool, default = False, help ='If true, compute gradients numerically.')
 parser.add_argument('--pinv', type=str2bool, default = False, help ='If true, use the pseudoinverse.')
+parser.add_argument('--max-iter', type=int, default = 1000, help ='1000 is all situation default value.  This max-iter now only modify for "conjucate" situation.')
+
+
 args = parser.parse_args()
 
 ## Print the arguments.
@@ -470,8 +473,7 @@ if args.optimize_from is not None or args.load is not None:
         solver = TrustRegions()
     elif args.optimize_solver == 'conjugate':
         # solver = ConjugateGradient()
-        print ("########### Now we use max iteration 20, for plot data!")
-        solver = ConjugateGradient(maxiter=21)
+        solver = ConjugateGradient(maxiter=args.max_iter)
 
     elif args.optimize_solver == 'steepest':
         solver = SteepestDescent()

@@ -41,7 +41,9 @@ do
         python3 -u flat_intersection.py "${REST_POSE}" "${POSES_DIR}" ${FLAT_INTERSECTION_ARGS_BIQUADRATIC} --save-matlab-initial "${OUTPUT_DIR}"/filename.mat
         x=$((H-1))
         echo $x
-        python3 -u pymanopt_test_karcher.py --load "${OUTPUT_DIR}"/filename.mat --test-data "${OUTPUT_DIR}"/filename.mat --handles $x --optimize-solver conjugate --manifold pB  2>&1 | tee -i "${OUTPUT_DIR}"/flat_intersection_pymanopt_pB.out
+        maxiter=$((MAXITER+1))
+        echo $maxiter
+        python3 -u pymanopt_test_karcher.py --load "${OUTPUT_DIR}"/filename.mat --test-data "${OUTPUT_DIR}"/filename.mat --handles $x --optimize-solver conjugate --manifold pB  --max-iter $maxiter  2>&1 | tee -i "${OUTPUT_DIR}"/flat_intersection_pymanopt_pB.out
 
 	done
 echo
