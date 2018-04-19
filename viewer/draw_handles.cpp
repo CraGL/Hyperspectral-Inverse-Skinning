@@ -231,12 +231,12 @@ void draw_handles_3d(
 		Matrix4d Te = Matrix4d::Identity();
 // 		std::cout << T.rows() << " " << T.cols() << " " << C.rows() << std::endl;
 		Te.block(0,0,3,4) = T.block(e*4,0,4,3).transpose();
-		bind_color(igl::MAYA_RED);
-		draw_arrow( m_camera, x_VAO, Te*mappings[4*e+1] );
-		bind_color(igl::MAYA_GREEN);
-		draw_arrow( m_camera, y_VAO, Te*mappings[4*e+2] );
-		bind_color(igl::MAYA_BLUE);
-		draw_arrow( m_camera, z_VAO,Te*mappings[4*e+3] );
+// 		bind_color(igl::MAYA_RED);
+// 		draw_arrow( m_camera, x_VAO, Te*mappings[4*e+1] );
+// 		bind_color(igl::MAYA_GREEN);
+// 		draw_arrow( m_camera, y_VAO, Te*mappings[4*e+2] );
+// 		bind_color(igl::MAYA_BLUE);
+// 		draw_arrow( m_camera, z_VAO,Te*mappings[4*e+3] );
 		bind_color(igl::MAYA_YELLOW);
 		draw_sphere( m_camera,Te*mappings[4*e] );
 	}
