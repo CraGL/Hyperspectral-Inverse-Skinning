@@ -1300,7 +1300,7 @@ def optimize_laplacian( P, H, rest_mesh, deformed_vs, qs_data, qs_errors, qs_ssv
 	elif neighbors_strategy == 'random':
 		all_indices = np.arange( num_vertices )
 		neighbors = []
-		num_random_neighs = 2*H
+		num_random_neighs = H+1
 		for i in range( num_vertices ):
 			all_but_i = np.array(list(set(all_indices) - set([i])))
 			np.random.shuffle( all_but_i )
@@ -1430,6 +1430,14 @@ def optimize_laplacian( P, H, rest_mesh, deformed_vs, qs_data, qs_errors, qs_ssv
 			print( "Function value:", f )	
 			
 			print( "Ts singular values:", np.linalg.svd( Ts, compute_uv = False ) )
+			
+			use_show_progress = True
+			if use_show_progress:
+				from space_mapper import SpaceMapper
+				pca = SpaceMapper.Uncorrellated_Space( Ts, dimension = H )
+				p = pca.Xavg_
+				B = pca.V_[:H-1].T
+				show_progress( pack( p, B ) )
 			
 			## If this is the first iteration, pretend that the old function value was
 			## out of termination range.
