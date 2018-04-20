@@ -585,6 +585,122 @@ def optimize_nullspace_directly(P, H, row_mats, deformed_vs, x0, strategy = None
 	
 	return converged, solution.x
 
+def optimize_nullspace_pymanopt(P, H, row_mats, deformed_vs, x0, strategy = None, max_iter = None, nullspace = None):
+	
+	## To make function values comparable, we need to normalize.
+	normalization = normalization_factor_from_row_mats( row_mats )
+	print( "===== Turning off function value normalization; watch termination thresholds! =====" )
+	normalization = 1.
+	
+	import pymanopt
+	from pymanopt.manifolds import Grassmann, Euclidean, Product
+	from pymanopt import Problem
+	from pymanopt.solvers import SteepestDescent, TrustRegions, ConjugateGradient
+	import autograd.numpy as np
+	
+	dim = row_mats[0].shape[1]
+	manifold = Product( [ Euclidean(dim), Grassmann(dim, H-1) ] )
+	
+	## Helper functions
+	pinv = True
+	if pinv:
+		# transpose by swapping last two dimensions
+		def T(x): return np.swapaxes(x, -1, -2)
+		def grad_pinv(ans, x):
+			dot = np.dot if ans.ndim == 2 else partial(np.einsum, '...ij,...jk->...ik')
+			# https://mathoverflow.net/questions/25778/analytical-formula-for-numerical-derivative-of-the-matrix-pseudo-inverse
+			return lambda g: (
+				-dot(dot(ans, g), ans)
+				+ dot(dot(dot( ans, T(ans) ), T(g) ), np.eye(x.shape[0]) - dot(x,ans))
+				+ dot(dot(dot( np.eye(ans.shape[0]) - dot(ans,x), T(g) ), T(ans) ), ans )
+				)
+		import autograd.extend
+		autograd.extend.defvjp(np.linalg.pinv, grad_pinv)
+		
+		## It is correct.
+		def test_pinv():
+			import scipy.optimize
+			foo = 5
+			Xrand = np.random.random((foo,foo))
+			def cost( x ): return np.linalg.pinv( x ).sum()
+			from autograd import grad
+			Gp = scipy.optimize.approx_fprime( Xrand.ravel(), lambda x: cost(x.reshape(foo,foo)), 1e-7 )
+			Ga = grad( cost )(Xrand).ravel()
+			grad_err = scipy.optimize.check_grad( lambda x: cost(x.reshape(foo,foo)), lambda x: grad( cost )(x.reshape(foo,foo)).T.ravel(), Xrand.ravel() )
+			print( "Autograd gradient error:", grad_err )
+		# test_pinv()
+	
+	myinverse = np.linalg.inv
+	pinv: myinverse = np.linalg.pinv
+	
+	def repeated_block_diag_times_matrix( block, matrix ):
+		# return scipy.sparse.block_diag( [ block ]*( matrix.shape[0]//block.shape[1] ) ).dot( matrix )
+		# print( abs( scipy.sparse.block_diag( [ block ]*( matrix.shape[0]//block.shape[1] ) ).dot( matrix ) - numpy.dot( block, matrix.reshape( block.shape[1], -1, order='F' ) ).reshape( -1, matrix.shape[1], order='F' ) ).max() )
+		return np.dot( block, matrix.reshape( block.shape[1], -1, order='F' ) ).reshape( -1, matrix.shape[1], order='F' )
+	
+	# (2) Define the cost function (here using autograd.numpy)
+	flats_are_vertices = True
+	def cost(pB):
+		p, B = pB
+		## For type checking, I want everything to be a matrix.
+		p = p.reshape(-1,1)
+		
+		sum = 0.
+		
+		for A,a in zip( row_mats, deformed_vs ):
+			def Adot( rhs ):
+				if flats_are_vertices:
+					return repeated_block_diag_times_matrix( A[:1,:4], rhs )
+				else:
+					return np.dot( A, rhs )
+			
+			## For type checking, I want everything to be a matrix.
+			a = a.reshape(-1,1)
+			
+			AB = Adot( B )
+			
+			z = np.dot( myinverse( np.dot( AB.T, AB ) ), -np.dot( AB.T, Adot( p ) - a ) )
+			diff = Adot( p + np.dot( B, z ) ) - a
+			
+			e = np.dot( diff.squeeze(), diff.squeeze() )
+			# e = np.sqrt(e)
+			sum += e
+		
+		## A regularizer to make p as small as possible.
+		## UPDATE: This doesn't speed up convergence at all!
+		# sum += 1e-5 * np.dot( p,p )
+		
+		return sum * normalization
+	
+	def callback( pB ):
+		p,B = pB
+		show_progress( pack( p, B ) )
+	
+	reset_progress()
+	
+	problem = Problem(manifold=manifold, cost=cost)
+	
+	## strategies: 'steepest', 'conjugate', 'trust'
+	if strategy is None: strategy = 'conjugate'
+	
+	if strategy == 'trust':
+		solver = TrustRegions(maxiter=max_iter)
+	elif strategy == 'conjugate':
+		solver = ConjugateGradient(maxiter=max_iter)
+	elif strategy == 'steepest':
+		solver = SteepestDescent(maxiter=max_iter)
+	
+	pB = solver.solve(problem, callback=callback, x = unpack( x0, P ) )
+	f = const( pB )
+	print( "Final cost:", f )
+	x = pack( *pB )
+	
+	## We don't know if it converged.
+	converged = abs( f ) < 1e-2
+	error_recorder.save_error()
+	
+	return converged, x
+
 def optimize_nullspace_cayley(P, H, row_mats, deformed_vs, x0, strategy = None, max_iter = None, nullspace = None):
 
 	## To make function values comparable, we need to normalize.
@@ -1539,8 +1655,8 @@ if __name__ == '__main__':
 	parser.add_argument('--handles', '-H', type=int, help='Number of handles.')
 	parser.add_argument('--ground-truth', '-GT', type=str, help='Ground truth data path.')
 	parser.add_argument('--recovery', '-R', type=float, help='Recovery test epsilon (default no recovery test).')
-	parser.add_argument('--strategy', '-S', type=str, choices = ['function', 'gradient', 'hessian', 'newton', 'mixed', 'grassmann', 'pinv', 'pinv+ssv:skip', 'pinv+ssv:weighted', 'ssv:skip', 'ssv:weighted', 'perfectp', 'momentum', 'basinhopping'], help='Strategy: function, gradient (default), hessian, newton, mixed, grassmann (for energy B only), basinhopping (for energy B only), pinv and ssv (for energy biquadratic only), perfectp and momentum (ipca only).')
-	parser.add_argument('--energy', '-E', type=str, default='B', choices = ['B', 'cayley', 'B+cayley', 'B+B', 'cayley+cayley', 'biquadratic', 'biquadratic+B', 'biquadratic+handles', 'laplacian', 'ipca', 'flag'], help='Energy: B (default), cayley, B+cayley, B+B, cayley+cayley, biquadratic, biquadratic+B, biquadratic+handles, laplacian, ipca (iterative PCA), flag (flag mean).')
+	parser.add_argument('--strategy', '-S', type=str, choices = ['function', 'gradient', 'hessian', 'steepest', 'conjugate', 'trust', 'newton', 'mixed', 'grassmann', 'pinv', 'pinv+ssv:skip', 'pinv+ssv:weighted', 'ssv:skip', 'ssv:weighted', 'perfectp', 'momentum', 'basinhopping'], help='Strategy: function, gradient (default), hessian, newton, mixed, grassmann (for energy B only), basinhopping (for energy B only), pinv and ssv (for energy biquadratic only), perfectp and momentum (ipca only), steepest/conjugate/trust (pB_pymanopt only).')
+	parser.add_argument('--energy', '-E', type=str, default='B', choices = ['B', 'pB_pymanopt', 'cayley', 'B+cayley', 'B+B', 'cayley+cayley', 'biquadratic', 'biquadratic+B', 'biquadratic+handles', 'laplacian', 'ipca', 'flag'], help='Energy: B (default), cayley, B+cayley, B+B, cayley+cayley, biquadratic, biquadratic+B, biquadratic+handles, laplacian, ipca (iterative PCA), flag (flag mean).')
 	## UPDATE: type=bool does not do what we think it does. bool("False") == True.
 	##		   For more, see https://stackoverflow.com/questions/15008758/parsing-boolean-values-with-argparse
 	def str2bool(s): return {'true': True, 'false': False}[s.lower()]
@@ -1712,6 +1828,8 @@ if __name__ == '__main__':
 			if args.energy == 'B':
 				# converged, x = optimize(P, H, all_R_mats, deformed_vs, x0)
 				converged, x = optimize_nullspace_directly(P, H, all_R_mats, deformed_vs, x0, strategy = args.strategy, max_iter = args.max_iter, nullspace = args.nullspace )
+			elif args.energy == 'pB_pymanopt':
+				converged, x = optimize_nullspace_pymanopt( P, H, all_R_mats, deformed_vs, x0, strategy = args.strategy, max_iter = args.max_iter, nullspace = args.nullspace )
 			elif args.energy == 'cayley':
 				converged, x = optimize_nullspace_cayley( P, H, all_R_mats, deformed_vs, x0, strategy = args.strategy, max_iter = args.max_iter, nullspace = args.nullspace )
 			elif args.energy == 'B+cayley':
