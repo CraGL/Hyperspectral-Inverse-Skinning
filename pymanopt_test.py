@@ -10,8 +10,8 @@ handles = 10
 # p, B
 manifold = Product( ( Euclidean(12*poses), Grassmann(12*poses, handles) ) )
 
-#method = 'AndersonDuffin'
-method = 'block'
+method = 'AndersonDuffin'
+#method = 'block'
 #method = 'power'
 power = 5
 assert method in ('AndersonDuffin', 'block', 'power')
