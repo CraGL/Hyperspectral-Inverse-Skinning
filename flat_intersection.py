@@ -631,7 +631,7 @@ def optimize_nullspace_pymanopt(P, H, row_mats, deformed_vs, x0, strategy = None
 		# test_pinv()
 	
 	myinverse = np.linalg.inv
-	pinv: myinverse = np.linalg.pinv
+	if pinv: myinverse = np.linalg.pinv
 	
 	def repeated_block_diag_times_matrix( block, matrix ):
 		# return scipy.sparse.block_diag( [ block ]*( matrix.shape[0]//block.shape[1] ) ).dot( matrix )
@@ -691,7 +691,7 @@ def optimize_nullspace_pymanopt(P, H, row_mats, deformed_vs, x0, strategy = None
 		solver = SteepestDescent(maxiter=max_iter)
 	
 	pB = solver.solve(problem, callback=callback, x = unpack( x0, P ) )
-	f = const( pB )
+	f = cost( pB )
 	print( "Final cost:", f )
 	x = pack( *pB )
 	
@@ -749,7 +749,7 @@ def optimize_intersection_pymanopt(P, H, row_mats, deformed_vs, x0, strategy = N
 		# test_pinv()
 	
 	myinverse = np.linalg.inv
-	pinv: myinverse = np.linalg.pinv
+	if pinv: myinverse = np.linalg.pinv
 	
 	## Orthonormalize the flats.
 	flats = []
@@ -811,9 +811,192 @@ def optimize_intersection_pymanopt(P, H, row_mats, deformed_vs, x0, strategy = N
 		solver = SteepestDescent(maxiter=max_iter)
 	
 	pB = solver.solve(problem, callback=callback, x = unpack( x0, P ) )
-	f = const( pB )
+	f = cost( pB )
 	print( "Final cost:", f )
 	x = pack( *pB )
+	
+	## We don't know if it converged.
+	converged = abs( f ) < 1e-2
+	error_recorder.save_error()
+	
+	return converged, x
+
+def optimize_intersection2_pymanopt(P, H, row_mats, deformed_vs, x0, strategy = None, max_iter = None, nullspace = None):
+	
+	print( "This function is broken." )
+	
+	## To make function values comparable, we need to normalize.
+	normalization = normalization_factor_from_row_mats( row_mats )
+	print( "===== Turning off function value normalization; watch termination thresholds! =====" )
+	normalization = 1.
+	
+	method = 'pB'
+	# method = 'B'
+	
+	from pymanopt.manifolds import Grassmann, Euclidean, Product
+	from pymanopt import Problem
+	from pymanopt.solvers import SteepestDescent, TrustRegions, ConjugateGradient
+	import autograd.numpy as np
+	
+	# (1) Instantiate a manifold
+	poses = P
+	dim = row_mats[0].shape[1]
+	assert dim == 12*poses
+	if method == 'pB':
+		manifold = Product( [ Euclidean(dim), Grassmann(dim, H-1) ] )
+	elif method == 'B':
+		manifold = Grassmann(dim, H-1)
+	else:
+		raise RuntimeError( "Unknown method: %s" % method )
+	
+	## Helper functions
+	pinv = True
+	if pinv:
+		# transpose by swapping last two dimensions
+		def T(x): return np.swapaxes(x, -1, -2)
+		def grad_pinv(ans, x):
+			dot = np.dot if ans.ndim == 2 else partial(np.einsum, '...ij,...jk->...ik')
+			# https://mathoverflow.net/questions/25778/analytical-formula-for-numerical-derivative-of-the-matrix-pseudo-inverse
+			return lambda g: (
+				-dot(dot(ans, g), ans)
+				+ dot(dot(dot( ans, T(ans) ), T(g) ), np.eye(x.shape[0]) - dot(x,ans))
+				+ dot(dot(dot( np.eye(ans.shape[0]) - dot(ans,x), T(g) ), T(ans) ), ans )
+				)
+		import autograd.extend
+		autograd.extend.defvjp(np.linalg.pinv, grad_pinv)
+		
+		## It is correct.
+		def test_pinv():
+			import scipy.optimize
+			foo = 5
+			Xrand = np.random.random((foo,foo))
+			def cost( x ): return np.linalg.pinv( x ).sum()
+			from autograd import grad
+			Gp = scipy.optimize.approx_fprime( Xrand.ravel(), lambda x: cost(x.reshape(foo,foo)), 1e-7 )
+			Ga = grad( cost )(Xrand).ravel()
+			grad_err = scipy.optimize.check_grad( lambda x: cost(x.reshape(foo,foo)), lambda x: grad( cost )(x.reshape(foo,foo)).T.ravel(), Xrand.ravel() )
+			print( "Autograd gradient error:", grad_err )
+		# test_pinv()
+	
+	myinverse = np.linalg.inv
+	if pinv: myinverse = np.linalg.pinv
+	
+	## Orthonormalize the flats.
+	flats = []
+	for A, a in zip( row_mats, deformed_vs ):
+		## For type checking, I want everything to be a matrix.
+		a = a.reshape(-1,1)
+		
+		vnorm = np.linalg.norm( row_mats[0,:4] )
+		A = A/vnorm
+		a = a/vnorm
+		flats.append( ( A, A.T.dot( a ) ) )
+	
+	# (2) Define the cost function (here using autograd.numpy)
+	def cost(pB):
+		if method == 'pB':
+			p,B = pB
+		elif method == 'B':
+			B = pB
+			sum_Ct = np.zeros( (12*poses,1) )
+			sum_C = np.zeros( (12*poses,12*poses) )
+		else:
+			raise RuntimeError( "Unknown method: %s" % method )
+		
+		sum = 0.
+		
+		I = np.eye(12*poses)
+		P_Bortho = (I - np.dot( B, B.T ) )
+		
+		for A,a in flats:
+			# a = np.zeros(a.shape)
+			
+			## The Anderson-Duffin formula
+			## https://mathoverflow.net/questions/108177/intersection-of-subspaces
+			P_Aortho = np.dot( A.T, A )
+			## Is the pseudoinverse necessary?
+			if type(B) == np.ndarray:
+				mr = np.linalg.matrix_rank( P_Bortho + P_Aortho )
+				if mr < P_Bortho.shape[0]:
+					print( "Matrix not full rank! We should be using pseudoinverse. (%s instead of %s)" % ( mr, P_Bortho.shape[0] ) )
+				# print( P_Bortho.shape, np.linalg.matrix_rank( P_Bortho + P_Aortho ) )
+				# print( np.linalg.svd( P_Bortho + P_Aortho, compute_uv = False ) )
+			## This should be pinv() not inv().
+			orthogonal_to_A_and_B = np.dot( 2.*P_Bortho, np.dot( myinverse( P_Bortho + P_Aortho ), P_Aortho ) )
+			
+			if method == 'pB':
+				diff = np.dot( orthogonal_to_A_and_B, p - a )
+				e = np.dot( diff.squeeze(), diff.squeeze() )
+				sum += e
+			elif method == 'B':
+				sum_C += orthogonal_to_A_and_B
+				Ct = np.dot( orthogonal_to_A_and_B, a )
+				sum_Ct += Ct
+				sum += np.dot( Ct.T, Ct )
+			else:
+				raise RuntimeError( "Unknown method: %s" % method )
+		
+		if method == 'B':
+			sum -= np.dot( np.dot( sum_Ct.T, myinverse( sum_C ) ), sum_Ct )
+		
+		return sum * normalization
+	
+	def p_from_B( B ):
+		sum_Ct = np.zeros( (12*poses,1) )
+		sum_C = np.zeros( (12*poses,12*poses) )
+		I = np.eye(12*poses)
+		P_Bortho = (I - np.dot( B, B.T ))
+		
+		for A,a in flats:
+			P_Aortho = np.dot( A.T, A )
+			C = np.dot( 2.*P_Bortho, np.dot( myinverse( P_Bortho + P_Aortho ), P_Aortho ) )
+			sum_Ct += np.dot( C, a )
+			sum_C += C
+		p = np.dot( myinverse(sum_C), sum_Ct )
+		return p
+	
+	def callback( pB ):
+		if method == 'pB':
+			p,B = pB
+		elif method == 'B':
+			B = pB
+			p = p_from_B( B )
+		else:
+			raise RuntimeError( "Unknown method: %s" % method )
+		
+		show_progress( pack( p, B ) )
+	
+	reset_progress()
+	
+	problem = Problem(manifold=manifold, cost=cost)
+	
+	## strategies: 'steepest', 'conjugate', 'trust'
+	if strategy is None: strategy = 'conjugate'
+	
+	if strategy == 'trust':
+		solver = TrustRegions(maxiter=max_iter)
+	elif strategy == 'conjugate':
+		solver = ConjugateGradient(maxiter=max_iter)
+	elif strategy == 'steepest':
+		solver = SteepestDescent(maxiter=max_iter)
+	else:
+		raise RuntimeError( "Unknown strategy: %s" % strategy )
+	
+	p0,B0 = unpack( x0, P )
+	if method == 'pB':
+		solver_x0 = p0, B0
+	elif method == 'B':
+		solver_x0 = B0
+	
+	pB = solver.solve(problem, callback=callback, x = solver_x0 )
+	f = cost( pB )
+	print( "Final cost:", f )
+	if method == 'pB':
+		x = pack( *pB )
+	elif method == 'B':
+		B = pB
+		p = p_from_B( B )
+		x = pack( p, B )
 	
 	## We don't know if it converged.
 	converged = abs( f ) < 1e-2
