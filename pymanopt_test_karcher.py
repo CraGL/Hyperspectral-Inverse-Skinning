@@ -270,29 +270,33 @@ def cost(X):
     return sum
 
 def callback( X ):
-	import web_gui.relay as relay
-	print( "callback:" )
-	if args.visualize == 'lines':
-		## p is the point on the line
-		## B is a one-column vector parallel to the line
-		relay.send_data( "lines" )
-		p,B = pB_from_X( X )
-		p = np.array( p ).ravel()
-		B = np.array( B ).ravel()
-		all_data = []
-		for flat in flats:
-			dir = np.cross( flat[0][0], flat[0][1] )
-			pt = flat[1]
-			all_data.append( pt.tolist() )
-			all_data.append( dir.tolist() )
-		all_data.append( p.tolist() )
-		all_data.append( B.tolist() )
-		relay.send_data( all_data )
-		# relay.send_data( [p.tolist(), B.tolist()] )
-		# from plot_visualization import draw_3d_line
-	elif args.visualize == 'points':
-		relay.send_data( "points" )
-		pass
+    print( "callback:" )
+    c = cost( X )
+    scale = 1.273873560482358
+    print( "E_RMS:", 2000*np.sqrt(c/(3*len(flats)*poses*scale*scale)) )
+
+    import web_gui.relay as relay
+    if args.visualize == 'lines':
+    	## p is the point on the line
+    	## B is a one-column vector parallel to the line
+    	relay.send_data( "lines" )
+    	p,B = pB_from_X( X )
+    	p = np.array( p ).ravel()
+    	B = np.array( B ).ravel()
+    	all_data = []
+    	for flat in flats:
+    		dir = np.cross( flat[0][0], flat[0][1] )
+    		pt = flat[1]
+    		all_data.append( pt.tolist() )
+    		all_data.append( dir.tolist() )
+    	all_data.append( p.tolist() )
+    	all_data.append( B.tolist() )
+    	relay.send_data( all_data )
+    	# relay.send_data( [p.tolist(), B.tolist()] )
+    	# from plot_visualization import draw_3d_line
+    elif args.visualize == 'points':
+    	relay.send_data( "points" )
+    	pass
 
 if args.numerical_gradient:
     print( "Using numerical gradient." )
