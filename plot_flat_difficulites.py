@@ -85,12 +85,19 @@ Example: python3 plot_flat_difficulites.py test_difficulties/test_flat_difficuli
 	df2.columns = df2.columns.astype( int )
 
 	# Draw a heatmap with the numeric values in each cell
+	## The default dimensions (9,6) are OK for 12-dimensional data
+	## but should be scaled for larger.
+	## Scale vertically less; it's only cramped by two-digit labels.
+	width = max(9, 9*df.shape[0]/12)
+	height = max(6, 6*(df.shape[0]-12)/8)
+	print( "width:", width )
+	print( "height:", height )
 	if args.which == "iterations":
-		f, ax = plt.subplots( figsize=(9, 6) )
+		f, ax = plt.subplots( figsize=(width, height) )
 		sns.heatmap(df, annot=True, fmt="d", linewidths=.5, ax=ax)
 		ax.invert_yaxis()
 	elif args.which == "error":
-		f, ax = plt.subplots( figsize=(9, 6) )
+		f, ax = plt.subplots( figsize=(width, height) )
 		sns.heatmap(df2, annot=True, fmt=".2g", linewidths=.5, ax=ax)
 		ax.invert_yaxis()
 
