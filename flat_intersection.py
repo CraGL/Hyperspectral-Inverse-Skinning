@@ -684,7 +684,7 @@ def optimize_nullspace_pymanopt(P, H, row_mats, deformed_vs, x0, strategy = None
 	if strategy is None: strategy = 'conjugate'
 	
 	if strategy == 'trust':
-		solver = TrustRegions(maxiter=max_iter)
+		solver = TrustRegions(maxiter=max_iter, maxtime=100000) #### to make sure reach maxiter =20 for plotting figure.
 	elif strategy == 'conjugate':
 		solver = ConjugateGradient(maxiter=max_iter)
 	elif strategy == 'steepest':
@@ -806,7 +806,7 @@ def optimize_intersection_pymanopt(P, H, row_mats, deformed_vs, x0, strategy = N
 	if strategy == 'trust':
 		solver = TrustRegions(maxiter=max_iter)
 	elif strategy == 'conjugate':
-		solver = ConjugateGradient(maxiter=max_iter)
+		solver = ConjugateGradient(maxiter=max_iter, maxtime=100000)  #### to make sure reach maxiter =20 for plotting figure.
 	elif strategy == 'steepest':
 		solver = SteepestDescent(maxiter=max_iter)
 	
