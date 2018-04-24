@@ -1857,6 +1857,7 @@ def optimize_laplacian( P, H, rest_mesh, deformed_vs, qs_data, qs_errors, qs_ssv
 				p = pca.Xavg_
 				B = pca.V_[:H-1].T
 				show_progress( pack( p, B ) )
+
 			
 			## If this is the first iteration, pretend that the old function value was
 			## out of termination range.
@@ -1891,6 +1892,7 @@ def optimize_laplacian( P, H, rest_mesh, deformed_vs, qs_data, qs_errors, qs_ssv
 		print( "Terminated by KeyboardInterrupt." )
 	
 	print( "Terminated after", iterations, "iterations." )
+	error_recorder.save_error()
 	
 	from space_mapper import SpaceMapper
 	pca = SpaceMapper.Uncorrellated_Space( Ts, dimension = H )
@@ -2186,6 +2188,8 @@ if __name__ == '__main__':
 				if args.fancy_init_errors is not None: qs_errors = np.loadtxt(args.fancy_init_errors)
 				qs_ssv = None
 				if args.fancy_init_ssv is not None: qs_ssv = np.loadtxt(args.fancy_init_ssv)
+				qs_data= None
+				if args.fancy_init is not None: qs_data=np.loadtxt(args.fancy_init)
 				converged, x = optimize_laplacian( P, H, rest_mesh, deformed_vs, qs_data, qs_errors, qs_ssv, max_iter = args.max_iter, f_eps = args.f_eps, x_eps = args.x_eps, z_strategy = args.z_strategy )
 			elif args.energy == 'ipca':
 				converged, x = optimize_iterative_pca( P, H, all_R_mats, deformed_vs, x0, strategy = args.strategy, max_iter = args.max_iter, f_eps = args.f_eps, x_eps = args.x_eps, W_projection = args.W_projection, z_strategy = args.z_strategy )

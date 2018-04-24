@@ -486,7 +486,9 @@ if __name__ == '__main__':
     end_time = time.time()
     print( "... Finished generating transformations." )
     print( "Finding subspace intersection duration (minutes):", (end_time-start_time)/60 )
-
+    
+    print (rest_pose.vs.shape)
+    print (find_scale(rest_pose.vs))
 
     if args.out is None:
         np.set_printoptions( precision = 24, linewidth = 2000 )
