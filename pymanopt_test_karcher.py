@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import autograd
 import autograd.numpy as np
 np.set_printoptions( linewidth = 2000 )
@@ -34,7 +36,8 @@ parser.add_argument('--recovery', type=float, help ='Recovery test magnitude.')
 parser.add_argument('--number', type=int, help ='Number of given vertices.')
 parser.add_argument('--numerical-gradient', type=str2bool, default = False, help ='If true, compute gradients numerically.')
 parser.add_argument('--pinv', type=str2bool, default = False, help ='If true, use the pseudoinverse.')
-parser.add_argument('--max-iter', type=int, default = 1000, help ='1000 is all situation default value.  This max-iter now only modify for "conjucate" situation.')
+parser.add_argument('--max-iter', type=int, default = 1000, help ='Maximum iterations. 1000 is the default value.')
+parser.add_argument('--max-time', type=float, default = 1000, help ='Maximum wall clock time in seconds. (It is not smart about sleep/wake.) 1000 is the default. "inf" means no limit.')
 
 
 args = parser.parse_args()
@@ -470,17 +473,17 @@ if args.optimize_from == 'centroid':
 ## Run optimization.
 if args.optimize_from is not None or args.load is not None:
     if args.optimize_solver == 'trust':
-        solver = TrustRegions()
+        solver = TrustRegions(maxiter=args.max_iter, maxtime=args.max_time)
     elif args.optimize_solver == 'conjugate':
         # solver = ConjugateGradient()
-        solver = ConjugateGradient(maxiter=args.max_iter)
+        solver = ConjugateGradient(maxiter=args.max_iter, maxtime=args.max_time)
 
     elif args.optimize_solver == 'steepest':
-        solver = SteepestDescent()
+        solver = SteepestDescent(maxiter=args.max_iter, maxtime=args.max_time)
     elif args.optimize_solver == 'particle':
-        solver = ParticleSwarm()
+        solver = ParticleSwarm(maxiter=args.max_iter, maxtime=args.max_time)
     elif args.optimize_solver == 'nelder':
-        solver = NelderMead()
+        solver = NelderMead(maxiter=args.max_iter, maxtime=args.max_time)
     else: raise RuntimeError
     
     if args.load is not None:
@@ -509,7 +512,7 @@ if args.optimize_from is not None or args.load is not None:
         Xopt2 = solver.solve(problem, x=Xopt)
     elif args.optimize_from == 'random':
         print( "Optimizing from random with the simple original cost function." )
-        if args.optimize_solver == 'trust':
+        if args.optimize_solver in ('trust', 'conjugate', 'steepest'):
             Xopt2 = solver.solve(problem, callback=callback)
         else:
             Xopt2 = solver.solve(problem)
