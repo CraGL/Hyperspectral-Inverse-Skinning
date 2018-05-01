@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
-DIM=12
-NUM=20
+DIM=24
+NUM=10
 # let "MAX_ITER = $DIM - 1"
 OUTPUT_DIR=test_difficulties
 

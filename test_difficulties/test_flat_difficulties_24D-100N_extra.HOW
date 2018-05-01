@@ -1,0 +1,32 @@
+# Original data was generated with:
+../test_flat_difficulties_24D-100N.sh
+
+egrep 'pymanopt_test_karcher\.py|max time' test_flat_difficulites.out-24D_100N | fgrep 'max time' -B 1 | fgrep pymanopt > test_flat_difficulties_24D-100N_extra.sh
+
+# Manually add in a "python3 " prefix to all the lines.
+
+## Run the new commands.
+cd ..
+parallel --results test_difficulties/test_difficulties_24D-100N :::: test_difficulties/test_flat_difficulties_24D-100N_extra.sh
+cd test_difficulties
+
+# Then in Python:
+python3
+
+>>> reg = open("test_flat_difficulites.out-24D_100N").read()
+>>> runs = reg.split("args:")
+>>> fixed = 'args:'.join([ run for run in runs if 'max time' not in run ])
+>>> with open('test_flat_difficulites.out-24D_100N-fixed', 'w') as f: f.write( fixed )
+
+# Add in the fixed runs:
+
+cat test_difficulties_24D-100N/1/*/stdout >> test_flat_difficulites.out-24D_100N-fixed
+
+# Generate plots
+
+python3 ../plot_flat_difficulites.py test_flat_difficulites.out-24D_100N-fixed error --show no --out test_flat_difficulites.out-24D_100N-fixed-error.pdf
+python3 ../plot_flat_difficulites.py test_flat_difficulites.out-24D_100N-fixed iterations --show no --out test_flat_difficulites.out-24D_100N-fixed-iterations.pdf
+
+# How long does 200 iterations take on average?
+
+fgrep -i 'seconds' test_flat_difficulites.out-24D_100N-fixed | grep 'max iter' | cut -d ' ' -f 7 | avg.py

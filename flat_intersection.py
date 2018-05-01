@@ -2278,6 +2278,13 @@ if __name__ == '__main__':
 	else:
 		start_time = time.time()						
 		rev_vertex_trans = solve_for_H( H, rest_vs, deformed_vs, all_R_mats )
+		## Switch to ground truth with procrustes.
+		# zero_test = True
+		## Switch to random seed 0 with procrustes.
+		# fancy_init_path = None
+		# SEED = 0
+		# args.max_iter = 0
+		# rev_vertex_trans = solve_for_H( H, rest_vs, deformed_vs, all_R_mats )
 		print( "Number of bones:", H )		
 		print( "Time for solving(minutes): ", (time.time() - start_time)/60 )
 		print( "Final vertex error RMS is:", vertex_error(rest_vs, rev_vertex_trans, deformed_vs ) )

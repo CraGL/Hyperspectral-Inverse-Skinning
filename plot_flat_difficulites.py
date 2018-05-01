@@ -8,6 +8,7 @@ import numpy as np
 def parseOutput( path ):
 	data, costs = [], []
 	dim, ortho, handle = None, None, None
+	maxiter = 200
 	file = open( path, "r" ) 
 	for line in file:
 		if line.startswith( "ambient dimension: " ):
@@ -28,12 +29,12 @@ def parseOutput( path ):
 			s = line[ len( "Terminated - " ): ]
 			if s.startswith( "max iterations reached" ): 
 				## max iterations reached
-				data.append( [ dim-ortho, handle, 1000 ] )
+				data.append( [ dim-ortho, handle, maxiter ] )
 			else:
 				words = s.split( " " )
 				if words[0] == "max":
 					## max time reached
-					data.append( [ dim-ortho, handle, 1000 ] )
+					data.append( [ dim-ortho, handle, maxiter ] )
 					# data.append( [ dim-ortho, handle, int( words[4] ) ] )
 				else:
 					## min grad norm reached
@@ -85,15 +86,27 @@ Example: python3 plot_flat_difficulites.py test_difficulties/test_flat_difficuli
 	df2.columns = df2.columns.astype( int )
 
 	# Draw a heatmap with the numeric values in each cell
+	## The default dimensions (9,6) are OK for 12-dimensional data
+	## but should be scaled for larger.
+	## Scale vertically less; it's only cramped by two-digit labels.
+	width = max(9, 9*df.shape[0]/12)
+	height = max(6, 6*(df.shape[0]-12)/8)
+	make_tiny = True
+	if make_tiny:
+		width *= 0.5
+		height *= 0.5
+		annot_kws={"size": 5}
+	print( "width:", width )
+	print( "height:", height )
 	if args.which == "iterations":
-		f, ax = plt.subplots( figsize=(9, 6) )
-		sns.heatmap(df, annot=True, fmt="d", linewidths=.5, ax=ax)
+		f, ax = plt.subplots( figsize=(width, height) )
+		sns.heatmap(df, annot=True, fmt="d", linewidths=.5, ax=ax, annot_kws=annot_kws)
 		ax.invert_yaxis()
 	elif args.which == "error":
-		f, ax = plt.subplots( figsize=(9, 6) )
-		sns.heatmap(df2, annot=True, fmt=".2g", linewidths=.5, ax=ax)
+		f, ax = plt.subplots( figsize=(width, height) )
+		sns.heatmap(df2, annot=True, fmt=".2g", linewidths=.5, ax=ax, annot_kws=annot_kws)
 		ax.invert_yaxis()
-
+	
 	if args.out:
 		print( "Saving", args.out, "..." )
 		plt.savefig(args.out)
