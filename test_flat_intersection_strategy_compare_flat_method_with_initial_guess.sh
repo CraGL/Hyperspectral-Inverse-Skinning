@@ -4,7 +4,7 @@ ROOT_DIR="../.."
 MODEL_DIR="./models"
 RES_DIR="./results_strategy_compare_flat_method_with_initial_guess"
 OBJ_SUFF=".obj"
-MAXITER=20
+MAXITER=21
 
 
 POSES_DIR="${MODEL_DIR}/${name}"
@@ -15,6 +15,7 @@ POSES_DIR="${MODEL_DIR}/${name}"
 # for OUTPUT_DIR in "${RES_DIR}"/cylinder* "${RES_DIR}"/cheburashka* "${RES_DIR}"/cat-poses* 
 for OUTPUT_DIR in "${RES_DIR}"/cylinder*
 # for OUTPUT_DIR in "${RES_DIR}"/cheburashka* 
+# for OUTPUT_DIR in "${RES_DIR}"/cat-poses*  "${RES_DIR}"/cheburashka*
 do
 	test_dir=$(basename "${OUTPUT_DIR}")
 	SUF=`expr "$test_dir" : '.*\(-[0-9]*\)'` 
@@ -25,9 +26,9 @@ do
 	H=${test_dir#$name-}
 
 
- #    ### initial guess: one ring, vertex method, unconstrained, 50% data saved
-	# INITIAL_GUESS_ARGS="--svd_threshold 1e-15 --transformation_percentile 50 --version 0 --method vertex -rand none"
-	# python -u PerVertex/local_subspace_recover.py ${INITIAL_GUESS_ARGS} "${REST_POSE}" "${POSES_DIR}"/*.obj --out "${OUTPUT_DIR}"/local_subspace_recover.txt  2>&1 | tee "${OUTPUT_DIR}"/local_subspace_recover.out
+    ### initial guess: one ring, vertex method, unconstrained, 50% data saved
+	INITIAL_GUESS_ARGS="--svd_threshold 1e-15 --transformation_percentile 50 --version 0 --method vertex -rand none"
+	python -u PerVertex/local_subspace_recover.py ${INITIAL_GUESS_ARGS} "${REST_POSE}" "${POSES_DIR}"/*.obj --out "${OUTPUT_DIR}"/local_subspace_recover.txt  2>&1 | tee "${OUTPUT_DIR}"/local_subspace_recover.out
 
 	# ## biquadratic
 	# FLAT_INTERSECTION_ARGS_BIQUADRATIC="--energy biquadratic --forced-init True --CSV ${OUTPUT_DIR}/${test_dir}_biquadratic.csv --strategy pinv+ssv:weighted --max-iter ${MAXITER} --f-eps 0 --handles ${H} -I ${OUTPUT_DIR}/local_subspace_recover.txt"
@@ -41,18 +42,23 @@ do
 	# FLAT_INTERSECTION_ARGS_IPCA="--energy ipca --forced-init True --CSV ${OUTPUT_DIR}/${test_dir}_ipca.csv --W-projection normalize --max-iter ${MAXITER} --f-eps 0 --handles ${H} -I ${OUTPUT_DIR}/local_subspace_recover.txt"
 	# python3 -u flat_intersection.py "${REST_POSE}" "${POSES_DIR}" ${FLAT_INTERSECTION_ARGS_IPCA} 2>&1 | tee -i "${OUTPUT_DIR}"/flat_intersection_ipca.out	
 
-	# ## pb_pymanopt conjugate
-	# FLAT_INTERSECTION_ARGS_PB_PYMANOPT_CONJUGATE="--energy pB_pymanopt --forced-init True --CSV ${OUTPUT_DIR}/${test_dir}_pB_pymanopt_conjugate.csv --strategy conjugate --max-iter ${MAXITER} --f-eps 0 --handles ${H} -I ${OUTPUT_DIR}/local_subspace_recover.txt"
-	# python3 -u flat_intersection.py "${REST_POSE}" "${POSES_DIR}" ${FLAT_INTERSECTION_ARGS_PB_PYMANOPT_CONJUGATE} 2>&1 | tee -i "${OUTPUT_DIR}"/flat_intersection_pB_pymanopt_conjugate.out
+	## pb_pymanopt conjugate
+	FLAT_INTERSECTION_ARGS_PB_PYMANOPT_CONJUGATE="--energy pB_pymanopt --forced-init True --CSV ${OUTPUT_DIR}/${test_dir}_pB_pymanopt_conjugate.csv --strategy conjugate --max-iter ${MAXITER} --f-eps 0 --handles ${H} -I ${OUTPUT_DIR}/local_subspace_recover.txt"
+	python3 -u flat_intersection.py "${REST_POSE}" "${POSES_DIR}" ${FLAT_INTERSECTION_ARGS_PB_PYMANOPT_CONJUGATE} 2>&1 | tee -i "${OUTPUT_DIR}"/flat_intersection_pB_pymanopt_conjugate.out
 
 	# ## pb_pymanopt trust
 	# FLAT_INTERSECTION_ARGS_PB_PYMANOPT_TRUST="--energy pB_pymanopt --forced-init True --CSV ${OUTPUT_DIR}/${test_dir}_pB_pymanopt_trust.csv --strategy trust --max-iter ${MAXITER} --f-eps 0 --handles ${H} -I ${OUTPUT_DIR}/local_subspace_recover.txt"
 	# python3 -u flat_intersection.py "${REST_POSE}" "${POSES_DIR}" ${FLAT_INTERSECTION_ARGS_PB_PYMANOPT_TRUST} 2>&1 | tee -i "${OUTPUT_DIR}"/flat_intersection_pB_pymanopt_trust.out
 
-	# ## pb_pymanopt steepest
-	# FLAT_INTERSECTION_ARGS_PB_PYMANOPT_STEEPEST="--energy pB_pymanopt --forced-init True --CSV ${OUTPUT_DIR}/${test_dir}_pB_pymanopt_steepest.csv --strategy steepest --max-iter ${MAXITER} --f-eps 0 --handles ${H} -I ${OUTPUT_DIR}/local_subspace_recover.txt"
-	# python3 -u flat_intersection.py "${REST_POSE}" "${POSES_DIR}" ${FLAT_INTERSECTION_ARGS_PB_PYMANOPT_STEEPEST} 2>&1 | tee -i "${OUTPUT_DIR}"/flat_intersection_pB_pymanopt_steepest.out
+	## pb_pymanopt steepest
+	FLAT_INTERSECTION_ARGS_PB_PYMANOPT_STEEPEST="--energy pB_pymanopt --forced-init True --CSV ${OUTPUT_DIR}/${test_dir}_pB_pymanopt_steepest.csv --strategy steepest --max-iter ${MAXITER} --f-eps 0 --handles ${H} -I ${OUTPUT_DIR}/local_subspace_recover.txt"
+	python3 -u flat_intersection.py "${REST_POSE}" "${POSES_DIR}" ${FLAT_INTERSECTION_ARGS_PB_PYMANOPT_STEEPEST} 2>&1 | tee -i "${OUTPUT_DIR}"/flat_intersection_pB_pymanopt_steepest.out
 
+
+
+
+
+ # #    #### not used anymore
 	# ## intersection conjugate
 	# FLAT_INTERSECTION_ARGS_INTERSECTION="--energy intersection --forced-init True --CSV ${OUTPUT_DIR}/${test_dir}_intersection_conjugate.csv --strategy conjugate --max-iter ${MAXITER} --f-eps 0 --handles ${H} -I ${OUTPUT_DIR}/local_subspace_recover.txt"
 	# python3 -u flat_intersection.py "${REST_POSE}" "${POSES_DIR}" ${FLAT_INTERSECTION_ARGS_INTERSECTION} 2>&1 | tee -i "${OUTPUT_DIR}"/flat_intersection_intersection_conjugate.out
