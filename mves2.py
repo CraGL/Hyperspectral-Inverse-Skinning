@@ -467,7 +467,79 @@ def MVES( pts, initial_guess_vertices = None, method = None, linear_solver = Non
 # 		import pdb; pdb.set_trace()	
 		print( "Final log volume:", f_log_volume( numpy.array(x0) ) )
 		solution = numpy.linalg.inv( unpack( numpy.array(x0) ) )
+	
+	elif method == "frank-wolfe" or method == "frank-wolfe-optimal":
+		print( "Solve MEVS with Franke-Wolfe algorithm." )
+		## This problem isn't convex, but it's an interesting algorithm nonetheless.
+		## Linear test:
+		import cvxopt
+		x0 = x0[:,numpy.newaxis]
+		all_x = [ (f_log_volume( numpy.array(x0) ), x0) ]
 		
+		## set invariant parameters
+		G = -g_bary_jac( x0 )
+		h = g_bary_rhs()
+		A = g_ones_jac( x0 )
+		b = g_ones_rhs()
+		sparse_G = to_spmatrix(G)
+		sparse_A = to_spmatrix(A)
+		try:
+			k = 0
+			while True:		
+				c = f_log_volume_grad( x0 )
+				solution = cvxopt.solvers.lp( cvxopt.matrix(c), sparse_G, cvxopt.matrix(h), sparse_A, cvxopt.matrix(b), solver=linear_solver )
+				# Hc = numpy.linalg.solve( make_positive_semidefinite( f_log_volume_hess( x0 ) ), f_log_volume_grad( x0 ) )
+				# solution = cvxopt.solvers.lp( cvxopt.matrix(Hc), sparse_G, cvxopt.matrix(h), sparse_A, cvxopt.matrix(b), solver=linear_solver )
+				# Hc = numpy.dot( f_log_volume_hess_inv( x0 ), f_log_volume_grad( x0 ) )
+				# solution = cvxopt.solvers.lp( cvxopt.matrix(Hc*0.9+c*0.1), sparse_G, cvxopt.matrix(h), sparse_A, cvxopt.matrix(b), solver=linear_solver )
+	
+				s = numpy.array( solution['x'] )
+				gamma = 2.0/(k+2)
+				if method == "frank-wolfe-optimal":
+					P = f_log_volume_hess( x0 )
+					# f = 1/2 * ( x + gamma * ( s - x ) )' * P * ( x + gamma * ( s - x ) ) + c' * ( x + gamma * ( s - x ) )
+					# f = 1/2 * gamma * sx' * P * x + 1/2 * x' P gamma sx + 1/2 gamma^2 sx' P sx + c' gamma sx
+					# f = gamma ( x' P sx + c' sx ) + 1/2 gamma^2 sx' P sx
+					# f = gamma ( x' P + c' ) sx + 1/2 gamma^2 sx' P sx
+					# df/dgamma = ( x' P + c' ) sx + gamma sx' P sx = 0 <=> gamma = -( x' P + c' ) sx / ( sx P sx )
+					sx = ( s - x0 )
+					gamma = -sx.T.dot( P.dot(x0) + c.reshape(-1,1) )/( sx.T.dot( P.dot( sx ) ) )
+					gamma = min( 1, max( 0, gamma ) )
+				x = x0 + gamma*( s - x0 )
+				k += 1
+				
+				fx = f_log_volume( x )
+				print( "Current log volume: ", fx  )
+				all_x.append( ( fx, x ) )
+				iter_num += 1
+				if( numpy.allclose( x, x0, rtol=1e-02, atol=1e-05 ) ):
+					print("all close!")
+					break
+				## More generally, check if we are in a cycle:
+				# if [ x - 
+				elif( iter_num>MAX_ITER/2 and abs( fx - f_log_volume(x0) ) <= 0.1 ):
+					print("log volume is close!")
+					break
+				elif iter_num >= MAX_ITER:
+					print("Exceed the maximum number of iterations!")
+					break
+	
+				x0 = x
+		
+		except KeyboardInterrupt:
+			print( "Terminated by KeyboardInterrupt." )
+		
+		print( "# LP Iteration: ", iter_num )
+		if iter_num >= MAX_ITER:
+			curr_volume = f_log_volume( x0 )
+			for i, item in enumerate(all_x):
+				if item[0] < curr_volume:
+					curr_volume = item[0]
+					x0 = item[1]
+# 		import pdb; pdb.set_trace()	
+		print( "Final log volume:", f_log_volume( numpy.array(x0) ) )
+		solution = numpy.linalg.inv( unpack( numpy.array(x0) ) )
+	
 	elif method == "QP" or method == "qp" or method == "qp-major":
 		print( "Solve MEVS with cvxopt qp solver." )	
 		import cvxopt
