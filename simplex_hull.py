@@ -169,6 +169,7 @@ if __name__ == '__main__':
 	## This option is not recommended.
 	parser.add_argument('--random-after-PCA', type=str2bool, default=False, help='Whether to take the random subset after computing PCA. Default: False.')
 	parser.add_argument('--random-reps', type=int, default=1, help='How many times to repeat the random subsampling. Default: 1.')
+	parser.add_argument('--project-to-rigid', type=str2bool, default=False, help='Wether to project the result to the closest rigid transformation.')
 	args = parser.parse_args()
 
 	# Check that in_mesh exists
@@ -369,6 +370,13 @@ if __name__ == '__main__':
 	print( "Number of points with negative weights (< -0.1):", ( weights < -0.1 ).any(axis=1).sum() )
 	print( "Number of points with negative weights (< -0.5):", ( weights < -0.5 ).any(axis=1).sum() )
 	print( "Number of points with negative weights (< -1):", ( weights < -1 ).any(axis=1).sum() )
+	
+	if args.project_to_rigid:
+		import rigid
+		print( "Projecting output to rigid transformations." )
+		recovered = np.swapaxes( recovered.reshape(-1,4,3), 1,2 ).reshape( recovered.shape[0], -1 )
+		recovered = np.array( [ rigid.closest_rotations_R12( q ) for q in recovered ] )
+		recovered = np.swapaxes( recovered.reshape(-1,3,4), 1,2 ).reshape( recovered.shape[0], -1 )
 	
 	output_path = os.path.join(per_vertex_folder, "result.txt")
 	if args.output is not None:

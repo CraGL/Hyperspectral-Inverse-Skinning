@@ -95,6 +95,14 @@ if __name__ == '__main__':
 	rest_vs = np.array(rest_mesh.vs)
 
 	Ts = np.loadtxt(args.per_vertex_tranformation)
+	## The following line fixes a bug in this code which assumed that the input was
+	## in DMAT format, vertices-by-poses-by-four-by-three. The output from the initial
+	## guess code was saving vertices-by-poses-by-four-by-three data (in row major order),
+	## which is what flat_intersection.py takes as input. flat_intersection outputs
+	## into DMAT format, which is appropriate for comparison with ground truth.
+	## The following swapaxes() line does the appropriate swap, but it hasn't been tested.
+	raise RuntimeError( "Test the following line." )
+	Ts = np.swapaxes( Ts.reshape(-1,3,4), 1,2 ).reshape( Ts.shape[0], -1 )
 	print( "# initial vertices: ", Ts.shape[0] )
 	
 	if args.WPCA is not None:

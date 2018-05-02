@@ -25,6 +25,9 @@ def closest_rotations_R12( v ):
     Given a vector of affine transformation coefficients `v` obtained as in the packing
     used by flat_intersection.py, returns the same vector with each transformation
     projected to the closest rotation in 3D.
+    
+    The packing used by flat_intersection.py is a row-major flattening of the data
+    as pose-by-three-by-four.
     '''
     
     v = np.asarray( v )
