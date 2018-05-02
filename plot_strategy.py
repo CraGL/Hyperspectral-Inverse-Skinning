@@ -27,7 +27,7 @@ def plot(all_data):
 		
 
 		# plt.title('Different optimization strategies with performance' , fontsize='medium')
-		plt.xlabel('iterations')
+		plt.xlabel('Iterations')
 		plt.ylabel('Vertex Error')
 
 
@@ -66,16 +66,16 @@ def plot(all_data):
 
 
 ############ with initial guess (50%)
-## cylinder
-		# plt.plot(range(len(y[0])), y[0], c=cmap[0], lw=2, label='Biquadratic (0.08 min)')
-		# plt.plot(range(len(y[1])), y[1], c=cmap[1], lw=2, label='p,B (0.06 min)')
-		# plt.plot(range(len(y[2])), y[2], c=cmap[2], lw=2, label='IPCA (0.06 min)')
-		# plt.plot(range(len(y[3])), y[3], c=cmap[3], lw=2, label='Manifold p,B conjugate (0.31 min)')
-		# plt.plot(range(len(y[4])), y[4], c=cmap[4], lw=2, label='Manifold p,B trust (93.13 min)')
-		# plt.plot(range(len(y[5])), y[5], c=cmap[5], lw=2, label='Manifold p,B steepest (0.26 min)')
-		# plt.ylim(ymin=0, ymax=32)
-		# # plt.plot(range(len(y[6])), y[6], c=cmap[6], lw=2, label='Intersection conjugate (0.31 min)')
-		# # plt.ylim(ymin=0, ymax=140)
+# ### cylinder
+# 		plt.plot(range(len(y[0])), y[0], c=cmap[0], lw=2, label='Biquadratic (0.08 min)')
+# 		plt.plot(range(len(y[1])), y[1], c=cmap[1], lw=2, label='p,B (0.06 min)')
+# 		plt.plot(range(len(y[2])), y[2], c=cmap[2], lw=2, label='IPCA (0.06 min)')
+# 		plt.plot(range(len(y[3])), y[3], c=cmap[3], lw=2, label='Manifold p,B conjugate (0.30 min)')
+# 		plt.plot(range(len(y[4])), y[4], c=cmap[4], lw=2, label='Manifold p,B trust (93.13 min)')
+# 		plt.plot(range(len(y[5])), y[5], c=cmap[5], lw=2, label='Manifold p,B steepest (0.35 min)')
+# 		plt.ylim(ymin=0, ymax=32)
+# 		# plt.plot(range(len(y[6])), y[6], c=cmap[6], lw=2, label='Intersection conjugate (0.31 min)')
+# 		# plt.ylim(ymin=0, ymax=140)
 
 
 
@@ -83,9 +83,9 @@ def plot(all_data):
 		# plt.semilogy(range(len(y[0])), y[0], c=cmap[0], lw=2, label='Biquadratic (0.08 min)')
 		# plt.semilogy(range(len(y[1])), y[1], c=cmap[1], lw=2, label='p,B (0.06 min)')
 		# plt.semilogy(range(len(y[2])), y[2], c=cmap[2], lw=2, label='IPCA (0.06 min)')
-		# plt.semilogy(range(len(y[3])), y[3], c=cmap[3], lw=2, label='Manifold p,B conjugate (0.31 min)')
+		# plt.semilogy(range(len(y[3])), y[3], c=cmap[3], lw=2, label='Manifold p,B conjugate (0.30 min)')
 		# plt.semilogy(range(len(y[4])), y[4], c=cmap[4], lw=2, label='Manifold p,B trust (93.13 min)')
-		# plt.semilogy(range(len(y[5])), y[5], c=cmap[5], lw=2, label='Manifold p,B steepest (0.26 min)')
+		# plt.semilogy(range(len(y[5])), y[5], c=cmap[5], lw=2, label='Manifold p,B steepest (0.35 min)')
 		# plt.ylim(ymin=0, ymax=40)
 		# # plt.semilogy(range(len(y[6])), y[6], c=cmap[6], lw=2, label='Intersection conjugate (0.31 min)')
 		# # plt.ylim(ymin=0, ymax=1e7)
@@ -104,22 +104,22 @@ def plot(all_data):
 # 		plt.plot(range(len(y[0])), y[0], c=cmap[0], lw=2, label='Biquadratic (1.86 min)')
 # 		plt.plot(range(len(y[1])), y[1], c=cmap[1], lw=2, label='p,B (1.48 min)')
 # 		plt.plot(range(len(y[2])), y[2], c=cmap[2], lw=2, label='IPCA (1.85 min)')
-# 		plt.plot(range(len(y[3])), y[3], c=cmap[3], lw=2, label='Manifold p,B conjugate (6.37 min)')
-# 		plt.plot(range(len(y[4])), y[4], c=cmap[4], lw=2, label='Manifold p,B trust (269.36 min)')
-# 		plt.plot(range(len(y[5])), y[5], c=cmap[5], lw=2, label='Manifold p,B steepest (7.17 min)')
+# 		plt.plot(range(len(y[3])), y[3], c=cmap[3], lw=2, label='Manifold p,B conjugate (7.13 min)')
+# 		plt.plot(range(len(y[4])), y[4], c=cmap[4], lw=2, label='Manifold p,B trust (290.0 min)')
+# 		plt.plot(range(len(y[5])), y[5], c=cmap[5], lw=2, label='Manifold p,B steepest (6.89 min)')
 # 		plt.ylim(ymin=0, ymax=10)
 
 # 		# plt.plot(range(len(y[6])), y[6], c=cmap[6], lw=2, label='Intersection conjugate (18.51 min)')
 # 		# plt.ylim(ymin=0, ymax=16)
 
 
-## cheburashka
+#### cheburashka
 		plt.plot(range(len(y[0])), y[0], c=cmap[0], lw=2, label='Biquadratic (1.47 min)')
 		plt.plot(range(len(y[1])), y[1], c=cmap[1], lw=2, label='p,B (1.38 min)')
 		plt.plot(range(len(y[2])), y[2], c=cmap[2], lw=2, label='IPCA (2.38 min)')
-		plt.plot(range(len(y[3])), y[3], c=cmap[3], lw=2, label='Manifold p,B conjugate (7.04 min)')
-		plt.plot(range(len(y[4])), y[4], c=cmap[4], lw=2, label='Manifold p,B trust (550.98 min)')
-		plt.plot(range(len(y[5])), y[5], c=cmap[5], lw=2, label='Manifold p,B steepest (5.17 min)')
+		plt.plot(range(len(y[3])), y[3], c=cmap[3], lw=2, label='Manifold p,B conjugate (5.41 min)')
+		plt.plot(range(len(y[4])), y[4], c=cmap[4], lw=2, label='Manifold p,B trust (603.43 min)')
+		plt.plot(range(len(y[5])), y[5], c=cmap[5], lw=2, label='Manifold p,B steepest (6.41 min)')
 		plt.ylim(ymin=0, ymax=6)
 
 		# plt.plot(range(len(y[6])), y[6], c=cmap[6], lw=2, label='Intersection conjugate (21.74 min)')
@@ -164,10 +164,8 @@ if __name__ == '__main__':
 		data_file_pB_pymanopt_conjugate = os.path.join( folder, name+'_pB_pymanopt_conjugate.csv' )
 		data_file_pB_pymanopt_trust = os.path.join( folder, name+'_pB_pymanopt_trust-manually_corrected.csv' )
 		data_file_pB_pymanopt_steepest = os.path.join( folder, name+'_pB_pymanopt_steepest.csv' )
-		data_file_intersection_conjugate = os.path.join( folder, name+'_intersection_conjugate.csv' )
 
-
-		all_data[name] = [np.loadtxt(data_file_biquadratic, delimiter=',')[:20], np.loadtxt(data_file_b, delimiter=',')[:20], np.loadtxt(data_file_ipca, delimiter=',')[:20], np.loadtxt(data_file_pB_pymanopt_conjugate, delimiter=',')[:20], np.loadtxt(data_file_pB_pymanopt_trust, delimiter=',')[:20], np.loadtxt(data_file_pB_pymanopt_steepest, delimiter=',')[:20], np.loadtxt(data_file_intersection_conjugate, delimiter=',')[:20]]
+		all_data[name] = [np.loadtxt(data_file_biquadratic, delimiter=',')[:21], np.loadtxt(data_file_b, delimiter=',')[:21], np.loadtxt(data_file_ipca, delimiter=',')[:21], np.loadtxt(data_file_pB_pymanopt_conjugate, delimiter=',')[:21], np.loadtxt(data_file_pB_pymanopt_trust, delimiter=',')[:21], np.loadtxt(data_file_pB_pymanopt_steepest, delimiter=',')[:21]]
 	
 	plot(all_data)
 
