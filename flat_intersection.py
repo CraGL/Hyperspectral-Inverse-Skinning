@@ -1340,6 +1340,10 @@ def optimize_biquadratic( P, H, rest_vs, deformed_vs, x0, solve_for_rest_pose = 
 	## Verify that we can unpack and re-pack shifted without changing anything.
 	assert abs( pack_W( unpack_W( np.arange(36), 1 ) ) - np.arange(36) ).max() < 1e-10
 	
+	enforce_rigidity = False
+	if enforce_rigidity:
+		import rigid
+	
 	if f_eps is None:
 		f_eps = 1e-6
 	if x_eps is None:
@@ -1472,6 +1476,10 @@ def optimize_biquadratic( P, H, rest_vs, deformed_vs, x0, solve_for_rest_pose = 
 			
 			## 4
 			W = biquadratic.solve_for_W_with_system( W_system, W_rhs, use_pseudoinverse = use_pseudoinverse, projection = W_projection, first_column = first_column )
+			if enforce_rigidity:
+				print( "Enforcing rigidity." )
+				for i in range(W.shape[1]):
+					W[:,i] = rigid.closest_rotations_R12( W[:,i] )
 			W = canonicalize( W )
 			
 			f *= normalization / weights
@@ -1560,6 +1568,10 @@ def optimize_iterative_pca( P, H, row_mats, deformed_vs, x0, max_iter = None, st
 	from space_mapper import SpaceMapper
 	converged = False
 	
+	enforce_rigidity = False
+	if enforce_rigidity:
+		import rigid
+	
 	import flat_metrics
 	
 	iterations = 0
@@ -1593,6 +1605,9 @@ def optimize_iterative_pca( P, H, row_mats, deformed_vs, x0, max_iter = None, st
 				## Solve for the new 12*P transformation for the vertex
 				Q[i] = np.linalg.solve(lh, rh)[:12*P]
 				# Q[i] = np.dot( np.linalg.pinv(lh), rh)[:12*P]
+				
+				if enforce_rigidity:
+					Q[i] = rigid.closest_rotations_R12( Q[i] )
 				
 				if strategy == 'momentum':
 					v = vbar[0,:4]
@@ -1972,6 +1987,7 @@ if __name__ == '__main__':
 	parser.add_argument('--fancy-init', '-I', type=str, help='Valid points generated from local subspace intersection.')
 	parser.add_argument('--fancy-init-errors', type=str, help='Errors for data generated from local subspace intersection.')
 	parser.add_argument('--fancy-init-ssv', type=str, help='Smallest singular values for data generated from local subspace intersection.')
+	parser.add_argument('--fancy-init-rigid', type=str2bool, help='Whether to project the fancy initial guess to rigid transformations.')
 	parser.add_argument('--output', '-O', type=str, help='output path.')
 	parser.add_argument('--max-iter', type=int, help='Maximum number of iterations.')
 	parser.add_argument('--f-eps', type=float, help='Function change epsilon (biquadratic).')
@@ -2114,6 +2130,11 @@ if __name__ == '__main__':
 			if fancy_init_path is not None:			
 				qs_data = np.loadtxt(fancy_init_path)
 				print( "# of good valid vertices: ", qs_data.shape[0] )
+				if args.fancy_init_rigid:
+					import rigid
+					print( "Projecting fancy initial guess to rigid transformations." )
+					qs_data = np.array( [ rigid.closest_rotations_R12( q ) for q in qs_data ] )
+				
 				from space_mapper import SpaceMapper
 				pca = SpaceMapper.Uncorrellated_Space( qs_data, dimension = H )
 				pt = pca.Xavg_
