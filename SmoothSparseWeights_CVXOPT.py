@@ -27,10 +27,10 @@ def to_spmatrix( M ):
 	return cvxopt.spmatrix( M.data, np.asarray( M.row, dtype = int ), np.asarray( M.col, dtype = int ) )
 
 def col_major(M):
-	return M.T.ravel()
+	return M.T.ravel().copy()
 
 def col_major_back(x, row, col):
-	return x.reshape(col, row).T
+	return x.reshape(col, row).T.copy()
 
 
 def optimize(vertices1, vertices2, Lap, weights, endmembers, fixed_x0, grad_zero_indices, initials=None):
@@ -89,7 +89,8 @@ def optimize(vertices1, vertices2, Lap, weights, endmembers, fixed_x0, grad_zero
 	A=scipy.sparse.kron(np.ones((1,H)), scipy.sparse.identity(N)) ### for sum to be 1 per row of mixing weights (N*H)
 	b=np.ones(N)
 
-	if len(grad_zero_indices)!=0:
+	if len(grad_zero_indices)!=0: ###grad_zero_indices is already col-Major from clip_first_k_values
+
 		A_2=np.zeros(N*H)
 		A_2[grad_zero_indices]=1.0 ### those zeros values sum should always be zero, during optimization.
 		b_2=np.zeros(1)
@@ -157,13 +158,21 @@ def clip_first_k_values(matrix, k):
 	### matrix shape is N*H
 	indices=np.argsort(matrix, axis=1)
 	output=matrix.copy()
-	fixed_indices=[] ## record the positions that filled with zeros. Will fix these values when run optimization.
+	flag=np.ones(matrix.shape)
+    
 	if 0<=k and k<len(indices):
 		for i in range(len(indices)):
 			index=indices[i]
 			output[i, index[:-k]]=0.0
-			fixed_indices.append(index[:-k]+indices.shape[1]*i)
-	return output, np.asarray(fixed_indices).ravel()
+			flag[i, index[:-k]]=0.0
+
+
+    ### need to consider col major for cvxopt solver
+	### record the positions that filled with zeros. Will fix these values when run optimization.
+	fixed_indices=np.arange(len(matrix.ravel()))[col_major(flag)==0.0]
+
+	return output, fixed_indices
+
 
 def find_scale(Vertices):
 	Dmin=Vertices.min(axis=0)
