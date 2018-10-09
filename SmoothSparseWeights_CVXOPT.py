@@ -33,7 +33,7 @@ def col_major_back(x, row, col):
 	return x.reshape(col, row).T.copy()
 
 
-def optimize(vertices1, vertices2, Lap, weights, endmembers, fixed_x0, grad_zero_indices, initials=None):
+def optimize(vertices1, vertices2, Lap, weights, endmembers, fixed_x0, grad_zero_indices, initials=None, choice="vertices_error"):
 
 	cvxopt.solvers.options['show_progress'] = True
 	# cvxopt.solvers.options['maxiters'] = 30
@@ -58,16 +58,40 @@ def optimize(vertices1, vertices2, Lap, weights, endmembers, fixed_x0, grad_zero
 	print (N, P, H)
 
 	#### build P_matrix and q
+	if choice=="transformation_error":
+		### for data term. |W.dot(E)-W_fixed.dot(E)|^2
+		print ("use transformation error as obj")
+		E=endmembers.reshape((H, -1))
+		A1=scipy.sparse.kron(E.T, scipy.sparse.identity(N))
+		temp=col_major(fixed_x0.reshape((N,H)))
+		b1=A1.dot(temp)
 
-	### for data term. |W.dot(E)-W_fixed.dot(E)|^2
-	E=endmembers.reshape((H, -1))
-	A1=scipy.sparse.kron(E.T, scipy.sparse.identity(N))
-	temp=col_major(fixed_x0.reshape((N,H)))
-	b1=A1.dot(temp)
+		### for spatial term. |Lap.dot(W)-Lap.dot(W_fixed)|^2
+		A2=scipy.sparse.kron(scipy.sparse.identity(H), Lap)
+		b2=A2.dot(temp)
 
-	### for spatial term. |Lap.dot(W)-Lap.dot(W_fixed)|^2
-	A2=scipy.sparse.kron(scipy.sparse.identity(H), Lap)
-	b2=A2.dot(temp)
+
+	elif choice=="vertices_error":
+		### for data term. |(W.dot(E)*V1).sum(axis=-1)-V2|^2 => |(W.dot(E)*V1).dot(project)-V2|^2 
+		print ("use vertices error as obj")
+		E=endmembers.reshape((H, -1))
+		vertices1_boadcast=np.concatenate((vertices1.reshape((N,P,1,4)), vertices1.reshape((N,P,1,4)), vertices1.reshape((N,P,1,4))), axis=2)
+		Project=np.ones((4,1))
+		tmp1=scipy.sparse.kron(Project.T, scipy.sparse.identity(3*N*P))
+		tmp2=scipy.sparse.diags(col_major(vertices1_boadcast.reshape((N,12*P))))
+		tmp3=scipy.sparse.kron(E.T, scipy.sparse.identity(N))
+		A1=tmp1.dot(tmp2).dot(tmp3)
+		b1=col_major(vertices2)
+
+		### for spatial term. |Lap.dot(W)-Lap.dot(W_fixed)|^2
+		A2=scipy.sparse.kron(scipy.sparse.identity(H), Lap)
+		temp=col_major(fixed_x0.reshape((N,H)))
+		b2=A2.dot(temp)
+
+
+
+
+
 
 	W_spatial=0.0
 	if 'W_spatial' in weights:
@@ -130,7 +154,7 @@ def optimize(vertices1, vertices2, Lap, weights, endmembers, fixed_x0, grad_zero
 	return col_major_back(x, N, H)
 
 
-def run(mesh1, mesh2_list, weights, endmembers, fixed_x0, grad_zero_indices, initials=None):
+def run(mesh1, mesh2_list, weights, endmembers, fixed_x0, grad_zero_indices, initials=None, choice="vertices_error"):
 
 	vertices1=vertices1_temp=np.hstack((np.asarray(mesh1.vs),np.ones((len(mesh1.vs),1))))
 	vertices2=vertices2_temp=np.asarray(mesh2_list[0].vs)
@@ -149,7 +173,7 @@ def run(mesh1, mesh2_list, weights, endmembers, fixed_x0, grad_zero_indices, ini
 
 	Smooth_Matrix=Get_basic_Laplacian_sparse_matrix(mesh1)
 
-	x=optimize(vertices1, vertices2, Smooth_Matrix, weights, endmembers, fixed_x0, grad_zero_indices, initials=initials)
+	x=optimize(vertices1, vertices2, Smooth_Matrix, weights, endmembers, fixed_x0, grad_zero_indices, initials=initials, choice=choice)
 
 	return x
 
