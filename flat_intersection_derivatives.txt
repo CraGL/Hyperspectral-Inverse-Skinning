@@ -1,5 +1,7 @@
 derivatives
 
+## See: https://gist.github.com/yig/c1959ce997f1d2fd6f3f982cb482e060
+
 # A good primer on basic matrix calculus: https://atmos.washington.edu/~dennis/MatrixCalculus.pdf
 # The Matrix Reference Manual: http://www.ee.ic.ac.uk/hp/staff/dmb/matrix/intro.html#Intro
 # Trying to understand the derivative of the inverse: https://math.stackexchange.com/questions/1471825/derivative-of-the-inverse-of-a-matrix
@@ -21,7 +23,6 @@ derivatives
     http://www.psi.toronto.edu/~andrew/papers/matrix_calculus_for_learning.pdf
 
 # Properties (: is Frobenius inner product, ∘ and ⊙ are element-wise Hadamard product, * is matrix multiplication, ' is transpose):
-    d(X:X)=dX:X+X:dX=2X:dX
     A:B=B:A
     A:(B+C)=A:B + A:C
     A:B=A':B'
@@ -29,6 +30,7 @@ derivatives
     A:B∘C=A∘B:C
     A:(B*C) = (B'*A):C = (A*C'):B
     d(X:Y) = (dX):Y + X:(dY)
+    d(X:X) = dX:X + X:dX = 2X:dX
     d(X⊙Y) = (dX)⊙Y + X⊙(dY)
     d(X*Y) = (dX)*Y + X*(dY)
     d(X') = (dX)'
@@ -37,6 +39,13 @@ derivatives
     
     vec_column( A*B*C ) = ( C' kronecker A ) * vec_column( B )
     vec_row( A*B*C ) = ( A kronecker C' ) * vec_row( B )
+
+# Example
+    E = norm2( A*x - b ) = M : M
+    dE = 2M : dM
+    dM = dA*x + A*dx - db
+    dE/dx = 2M : A*dx = 2 A' M : dx = 2 A' ( A x - b )
+
 
 ## Our energy:
 
