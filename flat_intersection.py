@@ -38,6 +38,7 @@ class ErrorRecorder:
 	ground_truth = None
 	visualize = False
 	visualize_port = None
+	enabled = False
 	
 	def __init__(self):
 		self.values=[]
@@ -45,6 +46,7 @@ class ErrorRecorder:
 		self.visualize_last = None
 		
 	def visualize_error( self, rev_vertex_trans ):
+		if self.enabled == False: return
 		if H > 4: return None
 		import web_gui.relay as relay
 		relay.send_data( "points", port = self.visualize_port )
@@ -65,6 +67,7 @@ class ErrorRecorder:
 		relay.send_data( reduced_data.tolist(), port = self.visualize_port )
 		
 	def add_error(self, data, enable_cayley = True):
+		if self.enabled == False: return
 		P = self.P 
 		H = self.H
 		x = data.copy()
@@ -84,9 +87,11 @@ class ErrorRecorder:
 			self.visualize_error( rev_vertex_trans )
 		
 	def clear_error(self):
+		if self.enabled == False: return
 		self.values=[]
 		
 	def save_error(self):
+		if self.enabled == False: return
 		if self.csv_path is not None:
 			values = np.array( self.values )
 			np.savetxt(self.csv_path, values, delimiter=",")
@@ -2005,6 +2010,7 @@ if __name__ == '__main__':
 	parser.add_argument('--basinhopping', type=int, default=0, help='basinhopping algorithm to jump out of local minima with random step.')
 	parser.add_argument('--visualize', type=str2bool, default=False, help='visualize the optimization precedure, only works for 4 handles.')
 	parser.add_argument('--visualize-port', type=int, help='visualization relay server port.')
+	parser.add_argument('--record-error', type=str2bool, default=False, help='compute error and make callback after each iteration.')
 	
 	args = parser.parse_args()
 	H = args.handles
@@ -2078,6 +2084,7 @@ if __name__ == '__main__':
 		return rest_vs[indices], deformed_vs[indices], all_R_mats[indices]
 	
 	## build global error recorder
+	error_recorder.enabled = args.record_error
 	error_recorder.energy = args.energy
 	error_recorder.H = H 
 	error_recorder.P = P

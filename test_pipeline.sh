@@ -2,17 +2,21 @@
 
 ROOT_DIR="../.."
 MODEL_DIR="./models"
-TEST_DIR="./results_clean"
+TEST_DIR="./results_pipeline"
 OBJ_SUFF=".obj"
-FLAT_MAX_ITER=4
+FLAT_MAX_ITER=10
+MVES_MAX_ITER=10
 
 INITIAL_GUESS_ARGS="--svd_threshold 1e-15 --transformation_percentile 50 --version 0 --method vertex -rand none"
-declare -a gt_models=("cylinder" "cube" "cheburashka" "wolf" "cow")
-declare -a wild_models=("cat-poses" "elephant-gallop" "elephant-poses" "chickenCrossing" "face-poses" "horse-collapse" "horse-gallop" "horse-poses" "lion-poses" "pcow" "pdance" "pjump")
-declare -a kavan_models=("crane" "elasticCow" "kavanElephant" "kavanHorse" "samba")
 
-# for REST_POSE in $(basename "${MODEL_DIR}"/cyli*.obj)
-for name in "${gt_models[@]}"; do
+# OUTPUT_FILE="${SSD_DIR}"/all_error.out
+
+# declare -a gt_models=("cylinder" "cube" "cheburashka" "wolf" "cow")
+# declare -a wild_models=("cat-poses" "elephant-gallop" "horse-collapse" "pdance" "samba")
+declare -a wild_models=("lion-poses" "chickCrossing" "face-poses" "pcow" "pjump" "crane" "kavanHorse")
+
+# echo -n "" > "${OUTPUT_FILE}"
+for name in "${wild_models[@]}"; do
 	REST_POSE="${MODEL_DIR}/${name}.obj"
 	POSES_DIR="${MODEL_DIR}/${name}"
 	for OUTPUT_DIR in "${TEST_DIR}"/"${name}"*
@@ -29,7 +33,18 @@ for name in "${gt_models[@]}"; do
 
 		### generate deformed meshes from per-vertex transformation
 # 		python generate_deformed_meshes.py "${REST_POSE}" "${MODEL_DIR}"/"${name}-all"/"${name}.DMAT" "${OUTPUT_DIR}"
+
+		### unmixing hyperspectral per-vertex transformations
+		RESULT="${OUTPUT_DIR}/result.txt"
+		SIMPLEX_HULL_ARGS="--max-iter ${MVES_MAX_ITER} -O ${RESULT} -R 50"
+ 		python -u simplex_hull.py "${OUTPUT_DIR}" ${SIMPLEX_HULL_ARGS} 2>&1 | tee -i "${OUTPUT_DIR}"/simplex_hull.out
+
+		## measure differences with ground truth
+		python -u ./compare.py "${REST_POSE}" "${MODEL_DIR}"/"${name}" "${MODEL_DIR}"/"${name}"-all/"${name}".DMAT "${OUTPUT}" 2>&1 | tee -a "${OUTPUT_DIR}/recover_poses.out"
 		
-		
+		## view recovered bones
+		cd build
+		./viewer2 "../${REST_POSE}" "../${RESULT}"
+		cd ..
 	done	
 done
