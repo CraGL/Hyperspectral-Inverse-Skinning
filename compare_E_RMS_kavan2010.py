@@ -34,6 +34,7 @@ if __name__ == '__main__':
 	##		   For more, see https://stackoverflow.com/questions/15008758/parsing-boolean-values-with-argparse
 	def str2bool(s): return {'true': True, 'false': False}[s.lower()]
 	# parser.add_argument( '--debug', '-D', type=str2bool, default=False, help='print out debug information.')
+	parser.add_argument( '--match-data', type=str2bool, default=False, help="Whether to compute a best match between poses, in case filenames don't match.")
 	args = parser.parse_args()
 	
 	print( "=== %s ===" % args.test_folder )
@@ -65,9 +66,10 @@ if __name__ == '__main__':
 	
 	np.set_printoptions(precision=6, suppress=True)
 	
-	ordering = match_data( gt_vs, test_vs )
-	print( "match order of our recovery: ", ordering )
-	test_vs = np.array([ test_vs[i] for i in ordering ])
+	if args.match_data:
+		ordering = match_data( gt_vs, test_vs )
+		print( "match order of our recovery: ", ordering )
+		test_vs = np.array([ test_vs[i] for i in ordering ])
 	
 	def compute_error( gt, data ):
 		error = []
