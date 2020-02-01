@@ -8,11 +8,11 @@ OTHER_POSE_DIR="${ROOT_DIR}"/models/cylinder
 
 # INITIAL_GUESS_ARGS="--svd_threshold 1e-15 --transformation_threshold 1e-4 --version 0"
 INITIAL_GUESS_ARGS="--svd_threshold 1e-15 --transformation_percentile 50 --version 0"
-FLAT_INTERSECTION_ARGS="--forced-init True --energy biquadratic --W-projection normalize --strategy pinv+ssv:weighted --x-eps 0 --max-iter 10 --f-eps 0 -GT "${OTHER_POSE_DIR}" --error True --handles 4 --visualize True --visualize-port 9988 --fancy-init "${OUTPUT_DIR}"/local_subspace_recover.txt"
+FLAT_INTERSECTION_ARGS="--forced-init True --energy biquadratic --W-projection normalize --strategy pinv+ssv:weighted --x-eps 0 --max-iter 20 --f-eps 0 -GT "${OTHER_POSE_DIR}" --error True --handles 4 --visualize True --visualize-port 9988 --fancy-init "${OUTPUT_DIR}"/local_subspace_recover.txt"
 #FLAT_INTERSECTION_ARGS="--forced-init True --energy biquadratic --W-projection normalize --strategy pinv+ssv:weighted --x-eps 0 --max-iter 0 --f-eps 0 -GT "${OTHER_POSE_DIR}" --error True --handles 4 --visualize True --visualize-port 9988"
 # SIMPLEX_HULL_ARGS="-R 0.01"
-# SIMPLEX_HULL_ARGS="--method qp-major"
-SIMPLEX_HULL_ARGS="--method frank-wolfe"
+SIMPLEX_HULL_ARGS="--method qp-major"
+# SIMPLEX_HULL_ARGS="--method frank-wolfe"
 
 # Generate
 mkdir -p "${OUTPUT_DIR}"
