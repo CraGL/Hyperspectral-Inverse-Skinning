@@ -141,7 +141,6 @@ def divide_mesh_into_small_sets( mesh, Ts, MAX_DIMENSION = 5 ):
 # CMD-line tool for getting filenames. #
 ########################################
 if __name__ == '__main__':
-
 	'''
 	Uses ArgumentParser to parse the command line arguments.
 	Input:
@@ -150,7 +149,7 @@ if __name__ == '__main__':
 		Returns the arguments as a tuple in the following order:
 			(in_mesh, Ts, Tmat)
 	'''
-		
+	
 	parser = argparse.ArgumentParser(description = "From per-vertex transformations to per-bone transformations. ", usage="%(prog)s path/to/input_model_folder")
 	parser.add_argument("per_vertex_tranformation", type=str, help="Path to the folder containing input mesh files.")
 	parser.add_argument('--method', '-M', type=str, help='linear or quadratic solver: "lp" (default), "qp", "qp-major", "ipopt", "binary" or "scipy".')
