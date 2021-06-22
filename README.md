@@ -1,6 +1,6 @@
 # InverseSkinning
 
-This is the repository for the code used in the paper [*Hyperspectral Inverse Skinning* by Songrun Liu, Jianchao Tan, Zhigang Deng, Yotam Gingold in Computer Graphics Forum 2020](https://cragl.cs.gmu.edu/hyperskinning/).
+This is the repository for the code and data used in the paper [*Hyperspectral Inverse Skinning* by Songrun Liu, Jianchao Tan, Zhigang Deng, Yotam Gingold in Computer Graphics Forum 2020](https://cragl.cs.gmu.edu/hyperskinning/).
 
 To generate the weights and transformations used in the paper, run the scripts:
 
