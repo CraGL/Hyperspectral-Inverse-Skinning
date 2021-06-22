@@ -36,22 +36,10 @@ The following meshes were downloaded from
 The following meshes were downloaded from [Geometry Videos: A new representation for 3D animations [Briceño et al. 2003]](https://web.archive.org/web/20061119211335/http://www710.univ-lyon1.fr/~hbriceno/research/geometryvideos/):
 
 * `elasticCow` is from `cowheavy.tar.gz`
-* `pcow` is the same as `elasticCow` (oops)
+* `pcow` is the same as `elasticCow`
 * `pdance` is from `dance.tar.gz`
 
-
-`pjump`'s origin is lost.
-
----
-
-Unused?
-
-cheburashka-all
-cow-all
-cube-all
-cylinder-all
-wolf-all
-
+`pjump`'s origin is lost to us.
 
 ---
 
