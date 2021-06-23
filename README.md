@@ -6,7 +6,7 @@ To generate the weights and transformations used in the paper, run the scripts:
 
     results_songrun_final_run_sh/*/run.sh
 
-for Table 3:
+For Table 3:
 
 * `cat-poses`
 * `chickenCrossing`
@@ -21,11 +21,9 @@ for Table 3:
 * `pdance`
 * `pjump`
 
-Run the scripts:
+and compare to the data in `SSD_unconstrained`.
 
-    results_???/*/run.sh
-
-for Table 2:
+For Table 2:
 
 * `crane`
 * `elasticCow`
@@ -33,11 +31,9 @@ for Table 2:
 * `horse`
 * `samba`
 
-Run the scripts:
+and compare to existing output data (see below).
 
-    results_???/*/run.sh
-
-for Table 5:
+For Table 5:
 
 * `cylinder`
 * `cube`
@@ -47,6 +43,13 @@ for Table 5:
 
 Various comparison scripts can be found as `compare*.py`.
 Various other scripts can be found as `test*.sh`.
+Some examples can be found in `COMMANDS.md`.
+
+To compute error and obtain OBJs from the output text file format, use the script `recover_poses.py`. For example, to recover OBJs from the output of Le and Deng [2012] for the `cat-poses` example with 20 bones:
+
+    python3 recover_poses.py models/cat-poses.obj models/cat-poses/ SSD_unconstrained/cat-poses-20-unconstrained.txt --output 'recovered by SSD'/
+
+The error and running time for Le and Deng's [2012] output comes from Table 3 of their paper. All recovered OBJs for our method, and a subset of the computed OBJs for Le and Deng [2012] and Luo et al. [2019] can be directly downloaded from the [project page](https://cragl.cs.gmu.edu/hyperskinning/).
 
 ## Dependencies:
 
